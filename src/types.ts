@@ -95,7 +95,6 @@ export interface FeedSource {
   // Real progress while status === 'syncing' — see runFeedSourceSyncJob.
   syncProgress?: number;
   syncPhase?: string | null;
-  requiresReview?: boolean;
   isPaused?: boolean;
   color: string;
   removedToday?: number;

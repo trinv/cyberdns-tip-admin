@@ -54,7 +54,7 @@ export const AddEditDomainModal: React.FC<AddEditDomainModalProps> = ({
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden text-xs text-slate-700 dark:text-slate-300">
         <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/40">
           <h2 className="text-base font-bold text-slate-900 dark:text-white font-sans">
-            {isEditing ? `Sửa tên miền: ${domainToEdit.domain}` : 'Thêm tên miền chặn mới'}
+            {isEditing ? `Sửa tên miền: ${domainToEdit.domain}` : 'Đề xuất tên miền chặn mới'}
           </h2>
           <button
             onClick={onClose}
@@ -141,7 +141,7 @@ export const AddEditDomainModal: React.FC<AddEditDomainModalProps> = ({
               type="submit"
               className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl cursor-pointer shadow-xs active-press"
             >
-              {isEditing ? 'Lưu thay đổi' : 'Thêm vào danh sách'}
+              {isEditing ? 'Lưu thay đổi' : 'Gửi để duyệt'}
             </button>
           </div>
         </form>

@@ -182,12 +182,6 @@ export const feedSources = pgTable(
     // "Đang phân tích...", "Đang ghi vào PostgreSQL (3/12)..." — null when
     // not currently syncing.
     syncPhase: text('sync_phase'),
-    // When true, a sync does NOT auto-block newly-discovered domains — it
-    // routes them into review_queue for a SOC analyst to confirm first (see
-    // runFeedSourceSyncJob in queries.ts). Off by default so existing
-    // high-trust community blocklists keep today's auto-block behavior;
-    // this is meant for lower-confidence/experimental sources.
-    requiresReview: boolean('requires_review').default(false).notNull(),
     // When true: excluded from "Đồng bộ tất cả" / the sync button is
     // disabled, and every domain this source is currently linked to (via
     // domain_categories.feedSourceId) has been moved to 'unblocked' — see
@@ -298,12 +292,13 @@ export const reviewQueue = pgTable(
     threatScore: doublePrecision('threat_score').default(0.5).notNull(),
     queryCount24h: integer('query_count_24h').default(0).notNull(),
     reportedBy: text('reported_by').notNull(),
-    // Which feed run proposed this item, when known (requiresReview-gated
-    // sources — see runFeedSourceSyncJob) — nullable because manually
-    // reported items have none. Carried through to the resulting domain's
-    // domain_categories.feedSourceId on approval (see resolveReviewItem),
-    // so a domain approved from review is just as traceable to its source
-    // as one that was auto-blocked directly.
+    // Nullable — set only for items a feed sync proposed (a legacy path;
+    // feed syncs always auto-block directly now, see runFeedSourceSyncJob,
+    // so this stays null for every new item, which all come from manual
+    // add / batch import instead). Kept so already-approved domains from
+    // that path remain traceable via domain_categories.feedSourceId (see
+    // resolveReviewItem), and so old pending rows from before this change
+    // still carry their real provenance.
     feedSourceId: varchar('feed_source_id', { length: 100 }).references(() => feedSources.id, { onDelete: 'set null' }),
     status: varchar('status', { length: 50 }).default('pending').notNull(), // 'pending' | 'approved' | 'rejected'
     reason: text('reason').notNull(),

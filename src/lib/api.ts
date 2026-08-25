@@ -190,22 +190,6 @@ export async function fetchDomains(params: {
   return res.json();
 }
 
-export async function createDomainApi(data: {
-  domain: string;
-  categories: string[];
-  source?: string;
-  reason?: string;
-}): Promise<DomainItem> {
-  const res = await fetch(`${API_BASE}/domains`, {
-    method: 'POST',
-    headers: await authHeaders(),
-    body: JSON.stringify(data),
-  });
-  await checkResponse(res, 'Failed to create domain');
-  const result = await res.json();
-  return result.domain;
-}
-
 export async function updateDomainApi(
   id: number | string,
   patch: Partial<DomainItem>,
@@ -221,18 +205,34 @@ export async function updateDomainApi(
   return data.domain;
 }
 
-export async function bulkImportDomainsApi(data: {
-  domains: string[];
+// Manual single add — submits to review_queue instead of writing straight
+// to domains (see server.ts POST /api/domains/propose).
+export async function proposeDomainApi(data: {
+  domain: string;
   categories: string[];
-  source?: string;
   reason?: string;
-}): Promise<{ domains: DomainItem[]; insertedCount: number }> {
-  const res = await fetch(`${API_BASE}/domains/bulk-import`, {
+}): Promise<{ insertedCount: number; skippedCount: number }> {
+  const res = await fetch(`${API_BASE}/domains/propose`, {
     method: 'POST',
     headers: await authHeaders(),
     body: JSON.stringify(data),
   });
-  await checkResponse(res, 'Failed to bulk import domains');
+  await checkResponse(res, 'Failed to propose domain for review');
+  return res.json();
+}
+
+// Batch/paste import — same as proposeDomainApi, many domains at once.
+export async function proposeBulkDomainsApi(data: {
+  domains: string[];
+  categories: string[];
+  reason?: string;
+}): Promise<{ insertedCount: number; skippedCount: number }> {
+  const res = await fetch(`${API_BASE}/domains/bulk-propose`, {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify(data),
+  });
+  await checkResponse(res, 'Failed to propose domains for review');
   return res.json();
 }
 

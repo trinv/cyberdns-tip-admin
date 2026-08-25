@@ -31,7 +31,6 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
   const [newSourceUrl, setNewSourceUrl] = useState('');
   const [newSourceCategory, setNewSourceCategory] = useState('malware-phishing');
   const [newSourceInterval, setNewSourceInterval] = useState('4 giờ');
-  const [newSourceRequiresReview, setNewSourceRequiresReview] = useState(false);
 
   // Sync IS whatever `src.status === 'syncing'` says, straight from the
   // server (see App.tsx's polling effect) — no local "isSyncing" flag here.
@@ -55,7 +54,6 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
       url: newSourceUrl,
       category: newSourceCategory,
       syncInterval: newSourceInterval,
-      requiresReview: newSourceRequiresReview,
       color: '#10b981',
       isCustom: true,
     });
@@ -63,7 +61,6 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
     setIsAddModalOpen(false);
     setNewSourceName('');
     setNewSourceUrl('');
-    setNewSourceRequiresReview(false);
   };
 
   return (
@@ -112,14 +109,6 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
                     style={{ backgroundColor: src.color }}
                   ></span>
                   <h3 className="font-bold text-sm text-slate-900 dark:text-white font-sans">{src.name}</h3>
-                  {src.requiresReview && (
-                    <span
-                      title="Domain mới từ nguồn này vào Hàng đợi duyệt thay vì tự động chặn"
-                      className="px-1.5 py-0.5 rounded text-xs font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 flex-shrink-0"
-                    >
-                      Qua duyệt
-                    </span>
-                  )}
                 </div>
 
                 {src.isPaused ? (
@@ -327,20 +316,6 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
                   </select>
                 </div>
               </div>
-
-              <label className="flex items-start space-x-2.5 p-3 rounded-xl bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200/70 dark:border-amber-900 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={newSourceRequiresReview}
-                  onChange={(e) => setNewSourceRequiresReview(e.target.checked)}
-                  className="w-4 h-4 mt-0.5 rounded border-slate-300 dark:border-slate-600 text-amber-600 focus:ring-0 cursor-pointer accent-amber-600 flex-shrink-0"
-                />
-                <span className="text-slate-700 dark:text-slate-300">
-                  <span className="font-bold text-slate-800 dark:text-slate-200">Yêu cầu xác nhận thủ công trước khi chặn</span>
-                  <br />
-                  Domain mới phát hiện từ nguồn này sẽ vào <strong>Hàng đợi duyệt</strong> thay vì tự động chặn ngay — phù hợp cho nguồn chưa qua kiểm chứng lâu dài.
-                </span>
-              </label>
 
               <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100 dark:border-slate-800">
                 <button

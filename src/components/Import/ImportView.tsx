@@ -76,7 +76,7 @@ export const ImportView: React.FC<ImportViewProps> = ({ categories, onImportDoma
     setTimeout(() => {
       onImportDomains(parsed.uniqueValid, selectedCategory, reason);
       setIsParsing(false);
-      setSuccessMessage(`Đã gửi ${parsed.uniqueValid.length} domain để lưu vào nhóm ${selectedCategory}!`);
+      setSuccessMessage(`Đã gửi ${parsed.uniqueValid.length} domain vào Hàng đợi duyệt (nhóm ${selectedCategory}) — chờ xác nhận trước khi chặn.`);
       setTimeout(() => setSuccessMessage(null), 4000);
     }, 500);
   };
@@ -215,7 +215,7 @@ export const ImportView: React.FC<ImportViewProps> = ({ categories, onImportDoma
                   className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-500 dark:text-slate-400 font-semibold"
                   disabled
                 >
-                  <option>Đang chặn (Active block)</option>
+                  <option>Chờ duyệt (Hàng đợi duyệt)</option>
                 </select>
               </div>
             </div>

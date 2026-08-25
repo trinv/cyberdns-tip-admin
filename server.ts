@@ -17,10 +17,10 @@ import { ensureDomainCategoryTriggers } from './src/db/triggers.ts';
 import {
   getDashboardStats,
   getDomains,
-  createDomain,
   updateDomain,
-  bulkCreateDomains,
   bulkUpdateDomains,
+  proposeDomain,
+  proposeDomainsBulk,
   getCategories,
   createCategory,
   updateCategory,
@@ -268,27 +268,6 @@ async function startServer() {
     }
   });
 
-  app.post('/api/domains', requireAuth, async (req: AuthRequest, res) => {
-    try {
-      const { domain, categories, source, reason } = req.body;
-      if (!domain || !categories || !Array.isArray(categories)) {
-        return res.status(400).json({ error: 'domain and categories (array) are required.' });
-      }
-
-      const created = await createDomain({
-        domain,
-        categories,
-        source,
-        reason,
-        userEmail: req.user?.email || 'SecOps Analyst',
-      });
-      res.status(201).json({ success: true, domain: created });
-    } catch (error: any) {
-      console.error('API POST /api/domains error:', error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
   app.patch('/api/domains/:id', requireAuth, async (req: AuthRequest, res) => {
     try {
       const id = parseInt(req.params.id, 10);
@@ -307,22 +286,46 @@ async function startServer() {
     }
   });
 
-  app.post('/api/domains/bulk-import', requireAuth, async (req: AuthRequest, res) => {
+  // Manual single add — goes to review_queue, not straight to domains
+  // (see proposeDomain: an individual analyst's own, unverified judgment
+  // call, unlike a feed sync).
+  app.post('/api/domains/propose', requireAuth, async (req: AuthRequest, res) => {
     try {
-      const { domains: domainList, categories: cats, source, reason } = req.body;
-      if (!Array.isArray(domainList) || domainList.length === 0 || !Array.isArray(cats) || cats.length === 0) {
-        return res.status(400).json({ error: 'domains (array) and categories (array) are required.' });
+      const { domain, categories, reason } = req.body;
+      if (!domain || !categories || !Array.isArray(categories) || categories.length === 0) {
+        return res.status(400).json({ error: 'domain and categories (array) are required.' });
       }
-      const result = await bulkCreateDomains({
-        domains: domainList,
-        categories: cats,
-        source,
+      const result = await proposeDomain({
+        domain,
+        category: categories[0],
         reason,
         userEmail: req.user?.email,
       });
       res.status(201).json({ success: true, ...result });
     } catch (error: any) {
-      console.error('API POST /api/domains/bulk-import error:', error);
+      console.error('API POST /api/domains/propose error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Batch/paste import — same reasoning as /api/domains/propose, many
+  // domains at once (Import tab). Goes to review_queue, not straight to
+  // domains.
+  app.post('/api/domains/bulk-propose', requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { domains: domainList, categories: cats, reason } = req.body;
+      if (!Array.isArray(domainList) || domainList.length === 0 || !Array.isArray(cats) || cats.length === 0) {
+        return res.status(400).json({ error: 'domains (array) and categories (array) are required.' });
+      }
+      const result = await proposeDomainsBulk({
+        domains: domainList,
+        category: cats[0],
+        reason,
+        userEmail: req.user?.email,
+      });
+      res.status(201).json({ success: true, ...result });
+    } catch (error: any) {
+      console.error('API POST /api/domains/bulk-propose error:', error);
       res.status(500).json({ error: error.message });
     }
   });

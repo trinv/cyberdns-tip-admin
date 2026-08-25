@@ -8,9 +8,9 @@ import {
   fetchReleases,
   fetchAuditLogs,
   fetchReviewQueue,
-  createDomainApi,
+  proposeDomainApi,
+  proposeBulkDomainsApi,
   updateDomainApi,
-  bulkImportDomainsApi,
   bulkActionDomainsApi,
   createCategoryApi,
   updateCategoryApi,
@@ -463,10 +463,10 @@ export default function App() {
           await Promise.all([
             fetchCategories().then(setCategories).catch(() => {}),
             fetchDashboardStats().then(setDashboardStats).catch(() => {}),
-            // A requiresReview-gated source's sync writes to review_queue,
-            // not domains — without refetching this too, new items never
-            // show up in the Hàng đợi duyệt tab (or its Sidebar/Dashboard
-            // badge counts) until a full page reload.
+            // Feed syncs always write straight to domains now (see
+            // runFeedSourceSyncJob), never to review_queue — this refetch is
+            // just a harmless defensive no-op kept in case anything else
+            // changed review_queue counts while this sync was running.
             fetchReviewQueue().then(setReviewItems).catch(() => {}),
             refreshDomains(),
           ]);
@@ -623,18 +623,26 @@ export default function App() {
         showToast(`Không thể lưu thay đổi cho ${domainData.domain} — vui lòng thử lại.`, 'warning');
       }
     } else {
-      // Create new
+      // Create new — manual adds go to review_queue, not straight to
+      // domains (unlike a feed sync): this is one analyst's own,
+      // unverified judgment call, so a second reviewer confirms it first
+      // (see proposeDomain / resolveReviewItem in queries.ts).
       try {
-        const created = await createDomainApi({
-          domain: domainData.domain || '',
+        const domainValue = domainData.domain || '';
+        const result = await proposeDomainApi({
+          domain: domainValue,
           categories: domainData.categories || ['gambling'],
           reason: reason || 'Bổ sung IOC từ giao diện quản trị',
         });
-        showToast(`Đã lưu tên miền mới vào PostgreSQL: ${created.domain}`, 'success');
-        await Promise.all([refreshDomains(), fetchCategories().then(setCategories).catch(() => {})]);
+        if (result.insertedCount > 0) {
+          showToast(`Đã gửi ${domainValue} vào Hàng đợi duyệt — chờ xác nhận trước khi chặn`, 'success');
+        } else {
+          showToast(`${domainValue} đã tồn tại hoặc đang chờ duyệt`, 'info');
+        }
+        await fetchReviewQueue().then(setReviewItems).catch(() => {});
       } catch (err) {
-        console.warn('Backend create domain notice:', err);
-        showToast(`Không thể lưu tên miền mới — vui lòng thử lại.`, 'warning');
+        console.warn('Backend propose domain notice:', err);
+        showToast(`Không thể gửi tên miền mới vào Hàng đợi duyệt — vui lòng thử lại.`, 'warning');
       }
     }
     setIsAddDomainModalOpen(false);
@@ -736,23 +744,24 @@ export default function App() {
     showToast(`Đã xuất ${targetList.length} tên miền sang file CSV!`, 'success');
   };
 
-  // Import batch — persists the FULL list via one bulk-insert call
-  // (POST /api/domains/bulk-import), not just the first N items.
+  // Import batch — same reasoning as the manual single-add in
+  // handleSaveDomain: this is an analyst's own unverified batch, so it goes
+  // to review_queue (POST /api/domains/bulk-propose), not straight into
+  // domains, for the FULL list in one call, not just the first N items.
   const handleImportDomains = async (domainsToImport: string[], category: string, reason: string) => {
     try {
-      const result = await bulkImportDomainsApi({
+      const result = await proposeBulkDomainsApi({
         domains: domainsToImport,
         categories: [category],
-        source: 'Nhập hàng loạt (Batch Import)',
         reason,
       });
-      showToast(`Đã nhập và lưu thành công ${result.insertedCount} tên miền vào PostgreSQL!`, 'success');
-      await Promise.all([refreshDomains(), fetchCategories().then(setCategories).catch(() => {})]);
+      showToast(`Đã gửi ${result.insertedCount} tên miền vào Hàng đợi duyệt — chờ xác nhận trước khi chặn (${result.skippedCount} đã bỏ qua vì trùng/đang chờ duyệt)`, 'success');
+      await fetchReviewQueue().then(setReviewItems).catch(() => {});
     } catch (err) {
-      console.warn('Backend bulk import notice:', err);
-      showToast(`Nhập thất bại — chưa có tên miền nào được lưu. Vui lòng thử lại.`, 'warning');
+      console.warn('Backend bulk propose notice:', err);
+      showToast(`Nhập thất bại — chưa có tên miền nào được gửi duyệt. Vui lòng thử lại.`, 'warning');
     }
-    setCurrentTab('domain');
+    setCurrentTab('review');
   };
 
   // Review Queue actions — approving creates a real domain server-side (see

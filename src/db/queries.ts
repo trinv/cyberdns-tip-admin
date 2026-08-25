@@ -924,7 +924,6 @@ export async function createFeedSource(data: {
   syncInterval?: string;
   color?: string;
   isCustom?: boolean;
-  requiresReview?: boolean;
 }) {
   try {
     const slug = data.name
@@ -950,7 +949,6 @@ export async function createFeedSource(data: {
         syncInterval: data.syncInterval || '4 giờ',
         status: 'idle',
         syncProgress: 0,
-        requiresReview: data.requiresReview ?? false,
         color: data.color || '#10B981',
         isCustom: data.isCustom ?? true,
       })
@@ -1118,50 +1116,12 @@ async function runFeedSourceSyncJob(id: string) {
 
     await setSyncProgress(id, 58, `Đã phân tích ${parsedDomains.length.toLocaleString('vi-VN')} domain — đang kiểm tra trùng lặp và ghi vào PostgreSQL...`);
 
-    // --- Phase 3: write to PostgreSQL (58-100%) ---
-    if (source.requiresReview) {
-      // Lower-confidence source: newly-discovered domains are NOT
-      // auto-blocked — they're queued in review_queue for a SOC analyst to
-      // confirm first (see resolveReviewItem). Domains this feed reports
-      // that are already tracked elsewhere are left untouched rather than
-      // being sent back through review again.
-      const CHECK_CHUNK = 10_000;
-      const existingSet = new Set<string>();
-      for (let i = 0; i < parsedDomains.length; i += CHECK_CHUNK) {
-        const chunk = parsedDomains.slice(i, i + CHECK_CHUNK);
-        const rows = await db.select({ domain: domains.domain }).from(domains).where(inArray(domains.domain, chunk));
-        for (const r of rows) existingSet.add(r.domain);
-      }
-      const newDomains = parsedDomains.filter((d) => !existingSet.has(d));
-
-      const reviewResult = await bulkCreateReviewItems({
-        domains: newDomains,
-        proposedCategory: source.category,
-        reportedBy: `Feed: ${source.name}`,
-        feedSourceId: id,
-        reason: `Phát hiện qua đồng bộ nguồn feed "${source.name}" — nguồn này được cấu hình yêu cầu xác nhận thủ công trước khi chặn.`,
-        onChunkProgress: async (processed, total) => {
-          const percent = 58 + (processed / Math.max(total, 1)) * 42;
-          await setSyncProgress(id, percent, `Đang đưa vào Hàng đợi duyệt (${processed.toLocaleString('vi-VN')}/${total.toLocaleString('vi-VN')})...`);
-        },
-      });
-
-      await db
-        .update(feedSources)
-        .set({
-          lastSync: new Date(),
-          status: 'healthy',
-          errorMessage: null,
-          lastSyncMessage: `Đã phân tích ${parsedDomains.length.toLocaleString('vi-VN')} domain — ${reviewResult.insertedCount.toLocaleString('vi-VN')} domain mới đã đưa vào Hàng đợi duyệt, ${(existingSet.size + reviewResult.skippedCount).toLocaleString('vi-VN')} đã tồn tại hoặc đang chờ duyệt (bỏ qua).`,
-          domainCount: parsedDomains.length,
-          syncProgress: 100,
-          syncPhase: null,
-          updatedAt: new Date(),
-        })
-        .where(eq(feedSources.id, id));
-      return;
-    }
-
+    // --- Phase 3: write DIRECTLY to PostgreSQL/domains (58-100%) ---
+    // Feed-synced domains always go straight into the blocklist — a feed
+    // is an already-curated third-party source, unlike a manual add/batch
+    // import (see proposeDomain/proposeDomainsBulk), which goes through
+    // review_queue first since that's an individual analyst's own,
+    // unverified judgment call.
     const result = await bulkCreateDomains({
       domains: parsedDomains,
       categories: [source.category],
@@ -1357,12 +1317,12 @@ export async function deleteFeedSource(id: string, userEmail: string) {
   }
 }
 
-// Bulk-queues domains for manual review instead of auto-blocking them —
-// used by requiresReview-flagged feed sources (see runFeedSourceSyncJob).
-// Idempotent against domains already pending: re-syncing the same
-// lower-confidence feed before its previous batch has been reviewed does
-// not create duplicate pending rows.
-async function bulkCreateReviewItems(data: {
+// Bulk-queues domains for manual review instead of writing them straight to
+// domains — the shared primitive behind proposeDomain/proposeDomainsBulk
+// below. Idempotent against domains already pending: submitting the same
+// domain again before it's been reviewed does not create a duplicate
+// pending row.
+export async function bulkCreateReviewItems(data: {
   domains: string[];
   proposedCategory: string;
   reportedBy: string;
@@ -1411,6 +1371,84 @@ async function bulkCreateReviewItems(data: {
     await data.onChunkProgress?.(i + chunk.length, toInsert.length);
   }
   return { insertedCount: inserted, skippedCount: cleanDomains.length - toInsert.length };
+}
+
+// A single manually-added domain — submitted for review instead of written
+// straight to `domains`, unlike a feed sync (see runFeedSourceSyncJob):
+// this is one analyst's own, unverified judgment call, not an already-
+// curated third-party source, so a second reviewer confirms it first (see
+// resolveReviewItem, which is what actually creates the domain on approval).
+export async function proposeDomain(data: {
+  domain: string;
+  category: string;
+  reason?: string;
+  userEmail?: string;
+}) {
+  try {
+    const result = await bulkCreateReviewItems({
+      domains: [data.domain],
+      proposedCategory: data.category,
+      reportedBy: `Thủ công: ${data.userEmail || 'SOC Analyst'}`,
+      reason: data.reason || 'Đề xuất bổ sung IOC thủ công — chờ xác nhận trước khi chặn.',
+    });
+
+    await db.insert(auditLogs).values({
+      user: data.userEmail || 'Analyst (Manual)',
+      role: 'SecOps',
+      action: 'add',
+      targetCount: result.insertedCount,
+      summary:
+        result.insertedCount > 0
+          ? `Đề xuất tên miền vào Hàng đợi duyệt: ${data.domain}`
+          : `Tên miền ${data.domain} đã tồn tại hoặc đang chờ duyệt — không đề xuất lại`,
+      reason: data.reason || 'Đề xuất bổ sung IOC thủ công',
+      canRollback: false,
+      details: [`Tên miền: ${data.domain}`, `Nhóm đề xuất: ${data.category}`],
+    });
+
+    return result;
+  } catch (error) {
+    console.error('proposeDomain failed:', error);
+    throw new Error('Failed to propose domain for review', { cause: error });
+  }
+}
+
+// A batch/paste import — same reasoning as proposeDomain, just many domains
+// at once (Import tab). Goes to review_queue, not straight to domains.
+export async function proposeDomainsBulk(data: {
+  domains: string[];
+  category: string;
+  reason?: string;
+  userEmail?: string;
+}) {
+  try {
+    const result = await bulkCreateReviewItems({
+      domains: data.domains,
+      proposedCategory: data.category,
+      reportedBy: `Nhập hàng loạt: ${data.userEmail || 'SOC Analyst'}`,
+      reason: data.reason || 'Đề xuất nhập hàng loạt IOC — chờ xác nhận trước khi chặn.',
+    });
+
+    await db.insert(auditLogs).values({
+      user: data.userEmail || 'Analyst (Batch Import)',
+      role: 'SecOps',
+      action: 'add',
+      targetCount: result.insertedCount,
+      summary: `Đề xuất ${result.insertedCount.toLocaleString('vi-VN')} tên miền vào Hàng đợi duyệt (nhóm ${data.category})`,
+      reason: data.reason || 'Đề xuất nhập hàng loạt IOC',
+      canRollback: false,
+      details: [
+        `Số lượng đề xuất: ${result.insertedCount}`,
+        `Đã bỏ qua (trùng/đang chờ duyệt): ${result.skippedCount}`,
+        `Nhóm đề xuất: ${data.category}`,
+      ],
+    });
+
+    return result;
+  } catch (error) {
+    console.error('proposeDomainsBulk failed:', error);
+    throw new Error('Failed to propose domains for review', { cause: error });
+  }
 }
 
 // 6. Review Queue Queries & Mutations
