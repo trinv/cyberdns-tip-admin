@@ -45,7 +45,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, isDarkMode, toggl
         }} />
 
         <div className="relative">
-          <CyberDNSLogo size={40} showText textClassName="text-2xl" glow />
+          {/* variant="dark": this panel's background is ALWAYS the dark
+              slate/emerald gradient above, regardless of the app's actual
+              light/dark toggle (see the toggle button on the right side of
+              this page) — with the default "auto" variant, switching the
+              app to light mode would render "Cyber" in near-black text
+              sitting on this permanently-dark panel, unreadable. */}
+          <CyberDNSLogo size={40} showText textClassName="text-2xl" glow variant="dark" />
         </div>
 
         <div className="relative space-y-5 py-10 lg:py-0">
