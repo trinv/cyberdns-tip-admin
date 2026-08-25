@@ -34,13 +34,17 @@ export const CyberDNSLogo: React.FC<LogoProps> = ({
           className="w-full h-full"
         >
           <defs>
+            {/* Brand teal in light mode, white in dark mode — driven by the
+                same global `.dark` class on <html> that toggles every other
+                themed color in this app (see src/index.css), so the mark
+                switches automatically wherever this component is used. */}
             <style>{`.cyberdns-mark { fill: #128e6f; } .dark .cyberdns-mark { fill: #ffffff; }`}</style>
           </defs>
 
-          {/* 
-            Exact geometry from uploaded logo_2.png:
-            Emerald shield divided into 4 quadrants by a central vertical and horizontal slit,
-            with a 4-pointed diamond star carved out from the center negative space.
+          {/*
+            Geometry matches the reference logo image (shield split into 4
+            quadrants by a central vertical/horizontal slit, with a
+            4-pointed diamond/star negative-space cutout at the center).
           */}
 
           {/* 1. Top-Left Quadrant */}
@@ -72,8 +76,15 @@ export const CyberDNSLogo: React.FC<LogoProps> = ({
       {showText && (
         <div className="flex flex-col justify-center">
           <div className="flex items-center gap-1.5 leading-none">
+            {/* "Cyber" follows the theme like normal text (black in light
+                mode, white in dark — text-foreground already resolves to
+                that via --text-primary in src/index.css). "DNS" is pinned
+                to a fixed brand color instead of the theme-swapping
+                text-primary *utility* (a different, confusingly-named
+                thing — Tailwind's `--color-primary`, which itself changes
+                per theme) — it must read the same in both modes. */}
             <span className={`font-bold tracking-tight text-foreground transition-colors ${textClassName || 'text-lg'}`}>
-              Cyber<span className="text-primary">DNS</span>
+              Cyber<span style={{ color: '#128e6f' }}>DNS</span>
             </span>
             <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-[#0f8564] dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60 font-mono">
               TIP v4.0
