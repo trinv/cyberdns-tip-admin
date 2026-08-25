@@ -1,0 +1,7 @@
+# Force LF line endings for anything that runs as a shell script on Linux —
+# authored on Windows, but these get executed on an Ubuntu VPS/inside Linux
+# containers, where a CRLF shebang line ("#!/bin/sh\r") fails outright.
+*.sh text eol=lf
+docker-entrypoint.sh text eol=lf
+Dockerfile text eol=lf
+docker-compose.yml text eol=lf

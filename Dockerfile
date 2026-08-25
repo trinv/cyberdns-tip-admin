@@ -17,9 +17,12 @@ RUN npm run build
 # "docker compose up" install.
 FROM node:20-alpine AS runtime
 WORKDIR /app
-ENV NODE_ENV=production
 COPY package.json package-lock.json ./
+# NODE_ENV is set AFTER `npm ci`, not before: npm treats NODE_ENV=production
+# as an implicit --omit=dev, which would silently skip drizzle-kit (a
+# devDependency docker-entrypoint.sh needs at runtime).
 RUN npm ci
+ENV NODE_ENV=production
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/tsconfig.json ./tsconfig.json

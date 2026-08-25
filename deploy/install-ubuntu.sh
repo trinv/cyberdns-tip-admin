@@ -37,9 +37,18 @@ else
 fi
 
 # ---- 3. Database + app role (idempotent) ----
+# On a re-run, an existing .env already fixes the real DB password — reuse
+# it instead of generating a new one, otherwise this ALTER ROLEs the DB user
+# to a fresh random password while leaving .env (never overwritten, see step
+# 4) pointing at the old one, silently breaking the app's DB connection.
+if [ -z "${DB_APP_PASSWORD:-}" ] && [ -f "$REPO_DIR/.env" ]; then
+  DB_APP_PASSWORD="$(grep -m1 '^DATABASE_URL=' "$REPO_DIR/.env" | sed -E 's#^DATABASE_URL=postgres://[^:]+:([^@]+)@.*#\1#')"
+fi
 if [ -z "${DB_APP_PASSWORD:-}" ]; then
   DB_APP_PASSWORD="$(openssl rand -base64 24 | tr -dc 'A-Za-z0-9' | head -c 24)"
   echo "==> Generated PostgreSQL app password (save this — also written to .env): $DB_APP_PASSWORD"
+else
+  echo "==> Reusing existing PostgreSQL app password from .env"
 fi
 
 sudo -u postgres psql -v ON_ERROR_STOP=1 <<SQL
