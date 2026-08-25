@@ -1,0 +1,41 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cyberdns_app
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env first — see .env.example}
+      POSTGRES_DB: cyberdns_tip
+    volumes:
+      - cyberdns_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cyberdns_app -d cyberdns_tip"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    # Not published to the host by default — the app container reaches it
+    # over the internal Compose network only. Uncomment during development
+    # if you want to inspect the database with a local psql/GUI client:
+    # ports:
+    #   - "5432:5432"
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      # Overrides whatever DATABASE_URL/DB_SSL is in .env — the app always
+      # reaches Postgres through the internal Compose network at the `db`
+      # hostname, over plain TCP (no TLS between containers on the same
+      # Docker network).
+      DATABASE_URL: postgres://cyberdns_app:${POSTGRES_PASSWORD}@db:5432/cyberdns_tip
+      DB_SSL: "false"
+    ports:
+      - "${PORT:-3000}:3000"
+
+volumes:
+  cyberdns_pgdata:

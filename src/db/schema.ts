@@ -1,0 +1,307 @@
+import { relations, sql } from 'drizzle-orm';
+import {
+  pgTable,
+  serial,
+  text,
+  timestamp,
+  integer,
+  doublePrecision,
+  boolean,
+  jsonb,
+  varchar,
+  index,
+  uniqueIndex,
+} from 'drizzle-orm/pg-core';
+
+// 1. Users Table — self-hosted email/password accounts (no external IdP).
+// email is the login identifier; passwordHash is `scrypt salt:hash` (see
+// src/lib/password.ts). isActive is the revoke switch: a deactivated
+// account's existing sessions are rejected on their very next request (see
+// getSessionUser in queries.ts) without needing to hunt down every token.
+export const users = pgTable(
+  'users',
+  {
+    id: serial('id').primaryKey(),
+    email: text('email').notNull().unique(),
+    passwordHash: text('password_hash').notNull(),
+    displayName: text('display_name'),
+    avatarUrl: text('avatar_url'),
+    // Least-privilege default: a brand-new account must be promoted to Admin
+    // explicitly by an existing Admin — it must never be granted implicitly.
+    role: varchar('role', { length: 50 }).default('Analyst').notNull(),
+    isActive: boolean('is_active').default(true).notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  }
+);
+
+// 1b. Sessions — opaque bearer tokens issued on login. Deleting a row (logout)
+// or flipping users.isActive to false (revoke) invalidates access immediately;
+// no JWT-style stateless-token complexity (blocklists, short expiries) needed.
+export const sessions = pgTable(
+  'sessions',
+  {
+    token: varchar('token', { length: 64 }).primaryKey(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    expiresAt: timestamp('expires_at').notNull(),
+  },
+  (table) => [index('sessions_user_id_idx').on(table.userId)]
+);
+
+// 2. Categories Table
+export const categories = pgTable(
+  'categories',
+  {
+    id: varchar('id', { length: 100 }).primaryKey(),
+    name: text('name').notNull(),
+    description: text('description'),
+    count: integer('count').default(0).notNull(),
+    color: varchar('color', { length: 20 }).default('#10B981').notNull(),
+    borderColor: varchar('border_color', { length: 50 }).default('border-emerald-500/30').notNull(),
+    badgeBg: varchar('badge_bg', { length: 50 }).default('bg-emerald-500/10').notNull(),
+    badgeText: varchar('badge_text', { length: 50 }).default('text-emerald-500').notNull(),
+    deltaThreshold: integer('delta_threshold').default(3).notNull(), // Max allowed deletion delta %
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  }
+);
+
+// 3. Domains Table (Core Threat Intel Inventory)
+export const domains = pgTable(
+  'domains',
+  {
+    id: serial('id').primaryKey(),
+    domain: text('domain').notNull().unique(),
+    etld1: text('etld1').notNull(),
+    tld: varchar('tld', { length: 50 }).notNull(),
+    // `categories` and `primaryCategory` below are a DENORMALIZED CACHE, not
+    // the source of truth — they exist so existing read queries (jsonb
+    // containment filters, list views) don't need a JOIN. The authoritative
+    // data lives in `domainCategories`; a Postgres trigger (see
+    // src/db/triggers.ts) keeps these two columns in sync automatically on
+    // every insert/delete against domainCategories. Never write to these two
+    // columns directly from application code — write to domainCategories
+    // instead and let the trigger derive them.
+    categories: jsonb('categories').$type<string[]>().default([]).notNull(),
+    primaryCategory: varchar('primary_category', { length: 100 }),
+    source: text('source').notNull(),
+    sourceDetail: text('source_detail'),
+    status: varchar('status', { length: 50 }).default('active').notNull(), // 'active' | 'grace_period' | 'unblocked' | 'allowlist' | 'protected'
+    graceDaysLeft: integer('grace_days_left').default(0),
+    firstSeen: timestamp('first_seen').defaultNow().notNull(),
+    lastSeen: timestamp('last_seen').defaultNow().notNull(),
+    asn: text('asn').default('Unknown ASN'),
+    domainAge: text('domain_age').default('Unknown'),
+    threatScore: doublePrecision('threat_score').default(0.0),
+    isProtected: boolean('is_protected').default(false).notNull(),
+    timeline: jsonb('timeline').$type<Array<{
+      time: string;
+      description: string;
+      source: string;
+      type: 'crawler' | 'feed' | 'manual' | 'system';
+    }>>().default([]).notNull(),
+    dnsRecords: jsonb('dns_records').$type<{
+      a?: string[];
+      aaaa?: string[];
+      cname?: string | string[];
+      mx?: string[];
+      ns?: string[];
+    }>().default({}).notNull(),
+    evidenceUrl: text('evidence_url'),
+    tags: jsonb('tags').$type<string[]>().default([]).notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (table) => [
+    index('domains_domain_idx').on(table.domain),
+    index('domains_status_idx').on(table.status),
+    index('domains_primary_category_idx').on(table.primaryCategory),
+    index('domains_tld_idx').on(table.tld),
+  ]
+);
+
+// 4. Feed Sources Table
+export const feedSources = pgTable(
+  'feed_sources',
+  {
+    id: varchar('id', { length: 100 }).primaryKey(),
+    name: text('name').notNull(),
+    url: text('url').notNull(),
+    category: varchar('category', { length: 100 }).notNull(),
+    domainCount: integer('domain_count').default(0).notNull(),
+    // Null until the source has actually been synced once — defaulting this
+    // to "now" at creation time (the old behavior) falsely implied a source
+    // had already fetched data the moment it was added.
+    lastSync: timestamp('last_sync'),
+    syncInterval: varchar('sync_interval', { length: 50 }).default('1 giờ').notNull(),
+    // 'idle' (never synced) | 'syncing' | 'healthy' | 'warning' | 'error'
+    status: varchar('status', { length: 50 }).default('idle').notNull(),
+    // Real progress while status = 'syncing', updated incrementally by the
+    // background sync job (see runFeedSourceSyncJob in queries.ts) — 0-100.
+    syncProgress: integer('sync_progress').default(0).notNull(),
+    // Human-readable current step, e.g. "Đang tải dữ liệu (42%)...",
+    // "Đang phân tích...", "Đang ghi vào PostgreSQL (3/12)..." — null when
+    // not currently syncing.
+    syncPhase: text('sync_phase'),
+    // When true, a sync does NOT auto-block newly-discovered domains — it
+    // routes them into review_queue for a SOC analyst to confirm first (see
+    // runFeedSourceSyncJob in queries.ts). Off by default so existing
+    // high-trust community blocklists keep today's auto-block behavior;
+    // this is meant for lower-confidence/experimental sources.
+    requiresReview: boolean('requires_review').default(false).notNull(),
+    color: varchar('color', { length: 20 }).default('#10B981').notNull(),
+    removedToday: integer('removed_today').default(0).notNull(),
+    errorMessage: text('error_message'),
+    // Neutral (non-error) human-readable outcome of the most recent
+    // successful sync, e.g. "Đã nạp 41.485 domain — 12.300 mới, 29.185 đã
+    // tồn tại" — kept separate from errorMessage so the UI doesn't render a
+    // successful sync's summary inside a red error box.
+    lastSyncMessage: text('last_sync_message'),
+    isCustom: boolean('is_custom').default(false).notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  }
+);
+
+// 4b. Domain ↔ Category Membership (the authoritative relation)
+//
+// A domain belongs to EXACTLY ONE category at a time: the UNIQUE index on
+// domainId alone below enforces that at the database level — atomically,
+// even under concurrent feed syncs — by making a second membership row for
+// the same domain impossible; re-adding a domain under a different category
+// therefore has to be an UPDATE (a move), not an INSERT (see
+// addDomainCategoryMemberships' onConflictDoUpdate in queries.ts). This is
+// what guarantees "1 tên miền chỉ tồn tại duy nhất trong 1 danh mục".
+//
+// `isPrimary` is always true for the (at most one) row a domain has — kept
+// as a column rather than removed so the existing sync trigger's promotion
+// logic (src/db/triggers.ts) and domains.primaryCategory derivation don't
+// need special-casing for "no primary yet" during the brief window between
+// insert and the trigger's promote step.
+export const domainCategories = pgTable(
+  'domain_categories',
+  {
+    id: serial('id').primaryKey(),
+    domainId: integer('domain_id')
+      .notNull()
+      .unique()
+      .references(() => domains.id, { onDelete: 'cascade' }),
+    categoryId: varchar('category_id', { length: 100 })
+      .notNull()
+      // RESTRICT (not cascade): deleting a category that still has domains
+      // in it must fail loudly (see deleteCategory in queries.ts) instead of
+      // silently orphaning those domains from all categorization.
+      .references(() => categories.id, { onDelete: 'restrict' }),
+    // Which feed run added this specific membership, when known — nullable
+    // because manual entries and legacy/unattributed data have none.
+    feedSourceId: varchar('feed_source_id', { length: 100 }).references(() => feedSources.id, {
+      onDelete: 'set null',
+    }),
+    // Human-readable provenance for this one membership (e.g. 'hagezi/gambling'
+    // or 'Thủ công (SOC Analyst)') — distinct from feedSourceId because not
+    // every source is a tracked feed row.
+    sourceLabel: text('source_label'),
+    isPrimary: boolean('is_primary').default(false).notNull(),
+    addedAt: timestamp('added_at').defaultNow().notNull(),
+  },
+  (table) => [
+    index('domain_categories_category_idx').on(table.categoryId),
+    index('domain_categories_feed_source_idx').on(table.feedSourceId),
+  ]
+);
+
+// 5. Release Pipeline Table
+export const releases = pgTable(
+  'releases',
+  {
+    id: serial('id').primaryKey(),
+    version: varchar('version', { length: 50 }).notNull().unique(),
+    status: varchar('status', { length: 50 }).default('ready').notNull(), // 'running' | 'staged' | 'blocked' | 'rolled_back' | 'ready'
+    categories: jsonb('categories').$type<Array<{
+      category: string;
+      current: number;
+      added: number;
+      removed: number;
+      deltaPercent: number;
+      safetyGate: 'passed' | 'warning' | 'failed' | 'unchanged';
+    }>>().default([]).notNull(),
+    diffSummary: jsonb('diff_summary').$type<{
+      added: string[];
+      removed: string[];
+      totalAdded: number;
+      totalRemoved: number;
+    }>().default({ added: [], removed: [], totalAdded: 0, totalRemoved: 0 }).notNull(),
+    blockedReason: text('blocked_reason'),
+    canaryNodes: jsonb('canary_nodes').$type<Array<{
+      nodeId: string;
+      status: 'healthy' | 'deploying' | 'error';
+      traffic: string;
+      blockRatio: string;
+    }>>().default([]).notNull(),
+    releasedBy: text('released_by'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  }
+);
+
+// 6. Review Queue Table (Pending CTI Analyst Verification)
+export const reviewQueue = pgTable(
+  'review_queue',
+  {
+    id: serial('id').primaryKey(),
+    domain: text('domain').notNull(),
+    proposedCategory: varchar('proposed_category', { length: 100 }).notNull(),
+    threatScore: doublePrecision('threat_score').default(0.5).notNull(),
+    queryCount24h: integer('query_count_24h').default(0).notNull(),
+    reportedBy: text('reported_by').notNull(),
+    status: varchar('status', { length: 50 }).default('pending').notNull(), // 'pending' | 'approved' | 'rejected'
+    reason: text('reason').notNull(),
+    screenshotUrl: text('screenshot_url'),
+    evidenceNotes: text('evidence_notes').default('').notNull(),
+    reviewedBy: text('reviewed_by'),
+    reviewedAt: timestamp('reviewed_at'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => [
+    index('review_status_idx').on(table.status),
+  ]
+);
+
+// 7. Audit Logs Table (Full SOC Governance & Rollback capability)
+export const auditLogs = pgTable(
+  'audit_logs',
+  {
+    id: serial('id').primaryKey(),
+    user: text('user').notNull(),
+    role: varchar('role', { length: 50 }).default('Admin').notNull(),
+    action: varchar('action', { length: 50 }).notNull(), // 'add' | 'edit_group' | 'remove' | 'allowlist' | 'bulk_action' | 'release' | 'rollback'
+    targetCount: integer('target_count').default(1).notNull(),
+    summary: text('summary').notNull(),
+    reason: text('reason').notNull(),
+    canRollback: boolean('can_rollback').default(false).notNull(),
+    rollbackExpiresAt: timestamp('rollback_expires_at'),
+    details: jsonb('details').$type<string[]>().default([]).notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => [
+    index('audit_logs_created_at_idx').on(table.createdAt),
+    index('audit_logs_action_idx').on(table.action),
+  ]
+);
+
+// 8. Saved Filters Table
+export const savedFilters = pgTable(
+  'saved_filters',
+  {
+    id: varchar('id', { length: 100 }).primaryKey(),
+    name: text('name').notNull(),
+    query: text('query').default('').notNull(),
+    category: varchar('category', { length: 100 }),
+    status: varchar('status', { length: 50 }),
+    count: integer('count').default(0).notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  }
+);

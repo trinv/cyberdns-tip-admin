@@ -1,0 +1,166 @@
+@import "tailwindcss";
+@custom-variant dark (&:is(.dark, .dark *));
+
+@theme inline {
+  --font-sans: "Arial", "Inter", "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", "SFMono-Regular", monospace;
+  --color-background: var(--bg-main);
+  --color-foreground: var(--text-primary);
+  --color-card: var(--bg-card);
+  --color-card-foreground: var(--text-primary);
+  --color-muted: var(--bg-surface);
+  --color-muted-foreground: var(--text-secondary);
+  --color-border: var(--border-subtle);
+  --color-primary: var(--primary-emerald);
+  --color-primary-foreground: #ffffff;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.875rem;
+}
+
+@layer base {
+  :root {
+    --bg-main: #f6f8fb;
+    --bg-card: #ffffff;
+    --bg-card-hover: #f8fafc;
+    --bg-surface: #eef2f6;
+    --border-subtle: #dfe5ec;
+    --border-highlight: #c5d0dc;
+    --text-primary: #14202b;
+    --text-secondary: #526273;
+    --text-muted: #8795a5;
+    --primary-emerald: #087f68;
+    --primary-blue: #2f6fed;
+  }
+
+  .dark {
+    --bg-main: #0b121a;
+    --bg-card: #111c26;
+    --bg-card-hover: #172632;
+    --bg-surface: #16232e;
+    --border-subtle: #263847;
+    --border-highlight: #3a5162;
+    --text-primary: #edf4f7;
+    --text-secondary: #9cafbb;
+    --text-muted: #6f8491;
+    --primary-emerald: #21b58f;
+    --primary-blue: #5d91f5;
+  }
+
+  * {
+    font-family: "Inter", "Arial", "Segoe UI", sans-serif;
+    letter-spacing: normal;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    background-color: var(--bg-main);
+    color: var(--text-primary);
+    font-family: "Inter", "Arial", "Segoe UI", sans-serif;
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+
+  button, input, textarea, select {
+    font: inherit;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--primary-emerald);
+    outline-offset: 2px;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+  }
+  .dark ::-webkit-scrollbar-thumb {
+    background: #334155;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: #475569;
+  }
+}
+
+.font-mono-code {
+  font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+}
+
+/* Readable console scale: promote tiny utility text without changing
+   the visual hierarchy of headings, metrics, or technical code. */
+.text-xs {
+  font-size: 0.8125rem;
+  line-height: 1.35rem;
+}
+.text-sm {
+  font-size: 0.9375rem;
+  line-height: 1.45rem;
+}
+.text-base {
+  font-size: 1rem;
+  line-height: 1.55rem;
+}
+
+.card-shadow {
+  box-shadow: 0 1px 2px rgba(20, 35, 50, 0.04), 0 8px 24px rgba(20, 35, 50, 0.035);
+}
+.dark .card-shadow {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25), 0 12px 28px rgba(0, 0, 0, 0.22);
+}
+
+/* Shared enterprise console surfaces */
+.bg-white, .bg-slate-50, .bg-slate-100\/90 {
+  background-color: var(--bg-card);
+}
+.border-slate-200, .border-slate-200\/80, .border-slate-200\/60 {
+  border-color: var(--border-subtle);
+}
+.text-slate-900, .text-slate-800 {
+  color: var(--text-primary);
+}
+.text-slate-600, .text-slate-500 {
+  color: var(--text-secondary);
+}
+.text-slate-400, .text-slate-300 {
+  color: var(--text-muted);
+}
+
+.card-hover-shadow {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.card-hover-shadow:hover {
+  box-shadow: 0 8px 24px 0 rgba(20, 30, 50, 0.08);
+  transform: translateY(-1px);
+}
+.dark .card-hover-shadow:hover {
+  box-shadow: 0 8px 28px 0 rgba(0, 0, 0, 0.5);
+  transform: translateY(-1px);
+}
+
+/* Mobile safe area support */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 16px);
+}
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 16px);
+}
+
+/* Native-like active button feedback */
+.active-press:active {
+  transform: scale(0.97);
+}
+
