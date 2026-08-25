@@ -10,11 +10,20 @@ import {
 import { CyberDNSLogo } from './CyberDNSLogo';
 import { AppUser } from '../types';
 
+export interface HeaderNotification {
+  id: string;
+  title: string;
+  description: string;
+  tab: string;
+  timestamp?: string;
+}
+
 interface HeaderProps {
   currentTab: string;
   setCurrentTab: (tab: string) => void;
   onOpenSearch: () => void;
   reviewCount: number;
+  notifications: HeaderNotification[];
   currentUser: AppUser | null;
   userRole: 'Analyst' | 'Admin' | 'Reviewer';
   isAuthLoading: boolean;
@@ -31,6 +40,7 @@ export const Header: React.FC<HeaderProps> = ({
   setCurrentTab,
   onOpenSearch,
   reviewCount,
+  notifications,
   currentUser,
   userRole,
   isAuthLoading,
@@ -149,44 +159,38 @@ export const Header: React.FC<HeaderProps> = ({
               title="Thông báo"
             >
               <Bell className="w-4 h-4" />
-              <span className="absolute top-0 right-0 w-3.5 h-3.5 rounded-full bg-rose-500 text-white text-xs font-bold flex items-center justify-center border-2 border-white dark:border-slate-900">
-                {reviewCount > 0 ? reviewCount : 4}
-              </span>
+              {notifications.length > 0 && (
+                <span className="absolute top-0 right-0 w-3.5 h-3.5 rounded-full bg-rose-500 text-white text-xs font-bold flex items-center justify-center border-2 border-white dark:border-slate-900">
+                  {notifications.length}
+                </span>
+              )}
             </button>
 
             {notificationsOpen && (
               <div className="absolute right-0 mt-3 w-80 bg-white dark:bg-slate-900 text-slate-800 dark:text-white rounded-2xl shadow-2xl border border-slate-200/80 dark:border-slate-800 py-3 z-50 animate-in fade-in zoom-in-95 duration-100">
                 <div className="px-4 pb-2.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                   <span className="font-bold text-xs text-slate-800 dark:text-white font-sans">Thông báo SOC</span>
-                  <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200/60 dark:border-emerald-800/60">
-                    4 Mới
-                  </span>
+                  {notifications.length > 0 && (
+                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200/60 dark:border-emerald-800/60">
+                      {notifications.length} Mới
+                    </span>
+                  )}
                 </div>
                 <div className="py-2 divide-y divide-slate-100 dark:divide-slate-800 text-xs max-h-72 overflow-y-auto">
-                  <div 
-                    onClick={() => { setCurrentTab('review'); setNotificationsOpen(false); }}
-                    className="px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer transition-colors"
-                  >
-                    <div className="font-semibold text-slate-800 dark:text-slate-200 font-sans">14 tên miền chờ duyệt khẩn</div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Phát hiện từ crawler VNCERT và Báo cáo cộng đồng</div>
-                    <div className="text-xs text-slate-400 dark:text-slate-500 mt-1 font-mono">10 phút trước</div>
-                  </div>
-                  <div 
-                    onClick={() => { setCurrentTab('release'); setNotificationsOpen(false); }}
-                    className="px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer transition-colors"
-                  >
-                    <div className="font-semibold text-slate-800 dark:text-slate-200 font-sans">Bản phát hành v2026.0822 sẵn sàng</div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Bao gồm 83 domain cờ bạc và lừa đảo mới</div>
-                    <div className="text-xs text-slate-400 dark:text-slate-500 mt-1 font-mono">1 giờ trước</div>
-                  </div>
-                  <div 
-                    onClick={() => { setCurrentTab('sources'); setNotificationsOpen(false); }}
-                    className="px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer transition-colors"
-                  >
-                    <div className="font-semibold text-slate-800 dark:text-slate-200 font-sans">Nguồn PhishTank hoàn tất quét</div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">+4.210 domain mới được phân loại tự động</div>
-                    <div className="text-xs text-slate-400 dark:text-slate-500 mt-1 font-mono">2 giờ trước</div>
-                  </div>
+                  {notifications.length === 0 ? (
+                    <div className="px-4 py-6 text-center text-slate-400 dark:text-slate-500">Không có thông báo mới.</div>
+                  ) : (
+                    notifications.map((n) => (
+                      <div
+                        key={n.id}
+                        onClick={() => { setCurrentTab(n.tab); setNotificationsOpen(false); }}
+                        className="px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer transition-colors"
+                      >
+                        <div className="font-semibold text-slate-800 dark:text-slate-200 font-sans">{n.title}</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{n.description}</div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             )}

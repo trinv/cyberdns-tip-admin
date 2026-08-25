@@ -31,7 +31,7 @@ import {
   updateUserApi,
   setUnauthorizedHandler,
 } from './lib/api';
-import { Header } from './components/Header';
+import { Header, HeaderNotification } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { SidebarFilters } from './components/DomainExplorer/SidebarFilters';
 import { DomainTable } from './components/DomainExplorer/DomainTable';
@@ -242,6 +242,51 @@ export default function App() {
     for (const s of dashboardStats.statusBreakdown) map[s.status as DomainStatus] = s.count;
     return map;
   }, [dashboardStats]);
+
+  // Header notification bell — real current-state summaries derived from
+  // actual data (pending reviews, feed sources that errored/warned/are
+  // mid-sync), not the hardcoded fake alert list ("crawler VNCERT",
+  // "PhishTank", a fabricated release version) this used to show regardless
+  // of real state.
+  const headerNotifications = useMemo((): HeaderNotification[] => {
+    const items: HeaderNotification[] = [];
+    if (reviewItems.length > 0) {
+      items.push({
+        id: 'review-pending',
+        title: `${reviewItems.length} tên miền đang chờ duyệt`,
+        description: 'Cần xác nhận phân loại trước khi được chặn hoặc từ chối.',
+        tab: 'review',
+      });
+    }
+    const erroredSources = sources.filter((s) => s.status === 'error');
+    if (erroredSources.length > 0) {
+      items.push({
+        id: 'sources-error',
+        title: `${erroredSources.length} nguồn feed gặp lỗi đồng bộ`,
+        description: erroredSources.map((s) => s.name).join(', '),
+        tab: 'sources',
+      });
+    }
+    const warningSources = sources.filter((s) => s.status === 'warning');
+    if (warningSources.length > 0) {
+      items.push({
+        id: 'sources-warning',
+        title: `${warningSources.length} nguồn feed có cảnh báo`,
+        description: warningSources.map((s) => s.name).join(', '),
+        tab: 'sources',
+      });
+    }
+    const syncingSources = sources.filter((s) => s.status === 'syncing');
+    if (syncingSources.length > 0) {
+      items.push({
+        id: 'sources-syncing',
+        title: `${syncingSources.length} nguồn đang đồng bộ`,
+        description: syncingSources.map((s) => `${s.name} (${s.syncProgress ?? 0}%)`).join(', '),
+        tab: 'sources',
+      });
+    }
+    return items;
+  }, [reviewItems, sources]);
 
   // Filter States
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -895,6 +940,7 @@ export default function App() {
             setTimeout(() => document.getElementById('input-domain-search')?.focus(), 50);
           }}
           reviewCount={reviewItems.length}
+          notifications={headerNotifications}
           currentUser={currentUser}
           userRole={userRole}
           isAuthLoading={isAuthLoading}
