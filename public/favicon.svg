@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <rect width="200" height="200" fill="#128e6f"/>
+  <!-- Same shield geometry as src/components/CyberDNSLogo.tsx, scaled down
+       and centered to match the padding of the reference app-icon image
+       (the mark fills roughly half the canvas, not nearly all of it). -->
+  <g transform="translate(28,28) scale(0.72)" fill="#ffffff">
+    <path d="M 97 12 C 72 18 42 25 24 28 L 24 97 L 38 97 C 68 97 97 68 97 12 Z"/>
+    <path d="M 103 12 C 128 18 158 25 176 28 L 176 97 L 162 97 C 132 97 103 68 103 12 Z"/>
+    <path d="M 24 103 L 38 103 C 68 103 97 132 97 188 C 76 182 24 148 24 103 Z"/>
+    <path d="M 176 103 L 162 103 C 132 103 103 132 103 188 C 124 182 176 148 176 103 Z"/>
+  </g>
+</svg>

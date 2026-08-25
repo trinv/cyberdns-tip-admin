@@ -45,31 +45,40 @@ export const CyberDNSLogo: React.FC<LogoProps> = ({
             Geometry matches the reference logo image (shield split into 4
             quadrants by a central vertical/horizontal slit, with a
             4-pointed diamond/star negative-space cutout at the center).
+
+            The reference app-icon image shows the mark filling roughly
+            half the canvas, with generous padding around it — the paths
+            below (unchanged) were originally sized to nearly fill the
+            whole 200x200 viewBox instead, so the rendered logo looked
+            noticeably larger/more cropped than the reference. Scaled down
+            and re-centered via this <g> instead of hand-editing every
+            curve's coordinates, which would risk distorting the shape.
           */}
+          <g transform="translate(28,28) scale(0.72)">
+            {/* 1. Top-Left Quadrant */}
+            <path
+              d="M 97 12 C 72 18 42 25 24 28 L 24 97 L 38 97 C 68 97 97 68 97 12 Z"
+              className="cyberdns-mark transition-colors duration-200"
+            />
 
-          {/* 1. Top-Left Quadrant */}
-          <path
-            d="M 97 12 C 72 18 42 25 24 28 L 24 97 L 38 97 C 68 97 97 68 97 12 Z"
-            className="cyberdns-mark transition-colors duration-200"
-          />
+            {/* 2. Top-Right Quadrant */}
+            <path
+              d="M 103 12 C 128 18 158 25 176 28 L 176 97 L 162 97 C 132 97 103 68 103 12 Z"
+              className="cyberdns-mark transition-colors duration-200"
+            />
 
-          {/* 2. Top-Right Quadrant */}
-          <path
-            d="M 103 12 C 128 18 158 25 176 28 L 176 97 L 162 97 C 132 97 103 68 103 12 Z"
-            className="cyberdns-mark transition-colors duration-200"
-          />
+            {/* 3. Bottom-Left Quadrant */}
+            <path
+              d="M 24 103 L 38 103 C 68 103 97 132 97 188 C 76 182 24 148 24 103 Z"
+              className="cyberdns-mark transition-colors duration-200"
+            />
 
-          {/* 3. Bottom-Left Quadrant */}
-          <path
-            d="M 24 103 L 38 103 C 68 103 97 132 97 188 C 76 182 24 148 24 103 Z"
-            className="cyberdns-mark transition-colors duration-200"
-          />
-
-          {/* 4. Bottom-Right Quadrant */}
-          <path
-            d="M 176 103 L 162 103 C 132 103 103 132 103 188 C 124 182 176 148 176 103 Z"
-            className="cyberdns-mark transition-colors duration-200"
-          />
+            {/* 4. Bottom-Right Quadrant */}
+            <path
+              d="M 176 103 L 162 103 C 132 103 103 132 103 188 C 124 182 176 148 176 103 Z"
+              className="cyberdns-mark transition-colors duration-200"
+            />
+          </g>
         </svg>
       </div>
 
