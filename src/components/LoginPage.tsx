@@ -97,9 +97,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, isDarkMode, toggl
         </button>
 
         <div className="w-full max-w-sm space-y-7">
-          <div className="space-y-1.5">
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white font-sans tracking-tight">Đăng nhập</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">Truy cập CyberDNS Threat Intelligence Platform</p>
+          {/* Matches every other page's header pattern (see e.g.
+              SourcesView/AuditLogsView/ReviewQueueView's <h1>) — this used
+              to be text-xl/text-sm, one step larger than the rest of the
+              app uses for a page title + subtitle. */}
+          <div className="space-y-1">
+            <h2 className="text-lg font-bold font-sans text-slate-900 dark:text-white">Đăng nhập</h2>
+            <p className="text-slate-500 dark:text-slate-400 text-xs">Truy cập CyberDNS Threat Intelligence Platform</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -119,7 +123,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, isDarkMode, toggl
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@cyberdns.vn"
-                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-100 dark:focus:ring-emerald-950/60 transition-all"
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-100 dark:focus:ring-emerald-950/60 transition-all"
               />
             </div>
 
@@ -132,7 +136,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, isDarkMode, toggl
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-800 rounded-xl px-3.5 py-2.5 pr-10 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-100 dark:focus:ring-emerald-950/60 transition-all"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-800 rounded-xl px-3.5 py-2 pr-10 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-100 dark:focus:ring-emerald-950/60 transition-all"
                 />
                 <button
                   type="button"
@@ -148,7 +152,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, isDarkMode, toggl
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all flex items-center justify-center space-x-2 cursor-pointer shadow-sm shadow-emerald-600/20 active-press disabled:opacity-60"
+              className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center space-x-2 cursor-pointer shadow-sm shadow-emerald-600/20 active-press disabled:opacity-60"
             >
               <LogIn className="w-4 h-4" />
               <span>{isSubmitting ? 'Đang đăng nhập...' : 'Đăng nhập'}</span>

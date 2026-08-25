@@ -82,9 +82,11 @@ export const CyberDNSLogo: React.FC<LogoProps> = ({
                 to a fixed brand color instead of the theme-swapping
                 text-primary *utility* (a different, confusingly-named
                 thing — Tailwind's `--color-primary`, which itself changes
-                per theme) — it must read the same in both modes. */}
+                per theme) — it must read the same in both modes. Uses the
+                same emerald-600 as every primary button/action across the
+                app, not a separate one-off brand hex. */}
             <span className={`font-bold tracking-tight text-foreground transition-colors ${textClassName || 'text-lg'}`}>
-              Cyber<span style={{ color: '#128e6f' }}>DNS</span>
+              Cyber<span style={{ color: '#059669' }}>DNS</span>
             </span>
             <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-[#0f8564] dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60 font-mono">
               TIP v4.0

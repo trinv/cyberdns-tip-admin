@@ -299,30 +299,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
-        {/* Footer Area: Edge Status Card & Collapse Toggle */}
+        {/* Footer Area: Collapse Toggle
+            (there used to be a "DNS Edge Anycast / 16 PoPs" status card
+            here — this app doesn't operate any real edge DNS resolver
+            network, so that was purely decorative/fabricated infrastructure
+            copy and was removed rather than left implying a capability that
+            doesn't exist.) */}
         <div className="p-3 border-t border-slate-100 dark:border-slate-800/80 space-y-2">
-          {!isCollapsed && (
-            <div className="bg-gradient-to-br from-slate-900 to-slate-800 dark:from-slate-950 dark:to-slate-900 text-white rounded-2xl p-3.5 space-y-2 border border-slate-800 shadow-xs">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                  <div>
-                    <div className="font-bold text-xs">DNS Edge Anycast</div>
-                    <div className="text-xs text-slate-400">16 PoPs Quốc tế & VN</div>
-                  </div>
-                </div>
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-              </div>
-              <button 
-                onClick={() => handleNavClick('release')}
-                className="w-full py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center justify-center space-x-1 transition-colors shadow-xs cursor-pointer active-press"
-              >
-                <span>Cập nhật Edge RPZ</span>
-                <ArrowUpRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )}
-
           {/* Desktop sidebar collapse toggle */}
           <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-end'}`}>
             {/* Desktop Collapse Button */}
