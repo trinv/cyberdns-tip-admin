@@ -51,6 +51,8 @@ import { KeyboardShortcutsModal } from './components/Modals/KeyboardShortcutsMod
 import { ExportModal } from './components/Modals/ExportModal';
 import { LoginModal } from './components/Modals/LoginModal';
 import { UserManagementView } from './components/Users/UserManagementView';
+import { WelcomeGate } from './components/WelcomeGate';
+import { CyberDNSLogo } from './components/CyberDNSLogo';
 import { CheckCircle2, AlertTriangle, Info, X } from 'lucide-react';
 
 export default function App() {
@@ -798,26 +800,58 @@ export default function App() {
     }
   };
 
+  // Shared between both the signed-out gate and the full app shell below,
+  // so the toast (e.g. a failed-login message) is visible either way
+  // without duplicating this markup.
+  const toastNode = toast && (
+    <div className="fixed top-14 right-6 z-50 animate-in fade-in slide-in-from-top-4 duration-200">
+      <div className={`px-4 py-3 rounded-2xl shadow-xl flex items-center space-x-3 text-xs font-bold border ${
+        toast.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-950/90 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200' :
+        toast.type === 'warning' ? 'bg-amber-50 dark:bg-amber-950/90 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200' :
+        'bg-blue-50 dark:bg-blue-950/90 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-200'
+      }`}>
+        {toast.type === 'success' && <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />}
+        {toast.type === 'warning' && <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />}
+        {toast.type === 'info' && <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />}
+        <span>{toast.message}</span>
+        <button onClick={() => setToast(null)} className="hover:text-slate-900 dark:hover:text-white ml-2 cursor-pointer">
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+
+  // Still resolving a stored session token (page load/refresh) — avoid a
+  // flash of the sign-in gate for someone who's actually already logged in.
+  if (isAuthLoading) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-[#f8fafc] dark:bg-[#0B1120]">
+        <CyberDNSLogo size={40} glow />
+      </div>
+    );
+  }
+
+  // No active session: show the landing/sign-in gate instead of the SOC
+  // dashboard — a visitor must authenticate before any real domain/threat
+  // data renders, not after.
+  if (!currentUser) {
+    return (
+      <>
+        <WelcomeGate onOpenLogin={() => setIsLoginModalOpen(true)} />
+        {toastNode}
+        <LoginModal
+          isOpen={isLoginModalOpen}
+          onClose={() => setIsLoginModalOpen(false)}
+          onLogin={handleLogin}
+        />
+      </>
+    );
+  }
+
   return (
     <div className="h-screen w-screen overflow-hidden bg-slate-100 dark:bg-[#0B1120] text-slate-800 dark:text-slate-100 flex flex-row font-sans selection:bg-emerald-500/20 selection:text-emerald-900 dark:selection:text-emerald-300">
       {/* Toast Notification */}
-      {toast && (
-        <div className="fixed top-14 right-6 z-50 animate-in fade-in slide-in-from-top-4 duration-200">
-          <div className={`px-4 py-3 rounded-2xl shadow-xl flex items-center space-x-3 text-xs font-bold border ${
-            toast.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-950/90 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200' :
-            toast.type === 'warning' ? 'bg-amber-50 dark:bg-amber-950/90 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200' :
-            'bg-blue-50 dark:bg-blue-950/90 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-200'
-          }`}>
-            {toast.type === 'success' && <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />}
-            {toast.type === 'warning' && <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />}
-            {toast.type === 'info' && <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />}
-            <span>{toast.message}</span>
-            <button onClick={() => setToast(null)} className="hover:text-slate-900 dark:hover:text-white ml-2 cursor-pointer">
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-      )}
+      {toastNode}
 
       {/* Global Sidebar (Left Navigation) */}
       <Sidebar
