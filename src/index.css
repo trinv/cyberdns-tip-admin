@@ -2,7 +2,14 @@
 @custom-variant dark (&:is(.dark, .dark *));
 
 @theme inline {
-  --font-sans: "Arial", "Inter", "Segoe UI", sans-serif;
+  /* Must list fonts in the SAME order as `*`/`body` below — this feeds
+     Tailwind's `font-sans` utility class, which is applied throughout
+     every page (every page header uses it: `font-bold font-sans`, etc.).
+     It previously listed Arial before Inter while `*`/`body` listed Inter
+     before Arial — on any system where both are actually installed,
+     `font-sans`-tagged text (headings) rendered in a visibly different
+     typeface than plain body text on the very same page. */
+  --font-sans: "Inter", "Arial", "Segoe UI", sans-serif;
   --font-mono: "IBM Plex Mono", "SFMono-Regular", monospace;
   --color-background: var(--bg-main);
   --color-foreground: var(--text-primary);
@@ -47,8 +54,13 @@
     --primary-blue: #5d91f5;
   }
 
+  /* `body` below is the ONLY place the concrete font stack is declared —
+     every element inherits it from there via plain CSS inheritance
+     (font-family is inherited by default), instead of every element
+     re-declaring the same stack itself. One source of truth: it can't
+     drift out of sync with itself the way --font-sans above once did. */
   * {
-    font-family: "Inter", "Arial", "Segoe UI", sans-serif;
+    font-family: inherit;
     letter-spacing: normal;
     -webkit-tap-highlight-color: transparent;
   }
