@@ -142,6 +142,18 @@ export interface AppUser {
   updatedAt?: string;
 }
 
+export interface LoginLog {
+  id: number;
+  userId: number | null;
+  email: string;
+  ipAddress: string;
+  userAgent: string | null;
+  success: boolean;
+  isNewIp: boolean;
+  failureReason: string | null;
+  createdAt: string;
+}
+
 export interface DashboardStats {
   totalActive: number;
   totalAll: number;

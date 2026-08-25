@@ -40,7 +40,14 @@ services:
       # still point at the right place.
       PORT: "3000"
     ports:
-      - "${PORT:-3000}:3000"
+      # Bound to 127.0.0.1 only — not reachable from outside this VPS at
+      # all, Docker-level, regardless of firewall rules. Put Nginx in front
+      # (see deploy/setup-domain-ssl.sh) and reach the app through it
+      # instead of this port directly. This also matters for login
+      # logging/new-IP detection to be meaningful: server.ts trusts
+      # X-Forwarded-For from whoever connects to it, so if this port were
+      # reachable directly, anyone could spoof their client IP.
+      - "127.0.0.1:${PORT:-3000}:3000"
 
 volumes:
   cyberdns_pgdata:

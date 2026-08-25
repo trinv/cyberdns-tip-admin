@@ -3,6 +3,11 @@
 # put a real domain + free HTTPS (Let's Encrypt) in front of it instead of
 # exposing the raw app port.
 #
+# For tipadmin.cyberdns.vn specifically, prefer the automated script
+# instead of following this file by hand — it does everything below plus
+# firewall hardening: deploy/setup-domain-ssl.sh. Keep this file as a manual
+# reference, or for a different domain.
+#
 # Install:
 #   sudo cp deploy/nginx.conf.example /etc/nginx/sites-available/cyberdns-tip
 #   # edit server_name below to your real domain first

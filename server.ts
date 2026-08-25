@@ -41,6 +41,9 @@ import {
   listUsers,
   createUserAccount,
   updateUserAccount,
+  recordLoginAttempt,
+  findUserIdByEmail,
+  getLoginLogs,
 } from './src/db/queries.ts';
 import { requireAuth, requireRole, AuthRequest } from './src/middleware/auth.ts';
 
@@ -82,6 +85,16 @@ async function startServer() {
   // the browser's @vite/client would never be able to reach it.
   const httpServer = http.createServer(app);
 
+  // Trust the reverse proxy (Nginx — see deploy/nginx.conf.example) for
+  // client IP resolution: req.ip then reflects the real visitor's address
+  // from X-Forwarded-For instead of always resolving to the proxy's own
+  // address. This is what makes login logging / new-IP detection meaningful.
+  // Safe ONLY because the app itself should never be reachable directly from
+  // the internet in production — see deploy/nginx.conf.example's firewall
+  // note (ufw should block direct access to PORT, leaving 80/443 as the only
+  // public entry points); otherwise anyone could spoof this header directly.
+  app.set('trust proxy', true);
+
   // Middleware
   app.use(express.json());
 
@@ -114,12 +127,37 @@ async function startServer() {
       if (!email || !password) {
         return res.status(400).json({ error: 'email và password là bắt buộc.' });
       }
+      const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
+      const userAgent = req.headers['user-agent'] || null;
+
       const user = await authenticateUser(email, password);
       if (!user) {
+        // Attribute the failed attempt to a real userId when the email
+        // matches an existing account (wrong password / revoked account),
+        // without changing what the response itself reveals — that stays a
+        // single generic message either way.
+        const maybeUserId = await findUserIdByEmail(email).catch(() => null);
+        await recordLoginAttempt({
+          userId: maybeUserId,
+          email,
+          ipAddress,
+          userAgent,
+          success: false,
+          failureReason: 'Sai email/mật khẩu hoặc tài khoản đã bị thu hồi',
+        });
         return res.status(401).json({ error: 'Email hoặc mật khẩu không đúng, hoặc tài khoản đã bị thu hồi.' });
       }
+
+      const { isNewIp } = await recordLoginAttempt({
+        userId: user.id,
+        email: user.email,
+        ipAddress,
+        userAgent,
+        success: true,
+      });
+
       const token = await createSession(user.id);
-      res.json({ success: true, token, user });
+      res.json({ success: true, token, user, isNewIp });
     } catch (error: any) {
       console.error('Error logging in:', error);
       res.status(500).json({ error: error.message || 'Internal server error' });
@@ -175,6 +213,19 @@ async function startServer() {
       res.json({ success: true, user: updated });
     } catch (error: any) {
       res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Login history (Admin-only) — every real login attempt, success and
+  // failure, with the real client IP/User-Agent (see recordLoginAttempt).
+  // ?userId=<id> scopes it to one account.
+  app.get('/api/login-logs', requireAuth, requireRole('Admin'), async (req, res) => {
+    try {
+      const userId = req.query.userId ? parseInt(req.query.userId as string, 10) : undefined;
+      const logs = await getLoginLogs({ userId: Number.isNaN(userId as number) ? undefined : userId });
+      res.json(logs);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 

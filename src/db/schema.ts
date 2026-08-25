@@ -51,6 +51,33 @@ export const sessions = pgTable(
   (table) => [index('sessions_user_id_idx').on(table.userId)]
 );
 
+// 1c. Login Logs — one row per real login attempt (success AND failure),
+// recording the real client IP/User-Agent. isNewIp is computed at insert
+// time (see recordLoginAttempt in queries.ts): true when this is the first
+// SUCCESSFUL login PostgreSQL has on record for this user from this exact
+// IP — the basis for the "unrecognized IP" warning shown right after such a
+// login (see resolveLoginAttempt's return value / POST /api/auth/login).
+export const loginLogs = pgTable(
+  'login_logs',
+  {
+    id: serial('id').primaryKey(),
+    // Nullable: a failed attempt against an email that doesn't exist has no
+    // real user row to reference, but is still worth logging as a signal.
+    userId: integer('user_id').references(() => users.id, { onDelete: 'cascade' }),
+    email: text('email').notNull(),
+    ipAddress: varchar('ip_address', { length: 64 }).notNull(),
+    userAgent: text('user_agent'),
+    success: boolean('success').notNull(),
+    isNewIp: boolean('is_new_ip').default(false).notNull(),
+    failureReason: text('failure_reason'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => [
+    index('login_logs_user_idx').on(table.userId),
+    index('login_logs_created_at_idx').on(table.createdAt),
+  ]
+);
+
 // 2. Categories Table
 export const categories = pgTable(
   'categories',

@@ -86,7 +86,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
         },
         { id: 'logs', label: 'Nhật ký Audit Logs', icon: History, badge: undefined, badgeColor: 'slate' },
         ...(userRole === 'Admin'
-          ? [{ id: 'users', label: 'Người dùng & Phân quyền', icon: Users, badge: undefined, badgeColor: 'slate' as const }]
+          ? [
+              { id: 'login-logs', label: 'Nhật ký đăng nhập', icon: ShieldCheck, badge: undefined, badgeColor: 'slate' as const },
+              { id: 'users', label: 'Người dùng & Phân quyền', icon: Users, badge: undefined, badgeColor: 'slate' as const },
+            ]
           : []),
       ]
     }

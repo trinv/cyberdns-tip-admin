@@ -51,7 +51,8 @@ import { KeyboardShortcutsModal } from './components/Modals/KeyboardShortcutsMod
 import { ExportModal } from './components/Modals/ExportModal';
 import { LoginModal } from './components/Modals/LoginModal';
 import { UserManagementView } from './components/Users/UserManagementView';
-import { WelcomeGate } from './components/WelcomeGate';
+import { LoginHistoryView } from './components/LoginHistory/LoginHistoryView';
+import { LoginPage } from './components/LoginPage';
 import { CyberDNSLogo } from './components/CyberDNSLogo';
 import { CheckCircle2, AlertTriangle, Info, X } from 'lucide-react';
 
@@ -75,11 +76,20 @@ export default function App() {
   const unreleasedCount = 0;
 
   const handleLogin = async (email: string, password: string) => {
-    const { token, user } = await loginApi(email, password); // lets the modal show the real error on failure
+    const { token, user, isNewIp } = await loginApi(email, password); // lets the caller show the real error on failure
     setStoredToken(token);
     setCurrentUser(user);
     setIsLoginModalOpen(false);
     showToast(`Đăng nhập thành công — xin chào ${user.displayName || user.email}!`, 'success');
+    // Real signal from the server (see recordLoginAttempt in queries.ts) —
+    // this is the first successful login on record for this account from
+    // this IP address. Surfaced as a distinct, longer-lived warning right
+    // after the success toast rather than silently logged only server-side.
+    if (isNewIp) {
+      setTimeout(() => {
+        showToast('⚠️ Đăng nhập từ một địa chỉ IP mới chưa từng dùng trước đây. Nếu không phải bạn, hãy đổi mật khẩu ngay trong phần Người dùng & Phân quyền.', 'warning');
+      }, 600);
+    }
   };
 
   const handleLogout = async () => {
@@ -837,13 +847,8 @@ export default function App() {
   if (!currentUser) {
     return (
       <>
-        <WelcomeGate onOpenLogin={() => setIsLoginModalOpen(true)} />
+        <LoginPage onLogin={handleLogin} isDarkMode={isDarkMode} toggleTheme={toggleTheme} />
         {toastNode}
-        <LoginModal
-          isOpen={isLoginModalOpen}
-          onClose={() => setIsLoginModalOpen(false)}
-          onLogin={handleLogin}
-        />
       </>
     );
   }
@@ -1125,7 +1130,18 @@ export default function App() {
             />
           )}
 
-          {/* TAB 8: NGƯỜI DÙNG (User Management — Admin only) */}
+          {/* TAB 8: NHẬT KÝ ĐĂNG NHẬP (Login History — Admin only) */}
+          {currentTab === 'login-logs' && (
+            userRole === 'Admin' ? (
+              <LoginHistoryView />
+            ) : (
+              <div className="flex-1 flex items-center justify-center text-sm text-slate-500 dark:text-slate-400">
+                Chỉ tài khoản Admin mới có quyền truy cập nhật ký đăng nhập.
+              </div>
+            )
+          )}
+
+          {/* TAB 9: NGƯỜI DÙNG (User Management — Admin only) */}
           {currentTab === 'users' && (
             userRole === 'Admin' ? (
               <UserManagementView

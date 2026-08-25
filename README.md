@@ -8,7 +8,8 @@ Threat Intelligence & Domain Blocklist management platform — sync domain block
 - **Tùy chọn "yêu cầu xác nhận thủ công"** cho từng nguồn feed: domain mới phát hiện có thể vào Hàng đợi duyệt (Review Queue) thay vì tự động chặn ngay.
 - **Mỗi tên miền chỉ thuộc đúng 1 danh mục** — thực thi ở tầng database (unique constraint + trigger), không thể trùng lặp phân loại.
 - **Domain Explorer**: lọc/sắp xếp/phân trang phía server, xuất toàn bộ danh mục (không giới hạn theo trang) ra .txt/.csv/.hosts/.rpz/AdBlock/dnsmasq.
-- **Quản lý người dùng & phân quyền** tự host (email/mật khẩu, không phụ thuộc Google/Firebase), tài khoản Super Admin tự tạo khi khởi động lần đầu nếu chưa có Admin nào.
+- **Quản lý người dùng & phân quyền** tự host (email/mật khẩu, không phụ thuộc Google/Firebase), tài khoản Super Admin tự tạo khi khởi động lần đầu nếu chưa có Admin nào. Toàn bộ ứng dụng yêu cầu đăng nhập — chưa xác thực chỉ thấy trang đăng nhập, không vào thẳng được Dashboard.
+- **Nhật ký đăng nhập & cảnh báo IP mới**: mọi lượt đăng nhập (thành công lẫn thất bại) đều ghi lại IP thật + trình duyệt (qua Nginx `X-Forwarded-For`); đăng nhập từ IP chưa từng dùng sẽ hiện cảnh báo ngay trong ứng dụng, và Admin xem được toàn bộ lịch sử ở mục "Nhật ký đăng nhập".
 - Dashboard, Audit Logs, Bulk actions — toàn bộ số liệu lấy trực tiếp từ PostgreSQL, không có dữ liệu giả lập.
 
 ## Yêu cầu
@@ -66,7 +67,17 @@ sudo journalctl -u cyberdns-tip -f
 
 ## Đưa ra domain thật / HTTPS
 
-Cả hai cách cài đặt trên đều chạy app ở cổng `3000` trên chính VPS. Để gắn domain thật + HTTPS miễn phí, dùng Nginx làm reverse proxy — xem `deploy/nginx.conf.example`.
+Cả hai cách cài đặt trên đều chạy app ở cổng `3000`, chỉ lắng nghe trên `127.0.0.1` (không lộ ra ngoài Internet trực tiếp — xem chú thích trong `docker-compose.yml`). Để gắn domain thật (`tipadmin.cyberdns.vn`) + HTTPS miễn phí (Let's Encrypt) + tường lửa, chạy 1 lệnh:
+
+```bash
+# DNS: trỏ A record của tipadmin.cyberdns.vn về đúng IP public của VPS trước
+chmod +x deploy/setup-domain-ssl.sh
+./deploy/setup-domain-ssl.sh tipadmin.cyberdns.vn
+```
+
+Script này cài Nginx + Certbot (nếu chưa có), tạo vhost reverse-proxy, mở `ufw` chỉ cho 22/80/443 (chặn truy cập trực tiếp vào cổng 3000 từ Internet — quan trọng để nhật ký đăng nhập ghi đúng IP thật, không bị giả mạo), và xin chứng chỉ SSL tự động gia hạn. Sau khi chạy xong, truy cập `https://tipadmin.cyberdns.vn`.
+
+Muốn tự cấu hình thủ công hoặc dùng domain khác, xem `deploy/nginx.conf.example`.
 
 ## Biến môi trường
 
@@ -87,7 +98,7 @@ Xem đầy đủ chú thích trong [`.env.example`](.env.example). Tóm tắt:
 - `src/db/queries.ts` — toàn bộ logic đọc/ghi database.
 - `src/db/triggers.ts` — trigger PostgreSQL (đồng bộ cache danh mục/domain, chạy theo lô ở cấp câu lệnh để xử lý tốt lượng lớn dữ liệu).
 - `src/components/` — giao diện React theo từng tab (Dashboard, Domain Explorer, Import, Review Queue, Releases, Sources, Audit Logs, User Management).
-- `deploy/` — script cài đặt & cấu hình tham khảo cho VPS Ubuntu.
+- `deploy/` — script cài đặt & cấu hình tham khảo cho VPS Ubuntu (`install-ubuntu.sh`, `setup-domain-ssl.sh`, `nginx.conf.example`, `cyberdns-tip.service.example`).
 
 ## Giới hạn đã biết (đang hoàn thiện)
 

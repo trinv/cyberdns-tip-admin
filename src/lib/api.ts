@@ -1,4 +1,4 @@
-import { DomainItem, CategoryInfo, FeedSource, ReleaseItem, AuditLog, ReviewDomainItem, DashboardStats, AppUser } from '../types';
+import { DomainItem, CategoryInfo, FeedSource, ReleaseItem, AuditLog, ReviewDomainItem, DashboardStats, AppUser, LoginLog } from '../types';
 
 export const API_BASE = '/api';
 
@@ -78,13 +78,22 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
   return res.json();
 }
 
-export async function loginApi(email: string, password: string): Promise<{ token: string; user: AppUser }> {
+export async function loginApi(email: string, password: string): Promise<{ token: string; user: AppUser; isNewIp?: boolean }> {
   const res = await fetch(`${API_BASE}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
   });
   await checkResponse(res, 'Đăng nhập thất bại');
+  return res.json();
+}
+
+// Admin-only login audit trail (see GET /api/login-logs). userId scopes it
+// to one account.
+export async function fetchLoginLogs(userId?: number): Promise<LoginLog[]> {
+  const query = userId ? `?userId=${userId}` : '';
+  const res = await fetch(`${API_BASE}/login-logs${query}`, { headers: await authHeaders() });
+  await checkResponse(res, 'Failed to fetch login logs');
   return res.json();
 }
 

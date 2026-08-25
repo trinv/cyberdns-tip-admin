@@ -2,6 +2,7 @@ import { db } from './index.ts';
 import {
   users,
   sessions,
+  loginLogs,
   categories,
   domains,
   domainCategories,
@@ -38,6 +39,16 @@ export async function authenticateUser(email: string, password: string) {
   }
 }
 
+// Looks up a user's id by email regardless of password/active status — used
+// ONLY by the login route to attach a real userId to a FAILED login-log
+// entry (e.g. "right email, wrong password") without changing what
+// authenticateUser() reveals to the actual login response (which must stay
+// a generic "email or password incorrect" either way).
+export async function findUserIdByEmail(email: string): Promise<number | null> {
+  const rows = await db.select({ id: users.id }).from(users).where(eq(users.email, email.toLowerCase().trim())).limit(1);
+  return rows[0]?.id ?? null;
+}
+
 export async function createSession(userId: number): Promise<string> {
   const token = generateSessionToken();
   await db.insert(sessions).values({ token, userId, expiresAt: new Date(Date.now() + SESSION_TTL_MS) });
@@ -46,6 +57,74 @@ export async function createSession(userId: number): Promise<string> {
 
 export async function deleteSession(token: string) {
   await db.delete(sessions).where(eq(sessions.token, token));
+}
+
+// 1d. Login logging + new-IP detection. Records EVERY attempt (success and
+// failure) with the real client IP/User-Agent — see server.ts's `trust
+// proxy` setting, which is what makes req.ip reflect the real visitor
+// instead of the Nginx reverse proxy's own address.
+//
+// isNewIp is true when this is the first successful login PostgreSQL has on
+// record for this user from this exact IP. Never throws: a failure here
+// must not block a real login, so any error is logged and swallowed.
+export async function recordLoginAttempt(params: {
+  userId: number | null;
+  email: string;
+  ipAddress: string;
+  userAgent?: string | null;
+  success: boolean;
+  failureReason?: string | null;
+}): Promise<{ isNewIp: boolean }> {
+  try {
+    let isNewIp = false;
+    if (params.success && params.userId) {
+      const priorFromThisIp = await db
+        .select({ id: loginLogs.id })
+        .from(loginLogs)
+        .where(
+          and(
+            eq(loginLogs.userId, params.userId),
+            eq(loginLogs.ipAddress, params.ipAddress),
+            eq(loginLogs.success, true)
+          )
+        )
+        .limit(1);
+      isNewIp = priorFromThisIp.length === 0;
+    }
+
+    await db.insert(loginLogs).values({
+      userId: params.userId,
+      email: params.email.toLowerCase().trim(),
+      ipAddress: params.ipAddress,
+      userAgent: params.userAgent || null,
+      success: params.success,
+      isNewIp,
+      failureReason: params.failureReason || null,
+    });
+
+    return { isNewIp };
+  } catch (error) {
+    console.error('recordLoginAttempt failed:', error);
+    return { isNewIp: false };
+  }
+}
+
+// Login history — Admin-only (see requireRole('Admin') in server.ts).
+// Passing userId scopes it to one account (e.g. "show my own recent
+// logins"); omitted, it's every account's attempts, most recent first.
+export async function getLoginLogs(params: { userId?: number; limit?: number } = {}) {
+  try {
+    const whereClause = params.userId ? eq(loginLogs.userId, params.userId) : undefined;
+    return await db
+      .select()
+      .from(loginLogs)
+      .where(whereClause)
+      .orderBy(desc(loginLogs.createdAt))
+      .limit(params.limit || 200);
+  } catch (error) {
+    console.error('getLoginLogs failed:', error);
+    throw new Error('Failed to retrieve login logs', { cause: error });
+  }
 }
 
 // Resolves a bearer token to its (safe) user row, honoring both session
