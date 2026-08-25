@@ -28,6 +28,9 @@ import {
   getFeedSources,
   createFeedSource,
   startFeedSourceSync,
+  pauseFeedSource,
+  resumeFeedSource,
+  deleteFeedSource,
   getReviewQueue,
   resolveReviewItem,
   getAuditLogs,
@@ -420,6 +423,41 @@ async function startServer() {
       res.status(202).json({ success: true, source: started });
     } catch (error: any) {
       console.error('API POST /api/sources/:id/sync error:', error);
+      res.status(error.message?.includes('đang tạm dừng') ? 400 : 500).json({ error: error.message });
+    }
+  });
+
+  // Tạm dừng nguồn: loại khỏi "Đồng bộ tất cả", và mọi tên miền nguồn này
+  // đang quản lý (active/grace_period) chuyển sang 'unblocked' (xem
+  // pauseFeedSource trong queries.ts).
+  app.post('/api/sources/:id/pause', requireAuth, requireRole('Admin'), async (req: AuthRequest, res) => {
+    try {
+      const result = await pauseFeedSource(req.params.id, req.user?.email || 'Admin');
+      res.json({ success: true, ...result });
+    } catch (error: any) {
+      console.error('API POST /api/sources/:id/pause error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Tiếp tục nguồn đang tạm dừng: chuyển lại 'active' cho đúng những tên
+  // miền bị tạm dừng gây ra (xem resumeFeedSource trong queries.ts).
+  app.post('/api/sources/:id/resume', requireAuth, requireRole('Admin'), async (req: AuthRequest, res) => {
+    try {
+      const result = await resumeFeedSource(req.params.id, req.user?.email || 'Admin');
+      res.json({ success: true, ...result });
+    } catch (error: any) {
+      console.error('API POST /api/sources/:id/resume error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete('/api/sources/:id', requireAuth, requireRole('Admin'), async (req: AuthRequest, res) => {
+    try {
+      const result = await deleteFeedSource(req.params.id, req.user?.email || 'Admin');
+      res.json({ success: true, ...result });
+    } catch (error: any) {
+      console.error('API DELETE /api/sources/:id error:', error);
       res.status(500).json({ error: error.message });
     }
   });

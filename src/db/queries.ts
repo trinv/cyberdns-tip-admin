@@ -487,7 +487,10 @@ export async function updateDomain(
 ) {
   try {
     const setValues: Record<string, any> = { updatedAt: new Date() };
-    if (patch.status !== undefined) setValues.status = patch.status;
+    // Any explicit status change here is a human decision — clear the
+    // "auto-unblocked by a paused source" marker regardless of which status
+    // it's changing to, so a later resumeFeedSource never second-guesses it.
+    if (patch.status !== undefined) { setValues.status = patch.status; setValues.unblockedBySourcePause = false; }
     if (patch.asn !== undefined) setValues.asn = patch.asn;
     if (patch.domainAge !== undefined) setValues.domainAge = patch.domainAge;
     if (patch.sourceDetail !== undefined) setValues.sourceDetail = patch.sourceDetail;
@@ -549,6 +552,11 @@ export async function createDomain(data: {
   source?: string;
   reason?: string;
   userEmail?: string;
+  // Set when this call originates from a feed (directly, or via an
+  // approved review-queue item that was itself reported by a feed — see
+  // resolveReviewItem) so the resulting domain_categories row stays
+  // traceable to its source, same as a directly-auto-blocked domain.
+  feedSourceId?: string;
 }) {
   try {
     const cleanDomain = data.domain.toLowerCase().trim();
@@ -589,6 +597,9 @@ export async function createDomain(data: {
         target: domains.domain,
         set: {
           status: 'active',
+          // An explicit (re-)block always clears the "auto-unblocked by a
+          // paused source" marker, whatever it was before.
+          unblockedBySourcePause: false,
           updatedAt: new Date(),
         },
       })
@@ -599,7 +610,7 @@ export async function createDomain(data: {
     // Idempotent: re-adding a domain to a category it's already in is a
     // silent no-op (DB-enforced), never a duplicate membership row.
     await addDomainCategoryMemberships(
-      data.categories.map((categoryId) => ({ domainId, categoryId, sourceLabel }))
+      data.categories.map((categoryId) => ({ domainId, categoryId, sourceLabel, feedSourceId: data.feedSourceId }))
     );
 
     // Re-select so the caller gets the trigger-updated categories/primaryCategory.
@@ -762,6 +773,9 @@ export async function bulkUpdateDomains(params: {
         .update(domains)
         .set({
           status: 'allowlist',
+          // Explicit human action — no longer just a side-effect of a
+          // paused source, whatever it was before.
+          unblockedBySourcePause: false,
           updatedAt: new Date(),
         })
         .where(inArray(domains.id, domainIds));
@@ -770,6 +784,7 @@ export async function bulkUpdateDomains(params: {
         .update(domains)
         .set({
           status: 'unblocked',
+          unblockedBySourcePause: false,
           updatedAt: new Date(),
         })
         .where(inArray(domains.id, domainIds));
@@ -962,6 +977,9 @@ export async function startFeedSourceSync(id: string) {
   const existing = await db.select().from(feedSources).where(eq(feedSources.id, id)).limit(1);
   const source = existing[0];
   if (!source) throw new Error(`Feed source ${id} not found`);
+  if (source.isPaused) {
+    throw new Error(`Nguồn "${source.name}" đang tạm dừng — hãy bấm "Tiếp tục" trước khi đồng bộ lại.`);
+  }
   if (activeSyncs.has(id) || source.status === 'syncing') {
     // Already running — just return current state rather than starting a
     // second overlapping job against the same source.
@@ -1120,6 +1138,7 @@ async function runFeedSourceSyncJob(id: string) {
         domains: newDomains,
         proposedCategory: source.category,
         reportedBy: `Feed: ${source.name}`,
+        feedSourceId: id,
         reason: `Phát hiện qua đồng bộ nguồn feed "${source.name}" — nguồn này được cấu hình yêu cầu xác nhận thủ công trước khi chặn.`,
         onChunkProgress: async (processed, total) => {
           const percent = 58 + (processed / Math.max(total, 1)) * 42;
@@ -1174,6 +1193,170 @@ async function runFeedSourceSyncJob(id: string) {
   }
 }
 
+// Domains this source currently owns — via domain_categories.feedSourceId,
+// the authoritative provenance link (set by addDomainCategoryMemberships on
+// every insert/move, including ones that came through an approved review
+// item — see resolveReviewItem). Shared by pause/resume/delete below.
+async function getDomainIdsForFeedSource(feedSourceId: string): Promise<number[]> {
+  const rows = await db
+    .select({ domainId: domainCategories.domainId })
+    .from(domainCategories)
+    .where(eq(domainCategories.feedSourceId, feedSourceId));
+  return rows.map((r) => r.domainId);
+}
+
+// Pauses a feed source: excludes it from future syncs (see
+// startFeedSourceSync's isPaused guard and "Đồng bộ tất cả" in the
+// frontend, which should skip paused sources) AND moves every domain it
+// currently owns from active/grace_period to 'unblocked' — marked
+// unblockedBySourcePause so resumeFeedSource can undo exactly this, and
+// only this, later. Domains a human separately moved to allowlist/protected
+// are left untouched (those are deliberate overrides, not "just being
+// blocked because of this feed").
+export async function pauseFeedSource(id: string, userEmail: string) {
+  try {
+    const existing = await db.select().from(feedSources).where(eq(feedSources.id, id)).limit(1);
+    const source = existing[0];
+    if (!source) throw new Error(`Feed source ${id} not found`);
+    if (source.isPaused) return { source, affectedCount: 0 };
+
+    const domainIds = await getDomainIdsForFeedSource(id);
+    let affectedCount = 0;
+    if (domainIds.length > 0) {
+      const CHUNK = 5000;
+      for (let i = 0; i < domainIds.length; i += CHUNK) {
+        const chunk = domainIds.slice(i, i + CHUNK);
+        const updated = await db
+          .update(domains)
+          .set({ status: 'unblocked', unblockedBySourcePause: true, updatedAt: new Date() })
+          .where(and(inArray(domains.id, chunk), inArray(domains.status, ['active', 'grace_period'])))
+          .returning({ id: domains.id });
+        affectedCount += updated.length;
+      }
+    }
+
+    const updatedSource = await db
+      .update(feedSources)
+      .set({ isPaused: true, updatedAt: new Date() })
+      .where(eq(feedSources.id, id))
+      .returning();
+
+    await db.insert(auditLogs).values({
+      user: userEmail,
+      role: 'Admin',
+      action: 'bulk_action',
+      targetCount: affectedCount,
+      summary: `Tạm dừng nguồn feed "${source.name}" — ${affectedCount.toLocaleString('vi-VN')} tên miền chuyển sang Thôi chặn`,
+      reason: 'Tạm dừng đồng bộ nguồn feed',
+      canRollback: false,
+      details: [`Nguồn: ${source.name} (${id})`, `Số tên miền: ${affectedCount}`],
+    });
+
+    return { source: updatedSource[0], affectedCount };
+  } catch (error) {
+    console.error('pauseFeedSource failed:', error);
+    throw error instanceof Error ? error : new Error('Failed to pause feed source', { cause: error });
+  }
+}
+
+// Reverses exactly what pauseFeedSource did: re-activates every domain this
+// source owns that is STILL 'unblocked' with unblockedBySourcePause = true
+// (i.e. untouched by any human action since the pause — see updateDomain/
+// bulkUpdateDomains clearing that flag on any explicit status change).
+export async function resumeFeedSource(id: string, userEmail: string) {
+  try {
+    const existing = await db.select().from(feedSources).where(eq(feedSources.id, id)).limit(1);
+    const source = existing[0];
+    if (!source) throw new Error(`Feed source ${id} not found`);
+    if (!source.isPaused) return { source, affectedCount: 0 };
+
+    const domainIds = await getDomainIdsForFeedSource(id);
+    let affectedCount = 0;
+    if (domainIds.length > 0) {
+      const CHUNK = 5000;
+      for (let i = 0; i < domainIds.length; i += CHUNK) {
+        const chunk = domainIds.slice(i, i + CHUNK);
+        const updated = await db
+          .update(domains)
+          .set({ status: 'active', unblockedBySourcePause: false, updatedAt: new Date() })
+          .where(and(inArray(domains.id, chunk), eq(domains.status, 'unblocked'), eq(domains.unblockedBySourcePause, true)))
+          .returning({ id: domains.id });
+        affectedCount += updated.length;
+      }
+    }
+
+    const updatedSource = await db
+      .update(feedSources)
+      .set({ isPaused: false, updatedAt: new Date() })
+      .where(eq(feedSources.id, id))
+      .returning();
+
+    await db.insert(auditLogs).values({
+      user: userEmail,
+      role: 'Admin',
+      action: 'bulk_action',
+      targetCount: affectedCount,
+      summary: `Tiếp tục nguồn feed "${source.name}" — ${affectedCount.toLocaleString('vi-VN')} tên miền chuyển lại Đang chặn`,
+      reason: 'Tiếp tục đồng bộ nguồn feed',
+      canRollback: false,
+      details: [`Nguồn: ${source.name} (${id})`, `Số tên miền: ${affectedCount}`],
+    });
+
+    return { source: updatedSource[0], affectedCount };
+  } catch (error) {
+    console.error('resumeFeedSource failed:', error);
+    throw error instanceof Error ? error : new Error('Failed to resume feed source', { cause: error });
+  }
+}
+
+// Deletes a feed source permanently. Unlike a pause, there's no "resume"
+// coming back for these domains, so they're moved to 'unblocked' WITHOUT
+// the unblockedBySourcePause marker (nothing will ever auto-re-activate
+// them again — a human has to deliberately re-block if that's wanted).
+// domain_categories.feedSourceId/reviewQueue.feedSourceId both reference
+// this row ON DELETE SET NULL, so those rows survive with the link cleared
+// rather than being cascade-deleted.
+export async function deleteFeedSource(id: string, userEmail: string) {
+  try {
+    const existing = await db.select().from(feedSources).where(eq(feedSources.id, id)).limit(1);
+    const source = existing[0];
+    if (!source) throw new Error(`Feed source ${id} not found`);
+
+    const domainIds = await getDomainIdsForFeedSource(id);
+    let affectedCount = 0;
+    if (domainIds.length > 0) {
+      const CHUNK = 5000;
+      for (let i = 0; i < domainIds.length; i += CHUNK) {
+        const chunk = domainIds.slice(i, i + CHUNK);
+        const updated = await db
+          .update(domains)
+          .set({ status: 'unblocked', unblockedBySourcePause: false, updatedAt: new Date() })
+          .where(and(inArray(domains.id, chunk), inArray(domains.status, ['active', 'grace_period'])))
+          .returning({ id: domains.id });
+        affectedCount += updated.length;
+      }
+    }
+
+    await db.delete(feedSources).where(eq(feedSources.id, id));
+
+    await db.insert(auditLogs).values({
+      user: userEmail,
+      role: 'Admin',
+      action: 'remove',
+      targetCount: affectedCount,
+      summary: `Đã xoá nguồn feed "${source.name}" — ${affectedCount.toLocaleString('vi-VN')} tên miền chuyển sang Thôi chặn`,
+      reason: 'Xoá nguồn feed',
+      canRollback: false,
+      details: [`Nguồn: ${source.name} (${id})`, `Số tên miền: ${affectedCount}`],
+    });
+
+    return { affectedCount };
+  } catch (error) {
+    console.error('deleteFeedSource failed:', error);
+    throw error instanceof Error ? error : new Error('Failed to delete feed source', { cause: error });
+  }
+}
+
 // Bulk-queues domains for manual review instead of auto-blocking them —
 // used by requiresReview-flagged feed sources (see runFeedSourceSyncJob).
 // Idempotent against domains already pending: re-syncing the same
@@ -1184,6 +1367,7 @@ async function bulkCreateReviewItems(data: {
   proposedCategory: string;
   reportedBy: string;
   reason: string;
+  feedSourceId?: string;
   onChunkProgress?: (processed: number, total: number) => void | Promise<void>;
 }) {
   const cleanDomains = Array.from(new Set(data.domains.map((d) => d.toLowerCase().trim()).filter(Boolean)));
@@ -1213,6 +1397,7 @@ async function bulkCreateReviewItems(data: {
           domain,
           proposedCategory: data.proposedCategory,
           reportedBy: data.reportedBy,
+          feedSourceId: data.feedSourceId || null,
           reason: data.reason,
           // Honest "unconfirmed" defaults — no crawler/telemetry pipeline
           // exists to back a specific-looking threat score or query count.
@@ -1262,12 +1447,18 @@ export async function resolveReviewItem(
     if (decision === 'approved' && item[0]) {
       // Add directly to domains — respects the reviewer's category override
       // if they picked a different one than the AI/crawler's proposal.
+      // feedSourceId carries the original feed's provenance through to the
+      // resulting domain_categories row, when this item came from one (see
+      // bulkCreateReviewItems), so pause/delete on that source still finds
+      // this domain even though it went through review rather than being
+      // auto-blocked directly.
       await createDomain({
         domain: item[0].domain,
         categories: [categoryOverride || item[0].proposedCategory],
         source: `Báo cáo: ${item[0].reportedBy}`,
         reason: item[0].reason,
         userEmail: reviewerEmail,
+        feedSourceId: item[0].feedSourceId || undefined,
       });
     }
 

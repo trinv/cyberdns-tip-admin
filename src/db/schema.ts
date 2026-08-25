@@ -117,6 +117,15 @@ export const domains = pgTable(
     source: text('source').notNull(),
     sourceDetail: text('source_detail'),
     status: varchar('status', { length: 50 }).default('active').notNull(), // 'active' | 'grace_period' | 'unblocked' | 'allowlist' | 'protected'
+    // True only when the CURRENT 'unblocked' status was set automatically by
+    // pauseFeedSource/deleteFeedSource (queries.ts) reacting to its feed
+    // source being paused/deleted — never by a human explicitly choosing to
+    // unblock this domain. This is what lets resumeFeedSource re-activate
+    // exactly (and only) the domains its own pause affected, instead of also
+    // sweeping up domains someone deliberately unblocked for an unrelated
+    // reason. Any explicit status change (updateDomain / bulkUpdateDomains)
+    // clears it back to false.
+    unblockedBySourcePause: boolean('unblocked_by_source_pause').default(false).notNull(),
     graceDaysLeft: integer('grace_days_left').default(0),
     firstSeen: timestamp('first_seen').defaultNow().notNull(),
     lastSeen: timestamp('last_seen').defaultNow().notNull(),
@@ -179,6 +188,11 @@ export const feedSources = pgTable(
     // high-trust community blocklists keep today's auto-block behavior;
     // this is meant for lower-confidence/experimental sources.
     requiresReview: boolean('requires_review').default(false).notNull(),
+    // When true: excluded from "Đồng bộ tất cả" / the sync button is
+    // disabled, and every domain this source is currently linked to (via
+    // domain_categories.feedSourceId) has been moved to 'unblocked' — see
+    // pauseFeedSource/resumeFeedSource in queries.ts.
+    isPaused: boolean('is_paused').default(false).notNull(),
     color: varchar('color', { length: 20 }).default('#10B981').notNull(),
     removedToday: integer('removed_today').default(0).notNull(),
     errorMessage: text('error_message'),
@@ -284,6 +298,13 @@ export const reviewQueue = pgTable(
     threatScore: doublePrecision('threat_score').default(0.5).notNull(),
     queryCount24h: integer('query_count_24h').default(0).notNull(),
     reportedBy: text('reported_by').notNull(),
+    // Which feed run proposed this item, when known (requiresReview-gated
+    // sources — see runFeedSourceSyncJob) — nullable because manually
+    // reported items have none. Carried through to the resulting domain's
+    // domain_categories.feedSourceId on approval (see resolveReviewItem),
+    // so a domain approved from review is just as traceable to its source
+    // as one that was auto-blocked directly.
+    feedSourceId: varchar('feed_source_id', { length: 100 }).references(() => feedSources.id, { onDelete: 'set null' }),
     status: varchar('status', { length: 50 }).default('pending').notNull(), // 'pending' | 'approved' | 'rejected'
     reason: text('reason').notNull(),
     screenshotUrl: text('screenshot_url'),

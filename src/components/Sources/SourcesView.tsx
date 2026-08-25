@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { FeedSource, CategoryInfo } from '../../types';
 import {
   RefreshCw, Plus, Globe, CheckCircle2, AlertTriangle,
-  Trash2, Edit3, Clock, ArrowRight, ShieldCheck, Activity
+  Trash2, Edit3, Clock, ArrowRight, ShieldCheck, Activity, Pause, Play
 } from 'lucide-react';
 
 interface SourcesViewProps {
@@ -11,6 +11,9 @@ interface SourcesViewProps {
   onSyncAll: () => void;
   onSyncSingle: (id: string) => Promise<void> | void;
   onAddSource: (newSource: Partial<FeedSource>) => void;
+  onPauseSource: (id: string) => Promise<void> | void;
+  onResumeSource: (id: string) => Promise<void> | void;
+  onDeleteSource: (id: string) => Promise<void> | void;
 }
 
 export const SourcesView: React.FC<SourcesViewProps> = ({
@@ -19,6 +22,9 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
   onSyncAll,
   onSyncSingle,
   onAddSource,
+  onPauseSource,
+  onResumeSource,
+  onDeleteSource,
 }) => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newSourceName, setNewSourceName] = useState('');
@@ -116,21 +122,27 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
                   )}
                 </div>
 
-                <span
-                  className={`px-2.5 py-0.5 rounded-full text-xs font-mono uppercase font-bold ${
-                    src.status === 'healthy'
-                      ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
-                      : src.status === 'warning'
-                      ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
-                      : src.status === 'error'
-                      ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
-                      : src.status === 'syncing'
-                      ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
-                  }`}
-                >
-                  {src.status}
-                </span>
+                {src.isPaused ? (
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-mono uppercase font-bold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-300 dark:border-slate-600">
+                    paused
+                  </span>
+                ) : (
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-xs font-mono uppercase font-bold ${
+                      src.status === 'healthy'
+                        ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                        : src.status === 'warning'
+                        ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
+                        : src.status === 'error'
+                        ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
+                        : src.status === 'syncing'
+                        ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                    }`}
+                  >
+                    {src.status}
+                  </span>
+                )}
               </div>
 
               <div className="font-mono text-xs text-slate-500 dark:text-slate-400 truncate bg-slate-50 dark:bg-slate-800/60 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
@@ -190,20 +202,67 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
                   <span>{src.lastSyncMessage}</span>
                 </div>
               )}
+
+              {src.isPaused && (
+                <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 p-3 rounded-xl text-xs text-slate-600 dark:text-slate-300 leading-relaxed flex items-start space-x-1.5">
+                  <Pause className="w-4 h-4 text-slate-500 dark:text-slate-400 flex-shrink-0 mt-0.5" />
+                  <span>Đã tạm dừng — mọi tên miền của nguồn này đã chuyển sang "Thôi chặn". Bấm "Tiếp tục" để đồng bộ lại và tự động chặn lại đúng những tên miền đó.</span>
+                </div>
+              )}
             </div>
 
-            <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800">
+            <div className="flex flex-col gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
               <span className="text-slate-400 dark:text-slate-500 text-xs">
                 Lần đồng bộ: {src.lastSync ? src.lastSync : 'Chưa đồng bộ lần nào'}
               </span>
-              <button
-                onClick={() => handleSyncClick(src.id)}
-                disabled={src.status === 'syncing'}
-                className="px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs font-bold flex items-center space-x-1 transition-colors cursor-pointer active-press disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${src.status === 'syncing' ? 'animate-spin' : ''}`} />
-                <span>{src.status === 'syncing' ? `Đang nạp... ${src.syncProgress ?? 0}%` : 'Đồng bộ'}</span>
-              </button>
+              <div className="flex items-center justify-between gap-2">
+                {src.isPaused ? (
+                  <button
+                    onClick={() => onResumeSource(src.id)}
+                    className="flex-1 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs font-bold flex items-center justify-center space-x-1 transition-colors cursor-pointer active-press"
+                  >
+                    <Play className="w-3.5 h-3.5" />
+                    <span>Tiếp tục</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleSyncClick(src.id)}
+                    disabled={src.status === 'syncing'}
+                    className="flex-1 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs font-bold flex items-center justify-center space-x-1 transition-colors cursor-pointer active-press disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${src.status === 'syncing' ? 'animate-spin' : ''}`} />
+                    <span>{src.status === 'syncing' ? `Đang nạp... ${src.syncProgress ?? 0}%` : 'Đồng bộ'}</span>
+                  </button>
+                )}
+
+                {!src.isPaused && (
+                  <button
+                    onClick={() => {
+                      if (window.confirm(`Tạm dừng nguồn "${src.name}"? Mọi tên miền đang chặn nhờ nguồn này sẽ chuyển sang "Thôi chặn" ngay lập tức.`)) {
+                        onPauseSource(src.id);
+                      }
+                    }}
+                    disabled={src.status === 'syncing'}
+                    title="Tạm dừng nguồn"
+                    className="p-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 rounded-xl transition-colors cursor-pointer active-press disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+                  >
+                    <Pause className="w-3.5 h-3.5" />
+                  </button>
+                )}
+
+                <button
+                  onClick={() => {
+                    if (window.confirm(`Xoá vĩnh viễn nguồn "${src.name}"? Mọi tên miền đang chặn nhờ nguồn này sẽ chuyển sang "Thôi chặn". Không thể hoàn tác.`)) {
+                      onDeleteSource(src.id);
+                    }
+                  }}
+                  disabled={src.status === 'syncing'}
+                  title="Xoá nguồn"
+                  className="p-1.5 bg-white dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/60 text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-700 hover:border-rose-200 dark:hover:border-rose-800 rounded-xl transition-colors cursor-pointer active-press disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
           </div>
         ))}

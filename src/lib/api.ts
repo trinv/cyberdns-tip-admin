@@ -304,6 +304,24 @@ export async function syncFeedSourceApi(id: string): Promise<FeedSource> {
   return result.source;
 }
 
+export async function pauseFeedSourceApi(id: string): Promise<{ source: FeedSource; affectedCount: number }> {
+  const res = await fetch(`${API_BASE}/sources/${id}/pause`, { method: 'POST', headers: await authHeaders() });
+  await checkResponse(res, 'Failed to pause feed source');
+  return res.json();
+}
+
+export async function resumeFeedSourceApi(id: string): Promise<{ source: FeedSource; affectedCount: number }> {
+  const res = await fetch(`${API_BASE}/sources/${id}/resume`, { method: 'POST', headers: await authHeaders() });
+  await checkResponse(res, 'Failed to resume feed source');
+  return res.json();
+}
+
+export async function deleteFeedSourceApi(id: string): Promise<{ affectedCount: number }> {
+  const res = await fetch(`${API_BASE}/sources/${id}`, { method: 'DELETE', headers: await authHeaders() });
+  await checkResponse(res, 'Failed to delete feed source');
+  return res.json();
+}
+
 export async function fetchReviewQueue(status: string = 'pending'): Promise<ReviewDomainItem[]> {
   const res = await fetch(`${API_BASE}/reviews?status=${status}`);
   if (!res.ok) throw new Error('Failed to fetch review queue');

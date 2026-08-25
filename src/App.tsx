@@ -17,6 +17,9 @@ import {
   deleteCategoryApi,
   createFeedSourceApi,
   syncFeedSourceApi,
+  pauseFeedSourceApi,
+  resumeFeedSourceApi,
+  deleteFeedSourceApi,
   deployReleaseApi,
   overrideReleaseApi,
   rollbackReleaseApi,
@@ -1119,9 +1122,17 @@ export default function App() {
               // keeps working correctly even if the user switches tabs
               // immediately after clicking.
               onSyncAll={async () => {
+                // Paused sources are excluded — starting one would just 400
+                // (see startFeedSourceSync's isPaused guard) since it needs
+                // an explicit "Tiếp tục" first.
+                const syncable = sources.filter((s) => !s.isPaused);
+                if (syncable.length === 0) {
+                  showToast('Không có nguồn nào để đồng bộ (tất cả đang tạm dừng).', 'info');
+                  return;
+                }
                 try {
                   const started = await Promise.all(
-                    sources.map((s) =>
+                    syncable.map((s) =>
                       syncFeedSourceApi(s.id).catch((e) => {
                         console.warn(`Bắt đầu đồng bộ nguồn ${s.id} thất bại:`, e);
                         return null;
@@ -1133,7 +1144,7 @@ export default function App() {
                   showToast(
                     failedToStart > 0
                       ? `Đã bắt đầu đồng bộ — ${failedToStart} nguồn không khởi động được, xem chi tiết ở từng thẻ.`
-                      : `Đã bắt đầu đồng bộ ${sources.length} nguồn feed — tiến trình sẽ cập nhật trực tiếp trên từng thẻ.`,
+                      : `Đã bắt đầu đồng bộ ${syncable.length} nguồn feed — tiến trình sẽ cập nhật trực tiếp trên từng thẻ.`,
                     failedToStart > 0 ? 'warning' : 'info'
                   );
                 } catch (err) {
@@ -1163,6 +1174,52 @@ export default function App() {
                 } catch (err: any) {
                   console.warn('Backend create source notice:', err);
                   showToast(err?.message || `Không thể thêm nguồn feed "${newSrc.name}" — vui lòng thử lại.`, 'warning');
+                }
+              }}
+              onPauseSource={async (id) => {
+                try {
+                  const { source: updated, affectedCount } = await pauseFeedSourceApi(id);
+                  setSources((prev) => prev.map((s) => (s.id === id ? updated : s)));
+                  showToast(`Đã tạm dừng "${updated.name}" — ${affectedCount.toLocaleString('vi-VN')} tên miền chuyển sang Thôi chặn.`, 'warning');
+                  await Promise.all([
+                    refreshDomains(),
+                    fetchDashboardStats().then(setDashboardStats).catch(() => {}),
+                    fetchAuditLogs().then(setAuditLogs).catch(() => {}),
+                  ]);
+                } catch (err: any) {
+                  console.warn('Backend pause source notice:', err);
+                  showToast(err?.message || 'Không thể tạm dừng nguồn — vui lòng thử lại.', 'warning');
+                }
+              }}
+              onResumeSource={async (id) => {
+                try {
+                  const { source: updated, affectedCount } = await resumeFeedSourceApi(id);
+                  setSources((prev) => prev.map((s) => (s.id === id ? updated : s)));
+                  showToast(`Đã tiếp tục "${updated.name}" — ${affectedCount.toLocaleString('vi-VN')} tên miền chuyển lại Đang chặn.`, 'success');
+                  await Promise.all([
+                    refreshDomains(),
+                    fetchDashboardStats().then(setDashboardStats).catch(() => {}),
+                    fetchAuditLogs().then(setAuditLogs).catch(() => {}),
+                  ]);
+                } catch (err: any) {
+                  console.warn('Backend resume source notice:', err);
+                  showToast(err?.message || 'Không thể tiếp tục nguồn — vui lòng thử lại.', 'warning');
+                }
+              }}
+              onDeleteSource={async (id) => {
+                const target = sources.find((s) => s.id === id);
+                try {
+                  const { affectedCount } = await deleteFeedSourceApi(id);
+                  setSources((prev) => prev.filter((s) => s.id !== id));
+                  showToast(`Đã xoá nguồn "${target?.name || id}" — ${affectedCount.toLocaleString('vi-VN')} tên miền chuyển sang Thôi chặn.`, 'warning');
+                  await Promise.all([
+                    refreshDomains(),
+                    fetchDashboardStats().then(setDashboardStats).catch(() => {}),
+                    fetchAuditLogs().then(setAuditLogs).catch(() => {}),
+                  ]);
+                } catch (err: any) {
+                  console.warn('Backend delete source notice:', err);
+                  showToast(err?.message || 'Không thể xoá nguồn — vui lòng thử lại.', 'warning');
                 }
               }}
             />

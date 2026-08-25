@@ -96,6 +96,7 @@ export interface FeedSource {
   syncProgress?: number;
   syncPhase?: string | null;
   requiresReview?: boolean;
+  isPaused?: boolean;
   color: string;
   removedToday?: number;
   errorMessage?: string;
