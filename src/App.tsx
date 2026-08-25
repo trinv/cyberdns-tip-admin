@@ -463,6 +463,11 @@ export default function App() {
           await Promise.all([
             fetchCategories().then(setCategories).catch(() => {}),
             fetchDashboardStats().then(setDashboardStats).catch(() => {}),
+            // A requiresReview-gated source's sync writes to review_queue,
+            // not domains — without refetching this too, new items never
+            // show up in the Hàng đợi duyệt tab (or its Sidebar/Dashboard
+            // badge counts) until a full page reload.
+            fetchReviewQueue().then(setReviewItems).catch(() => {}),
             refreshDomains(),
           ]);
         }
