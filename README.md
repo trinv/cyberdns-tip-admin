@@ -92,6 +92,7 @@ Xem đầy đủ chú thích trong [`.env.example`](.env.example). Tóm tắt:
 | `SUPERADMIN_EMAIL` / `SUPERADMIN_PASSWORD` | Khuyến nghị | Tài khoản Admin đầu tiên, tự tạo nếu chưa có Admin nào |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_SECURE` / `SMTP_FROM` | Không | Máy chủ SMTP để gửi email cảnh báo đăng nhập IP mới — để trống `SMTP_HOST` để tắt tính năng này (cảnh báo trong ứng dụng vẫn hoạt động) |
 | `SECURITY_ALERT_EMAIL` | Không | Địa chỉ nhận email cảnh báo đăng nhập từ IP mới |
+| `PG_MAX_WAL_SIZE` / `PG_CHECKPOINT_TIMEOUT` / `PG_SHARED_BUFFERS` / `PG_EFFECTIVE_CACHE_SIZE` | Không (chỉ Docker Compose) | Tinh chỉnh hiệu năng PostgreSQL — mặc định an toàn cho VPS nhỏ, tăng thêm nếu VPS có nhiều RAM hơn (xem `.env.example`) |
 
 ## Kiến trúc & cấu trúc thư mục
 

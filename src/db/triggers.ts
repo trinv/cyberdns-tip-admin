@@ -45,10 +45,24 @@ export async function ensureDomainCategoryTriggers() {
           SELECT array_agg(DISTINCT domain_id), array_agg(DISTINCT category_id)
           INTO affected_domain_ids, affected_category_ids
           FROM new_table;
+
+          -- Step 3 (count), INSERT case: every row in new_table is a net +1
+          -- for its category — see the comment above step 3 below for why
+          -- this is a delta, not a recount.
+          UPDATE categories c
+          SET count = count + nc.c
+          FROM (SELECT category_id, count(*) AS c FROM new_table GROUP BY category_id) nc
+          WHERE c.id = nc.category_id;
         ELSIF TG_OP = 'DELETE' THEN
           SELECT array_agg(DISTINCT domain_id), array_agg(DISTINCT category_id)
           INTO affected_domain_ids, affected_category_ids
           FROM old_table;
+
+          -- Step 3, DELETE case: every row in old_table is a net -1.
+          UPDATE categories c
+          SET count = count - oc.c
+          FROM (SELECT category_id, count(*) AS c FROM old_table GROUP BY category_id) oc
+          WHERE c.id = oc.category_id;
         ELSIF TG_OP = 'UPDATE' THEN
           -- A moved membership (domain_id unchanged, category_id changed)
           -- touches both the category it left (old_table) and the one it
@@ -60,6 +74,22 @@ export async function ensureDomainCategoryTriggers() {
             UNION
             SELECT domain_id, category_id FROM old_table
           ) both_tables;
+
+          -- Step 3, UPDATE case: per category, net change = (rows that
+          -- moved IN, from new_table) minus (rows that moved OUT, from
+          -- old_table) — zero for a category whose rows only had
+          -- sourceLabel/feedSourceId change (same category_id in both
+          -- tables, so it cancels out to a 0 delta and touches no row here).
+          UPDATE categories c
+          SET count = count + deltas.delta
+          FROM (
+            SELECT COALESCE(n.category_id, o.category_id) AS category_id,
+                   COALESCE(n.c, 0) - COALESCE(o.c, 0) AS delta
+            FROM (SELECT category_id, count(*) AS c FROM new_table GROUP BY category_id) n
+            FULL OUTER JOIN (SELECT category_id, count(*) AS c FROM old_table GROUP BY category_id) o
+              ON n.category_id = o.category_id
+          ) deltas
+          WHERE c.id = deltas.category_id AND deltas.delta <> 0;
         END IF;
 
         IF affected_domain_ids IS NULL THEN
@@ -102,12 +132,23 @@ export async function ensureDomainCategoryTriggers() {
         LEFT JOIN agg ON agg.domain_id = ids.id
         WHERE d.id = ids.id;
 
-        -- 3. Recompute every affected category's live domain count in ONE
-        --    statement (still one COUNT(*) per category, but at most a
-        --    handful of categories per statement — never per row).
-        UPDATE categories c
-        SET count = (SELECT count(*) FROM domain_categories dc WHERE dc.category_id = c.id)
-        WHERE c.id = ANY(affected_category_ids);
+        -- 3. Every affected category's live count is maintained INCREMENTALLY
+        --    above (inside each TG_OP branch), as a delta from just this
+        --    statement's transition table(s) — NOT by recomputing
+        --    SELECT count(*) FROM domain_categories WHERE category_id = c.id
+        --    (the original design). That recount was the real scaling bug: its
+        --    cost is proportional to the category's CURRENT total size, not to
+        --    how many rows this statement touched — so as a category
+        --    accumulates rows across repeated feed syncs over time, every
+        --    single later sync's checkpoint-triggering write burst gets
+        --    progressively more expensive purely from that one category
+        --    having grown, even though the actual work done per sync
+        --    (rows inserted) didn't change. An incremental delta costs the
+        --    same regardless of how large the category has already grown.
+        --    Safe because domain_categories has exactly one writer — this
+        --    trigger's own statement — so count can never drift out of sync
+        --    with reality (see the file-level comment: "the ONLY places that
+        --    should touch domain_categories").
 
         RETURN NULL;
       END;
