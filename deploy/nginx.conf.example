@@ -29,5 +29,11 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        # Default (60s) can be shorter than a slow query legitimately takes
+        # under heavy write load (e.g. mid-checkpoint on a VPS with slow
+        # disk I/O — see .env.example's PG_MAX_WAL_SIZE) — a request that's
+        # still genuinely running shouldn't get cut off and reported to the
+        # user as a failure.
+        proxy_read_timeout 120s;
     }
 }

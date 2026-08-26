@@ -7,14 +7,23 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env first — see .env.example}
       POSTGRES_DB: cyberdns_tip
     # The stock postgres image ships conservative defaults sized for a tiny
-    # container, not a write-heavy sync workload — max_wal_size=1GB (default)
-    # meant checkpoints were firing every ~60-90s during a large feed sync
-    # instead of the intended checkpoint_timeout=15min, each one a multi-
-    # second-to-multi-MINUTE I/O stall (see .env.example's PG_* variables for
-    # what these do and how to tune them for your VPS's actual RAM/disk).
+    # container, not a write-heavy sync workload (see .env.example's PG_*
+    # variables for what these do and how to tune them for your VPS's actual
+    # RAM/disk). max_wal_size back at Postgres' own compiled-in default
+    # (1GB) deliberately, NOT raised further — raising it to 2GB here in an
+    # earlier version made checkpoints fire less often but each one's I/O
+    # stall roughly DOUBLE in duration (measured: ~530MB/checkpoint at ~60s
+    # write time before, ~1.09GB/checkpoint at ~150-220s write time after —
+    # same real disk throughput, ~6-8MB/s, just more data queued up before
+    # each flush). On a VPS whose disk is this slow, a shorter-but-more-
+    # frequent stall is the safer trade-off: it's less likely any single
+    # stall runs long enough to trip a client/query timeout. This does NOT
+    # fix the underlying cause — that's the VPS's actual disk write
+    # throughput, which no Postgres setting can raise; see the deploy
+    # troubleshooting notes for how to check it.
     command: >
       postgres
-      -c max_wal_size=${PG_MAX_WAL_SIZE:-2GB}
+      -c max_wal_size=${PG_MAX_WAL_SIZE:-1GB}
       -c checkpoint_timeout=${PG_CHECKPOINT_TIMEOUT:-15min}
       -c shared_buffers=${PG_SHARED_BUFFERS:-256MB}
       -c effective_cache_size=${PG_EFFECTIVE_CACHE_SIZE:-768MB}

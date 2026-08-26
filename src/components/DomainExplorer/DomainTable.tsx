@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { DomainItem, CategoryInfo, DomainStatus } from '../../types';
+import { useClickOutside } from '../../hooks/useClickOutside';
 import {
   Search, X, Plus, Download, ShieldAlert, ShieldCheck,
   Trash2, Edit3, MoreHorizontal, ArrowUpDown,
@@ -88,6 +89,12 @@ export const DomainTable: React.FC<DomainTableProps> = ({
   const [sourceFilterOpen, setSourceFilterOpen] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [copiedDomain, setCopiedDomain] = useState<string | null>(null);
+  const tldFilterRef = useRef<HTMLDivElement>(null);
+  const sourceFilterRef = useRef<HTMLDivElement>(null);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+  useClickOutside(tldFilterRef, () => setTldFilterOpen(false), tldFilterOpen);
+  useClickOutside(sourceFilterRef, () => setSourceFilterOpen(false), sourceFilterOpen);
+  useClickOutside(exportMenuRef, () => setExportMenuOpen(false), exportMenuOpen);
 
   // Extract unique TLDs and sources for filter dropdowns. NOTE: derived only
   // from the currently loaded page, not the entire matching set — a proper
@@ -238,7 +245,7 @@ export const DomainTable: React.FC<DomainTableProps> = ({
               </button>
             </div>
           ) : (
-            <div className="relative">
+            <div className="relative" ref={tldFilterRef}>
               <button
                 onClick={() => setTldFilterOpen(!tldFilterOpen)}
                 className="flex items-center space-x-1 px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white text-xs font-medium cursor-pointer transition-colors shadow-xs"
@@ -283,7 +290,7 @@ export const DomainTable: React.FC<DomainTableProps> = ({
               </button>
             </div>
           ) : (
-            <div className="relative">
+            <div className="relative" ref={sourceFilterRef}>
               <button
                 onClick={() => setSourceFilterOpen(!sourceFilterOpen)}
                 className="flex items-center space-x-1 px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white text-xs font-medium cursor-pointer transition-colors shadow-xs"
@@ -326,7 +333,7 @@ export const DomainTable: React.FC<DomainTableProps> = ({
         </div>
 
         {/* Export Dropdown Menu */}
-        <div className="relative">
+        <div className="relative" ref={exportMenuRef}>
           <div className="flex items-center space-x-1">
             <button
               onClick={() => setExportMenuOpen(!exportMenuOpen)}

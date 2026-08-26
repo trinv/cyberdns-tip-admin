@@ -259,7 +259,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="flex items-center space-x-1.5 mt-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
               <CheckCircle2 className="w-4 h-4" />
               <span>{stats ? 'Cập nhật trực tiếp từ CyberDNSTIP-DB' : 'Đang tải...'}</span>
-              <span className="text-slate-400 dark:text-slate-500 font-normal">· Nhấp để xem đồ thị</span>
             </div>
           </div>
         </div>
@@ -292,7 +291,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="flex items-center space-x-1.5 mt-2 text-xs font-semibold text-rose-600 dark:text-rose-400">
               <AlertOctagon className="w-4 h-4" />
               <span>Chờ phê duyệt thủ công</span>
-              <span className="text-slate-400 dark:text-slate-500 font-normal">· Nhấp để duyệt</span>
             </div>
           </div>
         </div>

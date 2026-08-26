@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { CyberDNSLogo } from './CyberDNSLogo';
 import { AppUser } from '../types';
+import { useClickOutside } from '../hooks/useClickOutside';
 
 export interface HeaderNotification {
   id: string;
@@ -53,6 +54,10 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const [roleDropdownOpen, setRoleDropdownOpen] = React.useState(false);
   const [notificationsOpen, setNotificationsOpen] = React.useState(false);
+  const notificationsRef = React.useRef<HTMLDivElement>(null);
+  const roleDropdownRef = React.useRef<HTMLDivElement>(null);
+  useClickOutside(notificationsRef, () => setNotificationsOpen(false), notificationsOpen);
+  useClickOutside(roleDropdownRef, () => setRoleDropdownOpen(false), roleDropdownOpen);
 
   const getTabInfo = (tab: string) => {
     switch (tab) {
@@ -152,7 +157,7 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
 
           {/* Notification Bell */}
-          <div className="relative">
+          <div className="relative" ref={notificationsRef}>
             <button
               onClick={() => setNotificationsOpen(!notificationsOpen)}
               className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors relative cursor-pointer active-press"
@@ -210,7 +215,7 @@ export const Header: React.FC<HeaderProps> = ({
               <span>Đăng nhập</span>
             </button>
           ) : (
-            <div className="relative">
+            <div className="relative" ref={roleDropdownRef}>
               <button
                 onClick={() => setRoleDropdownOpen(!roleDropdownOpen)}
                 className="flex items-center space-x-2 pl-1.5 pr-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700/80 border border-slate-200/60 dark:border-slate-700/60 transition-colors cursor-pointer"
