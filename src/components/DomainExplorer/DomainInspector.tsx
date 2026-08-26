@@ -1,10 +1,6 @@
 import React, { useState } from 'react';
 import { DomainItem, CategoryInfo } from '../../types';
-import { 
-  X, ShieldAlert, ShieldCheck, Image, Trash2, Edit3, 
-  ExternalLink, Clock, Globe, Network, Activity, Calendar, Shield, Copy, Check,
-  RefreshCw, Server, Lock, AlertCircle
-} from 'lucide-react';
+import { X, Clock, Globe, Copy, Check } from 'lucide-react';
 
 interface DomainInspectorProps {
   domain: DomainItem | null;
@@ -12,7 +8,6 @@ interface DomainInspectorProps {
   onClose: () => void;
   onEditGroup: (domain: DomainItem) => void;
   onAddToAllowlist: (domain: DomainItem) => void;
-  onViewEvidence: (domain: DomainItem) => void;
   onUnblock: (domain: DomainItem) => void;
 }
 
@@ -22,41 +17,15 @@ export const DomainInspector: React.FC<DomainInspectorProps> = ({
   onClose,
   onEditGroup,
   onAddToAllowlist,
-  onViewEvidence,
   onUnblock,
 }) => {
   const [copied, setCopied] = useState(false);
-  const [isDnsTesting, setIsDnsTesting] = useState(false);
-  const [dnsTestResult, setDnsTestResult] = useState<{
-    ip: string;
-    resolvedInMs: number;
-    tlsValid: boolean;
-    serverCountry: string;
-    sinkholeAction: string;
-  } | null>(null);
 
   const handleCopy = () => {
     if (!domain) return;
     navigator.clipboard.writeText(domain.domain);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
-  };
-
-  const handleRunLiveDnsLookup = () => {
-    if (!domain) return;
-    setIsDnsTesting(true);
-    setDnsTestResult(null);
-
-    setTimeout(() => {
-      setIsDnsTesting(false);
-      setDnsTestResult({
-        ip: domain.dnsRecords?.a?.[0] || '104.21.48.192',
-        resolvedInMs: Math.floor(Math.random() * 15) + 8,
-        tlsValid: domain.threatScore ? domain.threatScore < 0.9 : true,
-        serverCountry: 'Singapore (SG) / Cloudflare Anycast',
-        sinkholeAction: domain.status === 'active' ? 'CHẶN TẠI EDGE (NXDOMAIN / SINKHOLE 0.0.0.0)' : 'CHO PHÉP (RESOLVED)',
-      });
-    }, 600);
   };
 
   if (!domain) {
@@ -143,92 +112,6 @@ export const DomainInspector: React.FC<DomainInspectorProps> = ({
           </span>
         </div>
 
-        <div className="flex items-center justify-between">
-          <span className="text-slate-400 dark:text-slate-500 uppercase text-xs font-bold tracking-wider">
-            TUỔI DOMAIN
-          </span>
-          <span className="font-mono text-slate-800 dark:text-slate-200">{domain.domainAge}</span>
-        </div>
-
-        <div className="flex items-center justify-between">
-          <span className="text-slate-400 dark:text-slate-500 uppercase text-xs font-bold tracking-wider">
-            ASN / ISP
-          </span>
-          <span className="font-mono text-slate-800 dark:text-slate-200 truncate max-w-[170px] text-right" title={domain.asn}>
-            {domain.asn}
-          </span>
-        </div>
-
-        {domain.threatScore !== undefined && (
-          <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-slate-700">
-            <span className="text-slate-400 dark:text-slate-500 uppercase text-xs font-bold tracking-wider">
-              THREAT SCORE (AI)
-            </span>
-            <span className={`font-mono font-extrabold text-xs px-2 py-0.5 rounded ${
-              domain.threatScore >= 0.8 
-                ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800' 
-                : 'text-slate-700 dark:text-slate-300'
-            }`}>
-              {(domain.threatScore * 100).toFixed(0)}% ({domain.threatScore.toFixed(2)})
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* Live DNS Diagnostic Tool */}
-      <div className="bg-slate-50/80 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 rounded-2xl p-3.5 space-y-2.5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-1.5 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-            <Server className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-            <span>TRA CỨU DNS LIVE (EDGE PROBE)</span>
-          </div>
-          <button
-            onClick={handleRunLiveDnsLookup}
-            disabled={isDnsTesting}
-            className="text-xs text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 font-bold flex items-center space-x-1 cursor-pointer disabled:opacity-50"
-          >
-            <RefreshCw className={`w-3 h-3 ${isDnsTesting ? 'animate-spin' : ''}`} />
-            <span>{isDnsTesting ? 'Đang ping...' : 'Kiểm tra'}</span>
-          </button>
-        </div>
-
-        {dnsTestResult && (
-          <div className="bg-slate-900 text-slate-200 p-2.5 rounded-xl font-mono text-xs space-y-1 animate-in fade-in duration-150 border border-slate-700">
-            <div className="flex items-center justify-between text-slate-400">
-              <span>Độ trễ phản hồi:</span>
-              <span className="text-emerald-400 font-bold">{dnsTestResult.resolvedInMs} ms</span>
-            </div>
-            <div className="flex items-center justify-between text-slate-400">
-              <span>Địa chỉ IP gốc:</span>
-              <span className="text-slate-100 font-bold">{dnsTestResult.ip}</span>
-            </div>
-            <div className="flex items-center justify-between text-slate-400">
-              <span>Vị trí Edge:</span>
-              <span className="text-slate-300">{dnsTestResult.serverCountry}</span>
-            </div>
-            <div className="pt-1 border-t border-slate-800 text-xs">
-              <span className="text-slate-400">Chính sách DNS: </span>
-              <span className="text-amber-400 font-bold">{dnsTestResult.sinkholeAction}</span>
-            </div>
-          </div>
-        )}
-
-        {domain.dnsRecords && !dnsTestResult && (
-          <div className="font-mono text-xs space-y-1 text-slate-600 dark:text-slate-400">
-            {domain.dnsRecords.a && (
-              <div className="flex items-start space-x-2">
-                <span className="text-emerald-600 dark:text-emerald-400 font-bold w-4">A:</span>
-                <span className="truncate text-slate-800 dark:text-slate-200">{domain.dnsRecords.a.join(', ')}</span>
-              </div>
-            )}
-            {domain.dnsRecords.ns && (
-              <div className="flex items-start space-x-2 text-slate-500">
-                <span className="text-purple-600 dark:text-purple-400 font-bold w-4">NS:</span>
-                <span className="truncate">{domain.dnsRecords.ns.join(', ')}</span>
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       {/* DÒNG THỜI GIAN (Timeline) */}
@@ -275,21 +158,12 @@ export const DomainInspector: React.FC<DomainInspectorProps> = ({
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            onClick={() => onViewEvidence(domain)}
-            className="px-3 py-2 bg-purple-50 dark:bg-purple-950/60 hover:bg-purple-100 text-purple-800 dark:text-purple-300 rounded-xl border border-purple-200 dark:border-purple-800 text-xs font-bold transition-colors flex items-center justify-center space-x-1 cursor-pointer shadow-xs active-press"
-          >
-            <Image className="w-3.5 h-3.5" />
-            <span>Ảnh crawl</span>
-          </button>
-          <button
-            onClick={() => onUnblock(domain)}
-            className="px-3 py-2 bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 text-rose-800 dark:text-rose-300 rounded-xl border border-rose-200 dark:border-rose-800 text-xs font-bold transition-colors cursor-pointer shadow-xs active-press"
-          >
-            Thôi chặn
-          </button>
-        </div>
+        <button
+          onClick={() => onUnblock(domain)}
+          className="w-full px-3 py-2 bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 text-rose-800 dark:text-rose-300 rounded-xl border border-rose-200 dark:border-rose-800 text-xs font-bold transition-colors cursor-pointer shadow-xs active-press"
+        >
+          Thôi chặn
+        </button>
       </div>
     </div>
   );

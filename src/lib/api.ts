@@ -186,7 +186,7 @@ export async function fetchDomains(params: {
   source?: string;
   limit?: number;
   offset?: number;
-  sortField?: 'domain' | 'firstSeen' | 'lastSeen' | 'threatScore';
+  sortField?: 'domain' | 'firstSeen' | 'lastSeen';
   sortDirection?: 'asc' | 'desc';
 }): Promise<{ domains: DomainItem[]; total: number }> {
   const query = new URLSearchParams();

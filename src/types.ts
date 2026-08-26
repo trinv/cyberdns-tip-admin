@@ -35,9 +35,6 @@ export interface DomainItem {
   graceDaysLeft?: number;
   firstSeen: string;
   lastSeen: string;
-  asn: string;
-  domainAge: string;
-  threatScore?: number; // 0.00 to 1.00
   isProtected?: boolean;
   timeline: {
     time: string;
@@ -45,14 +42,6 @@ export interface DomainItem {
     source: string;
     type: 'crawler' | 'feed' | 'manual' | 'system';
   }[];
-  dnsRecords?: {
-    a?: string[];
-    aaaa?: string[];
-    cname?: string | string[];
-    mx?: string[];
-    ns?: string[];
-  };
-  evidenceUrl?: string;
   tags?: string[];
 }
 
@@ -159,9 +148,8 @@ export interface DashboardStats {
   totalAll: number;
   categoryBreakdown: { category: string; count: number; percent: number }[];
   tldBreakdown: { tld: string; count: number; percent: number }[];
-  asnBreakdown: { asn: string; count: number }[];
   statusBreakdown: { status: string; count: number; percent: number }[];
-  recentHighThreat: DomainItem[];
+  recentActive: DomainItem[];
 }
 
 export interface SavedFilter {

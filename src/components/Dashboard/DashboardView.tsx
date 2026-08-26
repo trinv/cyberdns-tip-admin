@@ -121,22 +121,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     }));
   }, [stats]);
 
-  // ASN breakdown: real counts grouped from the `asn` column, which already
-  // stores "AS#### ORG NAME" as one string in this schema — no separate
-  // country field exists, so it's simply not shown for live data.
-  const asnBreakdownSource = stats?.asnBreakdown || [];
-
-  // Severity band derived from the domain's real threatScore column — an
-  // honest transformation of stored data, unlike the specific attack-type /
-  // victim / query-hit-rate fields the old mock rows fabricated (those need
-  // a classification + telemetry pipeline this system doesn't have).
-  const getThreatBand = (score: number) => {
-    if (score >= 0.9) return { label: 'Critical', className: 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800' };
-    if (score >= 0.7) return { label: 'High', className: 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800' };
-    return { label: 'Medium', className: 'bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700' };
-  };
-
-  const recentHighThreatDomains = stats?.recentHighThreat || [];
+  // Most recently seen active domains, real data straight from CyberDNSTIP-DB
+  // (see getDashboardStats' recentActive) — no ASN/threat-score fields exist
+  // anymore (removed: neither was ever backed by a real lookup/scoring
+  // pipeline, just an honest-default placeholder or a fixed constant).
+  const recentActiveDomains = stats?.recentActive || [];
 
   const handleTriggerEdgeSync = () => {
     setIsSyncing(true);
@@ -614,30 +603,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
             )}
 
-            {/* ASNs mini table */}
-            <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800">
-              <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-2">
-                TOP AUTONOMOUS SYSTEMS
-              </span>
-              {asnBreakdownSource.length === 0 ? (
-                <div className="py-4 text-center text-slate-400 dark:text-slate-500 text-xs">
-                  {stats ? 'Chưa có dữ liệu ASN.' : 'Đang tải...'}
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                  {asnBreakdownSource.map((a, i) => (
-                    <div key={i} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60 space-y-1">
-                      <div className="text-xs text-slate-700 dark:text-slate-300 font-mono font-bold truncate" title={a.asn}>
-                        {a.asn}
-                      </div>
-                      <div className="text-xs font-mono text-rose-600 dark:text-rose-400 font-bold">
-                        {a.count.toLocaleString('vi-VN')} domain
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
           </div>
         </div>
       </div>
@@ -649,11 +614,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="flex items-center space-x-2">
               <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
               <h3 className="text-base font-bold text-slate-900 dark:text-white font-sans">
-                Tên Miền Rủi Ro Cao Đang Chặn
+                Tên Miền Đang Chặn Gần Đây Nhất
               </h3>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Xếp hạng theo threat score, lấy trực tiếp từ CyberDNSTIP-DB (không phải luồng thời gian thực — cần pipeline sensor DNS để có mốc thời gian phát hiện chính xác)
+              Sắp xếp theo thời điểm phát hiện gần nhất, lấy trực tiếp từ CyberDNSTIP-DB
             </p>
           </div>
 
@@ -673,7 +638,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* High-threat Domains Table */}
+        {/* Recently-blocked Domains Table */}
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse min-w-[600px]">
             <thead>
@@ -681,21 +646,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <th className="px-4 py-3">TÊN MIỀN</th>
                 <th className="px-4 py-3">NHÓM DANH MỤC</th>
                 <th className="px-4 py-3">NGUỒN PHÁT HIỆN</th>
-                <th className="px-4 py-3">THREAT SCORE</th>
+                <th className="px-4 py-3">PHÁT HIỆN LÚC</th>
                 <th className="px-4 py-3">TRẠNG THÁI</th>
                 <th className="px-4 py-3 text-right">THAO TÁC</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
-              {recentHighThreatDomains.length === 0 && (
+              {recentActiveDomains.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-4 py-6 text-center text-slate-400 dark:text-slate-500">
                     {stats ? 'Chưa có tên miền nào trong danh sách chặn.' : 'Đang tải dữ liệu từ CyberDNSTIP-DB...'}
                   </td>
                 </tr>
               )}
-              {recentHighThreatDomains.map((d) => {
-                const band = getThreatBand(d.threatScore ?? 0);
+              {recentActiveDomains.map((d) => {
                 return (
                   <tr
                     key={d.id}
@@ -716,10 +680,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       {d.source}
                     </td>
 
-                    <td className="px-4 py-3 font-mono">
-                      <span className={`px-2.5 py-0.5 rounded text-xs font-extrabold border ${band.className}`}>
-                        {((d.threatScore ?? 0) * 100).toFixed(1)}% ({band.label})
-                      </span>
+                    <td className="px-4 py-3 text-slate-600 dark:text-slate-400 font-mono">
+                      {new Date(d.lastSeen).toLocaleString('vi-VN')}
                     </td>
 
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-400 font-medium">

@@ -108,10 +108,6 @@
   }
 }
 
-.font-mono-code {
-  font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
-}
-
 /* Readable console scale: promote tiny utility text without changing
    the visual hierarchy of headings, metrics, or technical code. */
 .text-xs {

@@ -48,7 +48,6 @@ import { SourcesView } from './components/Sources/SourcesView';
 import { AuditLogsView } from './components/AuditLogs/AuditLogsView';
 import { AddEditDomainModal } from './components/Modals/AddEditDomainModal';
 import { CategoryManagerModal } from './components/Modals/CategoryManagerModal';
-import { CrawlEvidenceModal } from './components/Modals/CrawlEvidenceModal';
 import { DiffViewerModal } from './components/Modals/DiffViewerModal';
 import { KeyboardShortcutsModal } from './components/Modals/KeyboardShortcutsModal';
 import { ExportModal } from './components/Modals/ExportModal';
@@ -319,7 +318,7 @@ export default function App() {
   // row 200 — see the review that flagged this).
   const [domainsPage, setDomainsPage] = useState<number>(1);
   const [domainsPageSize, setDomainsPageSize] = useState<number>(25);
-  const [sortField, setSortField] = useState<'domain' | 'firstSeen' | 'lastSeen' | 'threatScore'>('lastSeen');
+  const [sortField, setSortField] = useState<'domain' | 'firstSeen' | 'lastSeen'>('lastSeen');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   // Selection & Inspector States
@@ -333,8 +332,6 @@ export default function App() {
   const [isAddDomainModalOpen, setIsAddDomainModalOpen] = useState<boolean>(false);
   const [domainToEdit, setDomainToEdit] = useState<DomainItem | null>(null);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState<boolean>(false);
-  const [isCrawlEvidenceModalOpen, setIsCrawlEvidenceModalOpen] = useState<boolean>(false);
-  const [evidenceDomain, setEvidenceDomain] = useState<DomainItem | ReviewDomainItem | null>(null);
   const [isDiffModalOpen, setIsDiffModalOpen] = useState<boolean>(false);
   const [isKeyboardHelpOpen, setIsKeyboardHelpOpen] = useState<boolean>(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
@@ -723,13 +720,12 @@ export default function App() {
       }
     }
 
-    const headers = ['domain', 'primaryCategory', 'categories', 'status', 'threatScore', 'source', 'firstSeen'];
+    const headers = ['domain', 'primaryCategory', 'categories', 'status', 'source', 'firstSeen'];
     const rows = targetList.map(d => [
       d.domain,
       d.primaryCategory,
       `"${d.categories.join(';')}"`,
       d.status,
-      d.threatScore ?? 0,
       d.source,
       d.firstSeen
     ].join(','));
@@ -1040,10 +1036,6 @@ export default function App() {
                 }}
                 onUnblockSingle={handleUnblockSingle}
                 onMoveToAllowlistSingle={handleMoveToAllowlist}
-                onViewEvidence={(d) => {
-                  setEvidenceDomain(d);
-                  setIsCrawlEvidenceModalOpen(true);
-                }}
                 onSaveFilter={() => showToast('Đã lưu bộ lọc tìm kiếm hiện tại vào danh sách!', 'info')}
                 onOpenMobileFilters={() => setIsMobileFiltersOpen(true)}
               />
@@ -1058,10 +1050,6 @@ export default function App() {
                   setIsAddDomainModalOpen(true);
                 }}
                 onAddToAllowlist={handleMoveToAllowlist}
-                onViewEvidence={(d) => {
-                  setEvidenceDomain(d);
-                  setIsCrawlEvidenceModalOpen(true);
-                }}
                 onUnblock={handleUnblockSingle}
               />
             </div>
@@ -1103,10 +1091,6 @@ export default function App() {
               onApprove={handleApproveReview}
               onReject={handleRejectReview}
               onApproveAll={handleApproveAllReviews}
-              onViewScreenshot={(item) => {
-                setEvidenceDomain(item);
-                setIsCrawlEvidenceModalOpen(true);
-              }}
             />
           )}
 
@@ -1334,12 +1318,6 @@ export default function App() {
             showToast(err?.message || `Không thể xóa nhóm danh mục ${id} — vui lòng thử lại.`, 'warning');
           }
         }}
-      />
-
-      <CrawlEvidenceModal
-        isOpen={isCrawlEvidenceModalOpen}
-        onClose={() => setIsCrawlEvidenceModalOpen(false)}
-        domain={evidenceDomain}
       />
 
       <DiffViewerModal

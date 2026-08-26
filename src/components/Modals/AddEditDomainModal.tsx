@@ -46,11 +46,6 @@ export const AddEditDomainModal: React.FC<AddEditDomainModalProps> = ({
         primaryCategory: selectedCat,
         categories: [selectedCat],
         status,
-        // For a brand-new domain there is no real WHOIS/ASN lookup here yet
-        // — leave asn/domainAge unset so the backend's honest "Unknown"
-        // defaults apply, instead of a specific-looking fabricated value.
-        // When editing, keep the domain's existing (real) values as-is.
-        ...(domainToEdit ? { asn: domainToEdit.asn, domainAge: domainToEdit.domainAge } : {}),
         source: domainToEdit ? domainToEdit.source : 'Thủ công',
         sourceDetail: 'Admin / Manual entry',
       },

@@ -1,9 +1,6 @@
 import React, { useState } from 'react';
 import { ReviewDomainItem, CategoryInfo } from '../../types';
-import { 
-  CheckCircle2, XCircle, AlertTriangle, Eye, ShieldAlert, 
-  ExternalLink, Filter, Check, Image, Sparkles, CheckCheck
-} from 'lucide-react';
+import { CheckCircle2, Check, CheckCheck } from 'lucide-react';
 
 interface ReviewQueueViewProps {
   items: ReviewDomainItem[];
@@ -11,7 +8,6 @@ interface ReviewQueueViewProps {
   onApprove: (id: string, category: string) => void;
   onReject: (id: string) => void;
   onApproveAll: () => void;
-  onViewScreenshot: (item: ReviewDomainItem) => void;
 }
 
 export const ReviewQueueView: React.FC<ReviewQueueViewProps> = ({
@@ -20,7 +16,6 @@ export const ReviewQueueView: React.FC<ReviewQueueViewProps> = ({
   onApprove,
   onReject,
   onApproveAll,
-  onViewScreenshot,
 }) => {
   const [selectedFilter, setSelectedFilter] = useState<string>('all');
 
@@ -136,15 +131,7 @@ export const ReviewQueueView: React.FC<ReviewQueueViewProps> = ({
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
-                <button
-                  onClick={() => onViewScreenshot(item)}
-                  className="text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 text-xs font-semibold flex items-center space-x-1.5 transition-colors cursor-pointer"
-                >
-                  <Eye className="w-4 h-4" />
-                  <span>Bằng chứng crawl</span>
-                </button>
-
+              <div className="flex items-center justify-end pt-2 border-t border-slate-100 dark:border-slate-800">
                 <div className="flex items-center space-x-2">
                   <button
                     onClick={() => onReject(item.id)}

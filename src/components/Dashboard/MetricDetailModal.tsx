@@ -19,9 +19,11 @@ interface MetricDetailModalProps {
   reviewItems: ReviewDomainItem[];
 }
 
-// Severity band derived from the domain's real threatScore column — mirrors
-// DashboardView's getThreatBand so the review-queue breakdown below is a
-// real aggregation of stored data instead of a fabricated P1/P2/P3 split.
+// Severity band derived from review_queue's own real threatScore column
+// (distinct from domains — see schema.ts: domains.threatScore was removed,
+// never having been backed by a real scoring pipeline; review_queue's is a
+// separate field still in use for pending items) — a real aggregation of
+// stored data, not a fabricated P1/P2/P3 split.
 function getSeverityBand(score: number): 'Critical' | 'High' | 'Medium' {
   if (score >= 0.9) return 'Critical';
   if (score >= 0.7) return 'High';

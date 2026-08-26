@@ -129,9 +129,15 @@ export const domains = pgTable(
     graceDaysLeft: integer('grace_days_left').default(0),
     firstSeen: timestamp('first_seen').defaultNow().notNull(),
     lastSeen: timestamp('last_seen').defaultNow().notNull(),
-    asn: text('asn').default('Unknown ASN'),
-    domainAge: text('domain_age').default('Unknown'),
-    threatScore: doublePrecision('threat_score').default(0.0),
+    // asn / domainAge / dnsRecords / evidenceUrl / threatScore removed: none
+    // of the five was ever backed by a real data pipeline (no WHOIS/ASN
+    // lookup, no DNS resolver, no crawler-produced evidence URL, no actual
+    // threat-scoring model exists in this system) — every value stored here
+    // was always either a hardcoded honest-default placeholder ('Unknown
+    // ASN', 'Unknown', {}) or a fixed constant (threatScore 0.5/0.85 chosen
+    // by which code path wrote it, never computed). Keeping unused columns
+    // around also cost real write throughput: every domain row is smaller
+    // and cheaper to insert/update without them.
     isProtected: boolean('is_protected').default(false).notNull(),
     timeline: jsonb('timeline').$type<Array<{
       time: string;
@@ -139,14 +145,6 @@ export const domains = pgTable(
       source: string;
       type: 'crawler' | 'feed' | 'manual' | 'system';
     }>>().default([]).notNull(),
-    dnsRecords: jsonb('dns_records').$type<{
-      a?: string[];
-      aaaa?: string[];
-      cname?: string | string[];
-      mx?: string[];
-      ns?: string[];
-    }>().default({}).notNull(),
-    evidenceUrl: text('evidence_url'),
     tags: jsonb('tags').$type<string[]>().default([]).notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),

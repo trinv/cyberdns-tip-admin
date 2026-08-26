@@ -76,9 +76,9 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       }
 
       case 'csv': {
-        const header = 'domain,etld1,tld,primary_category,categories,status,asn,threat_score,first_seen,last_seen\n';
+        const header = 'domain,etld1,tld,primary_category,categories,status,first_seen,last_seen\n';
         const rows = targetList.map((d) =>
-          `"${d.domain}","${d.etld1}","${d.tld}","${d.primaryCategory}","${d.categories.join(';')}","${d.status}","${d.asn}",${d.threatScore || 0},"${d.firstSeen}","${d.lastSeen}"`
+          `"${d.domain}","${d.etld1}","${d.tld}","${d.primaryCategory}","${d.categories.join(';')}","${d.status}","${d.firstSeen}","${d.lastSeen}"`
         ).join('\n');
         return header + rows;
       }

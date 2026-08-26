@@ -1,11 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { DomainItem, CategoryInfo, DomainStatus } from '../../types';
-import { 
-  Search, X, Plus, Download, ShieldAlert, ShieldCheck, 
-  Trash2, Edit3, MoreHorizontal, ArrowUpDown, ExternalLink,
-  CheckCircle, AlertTriangle, Shield, Copy, Check, Filter,
+import {
+  Search, X, Plus, Download, ShieldAlert, ShieldCheck,
+  Trash2, Edit3, MoreHorizontal, ArrowUpDown,
+  Copy, Check, Filter,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
-  FileText, FileSpreadsheet, Code2, Globe, Database
+  FileText, FileSpreadsheet, Database
 } from 'lucide-react';
 
 interface DomainTableProps {
@@ -24,9 +24,9 @@ interface DomainTableProps {
   totalCount: number;
   onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
-  sortField: 'domain' | 'firstSeen' | 'lastSeen' | 'threatScore';
+  sortField: 'domain' | 'firstSeen' | 'lastSeen';
   sortDirection: 'asc' | 'desc';
-  onSortChange: (field: 'domain' | 'firstSeen' | 'lastSeen' | 'threatScore', direction: 'asc' | 'desc') => void;
+  onSortChange: (field: 'domain' | 'firstSeen' | 'lastSeen', direction: 'asc' | 'desc') => void;
   activeDomainId: string | null;
   onSetActiveDomainId: (id: string) => void;
   searchQuery: string;
@@ -44,7 +44,6 @@ interface DomainTableProps {
   onEditDomain: (domain: DomainItem) => void;
   onUnblockSingle: (domain: DomainItem) => void;
   onMoveToAllowlistSingle: (domain: DomainItem) => void;
-  onViewEvidence: (domain: DomainItem) => void;
   onSaveFilter: () => void;
   onOpenMobileFilters?: () => void;
 }
@@ -82,7 +81,6 @@ export const DomainTable: React.FC<DomainTableProps> = ({
   onEditDomain,
   onUnblockSingle,
   onMoveToAllowlistSingle,
-  onViewEvidence,
   onSaveFilter,
   onOpenMobileFilters,
 }) => {
@@ -109,7 +107,7 @@ export const DomainTable: React.FC<DomainTableProps> = ({
 
   const totalPages = Math.ceil(totalCount / pageSize) || 1;
 
-  const handleSortClick = (field: 'domain' | 'firstSeen' | 'lastSeen' | 'threatScore', defaultAsc: boolean) => {
+  const handleSortClick = (field: 'domain' | 'firstSeen' | 'lastSeen', defaultAsc: boolean) => {
     if (sortField === field) onSortChange(field, sortDirection === 'asc' ? 'desc' : 'asc');
     else onSortChange(field, defaultAsc ? 'asc' : 'desc');
   };
@@ -467,17 +465,6 @@ export const DomainTable: React.FC<DomainTableProps> = ({
                 <th className="px-4 py-3 text-slate-500 dark:text-slate-400">NGUỒN FEED</th>
                 <th className="px-4 py-3 text-slate-500 dark:text-slate-400">TRẠNG THÁI</th>
                 <th
-                  onClick={() => handleSortClick('threatScore', false)}
-                  className="px-4 py-3 text-slate-500 dark:text-slate-400 cursor-pointer hover:text-emerald-600 dark:hover:text-emerald-400"
-                >
-                  <div className="flex items-center space-x-1">
-                    <span>THREAT SCORE</span>
-                    {sortField === 'threatScore' && (
-                      <span className="text-emerald-600 dark:text-emerald-400 font-mono">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                    )}
-                  </div>
-                </th>
-                <th
                   onClick={() => handleSortClick('firstSeen', false)}
                   className="px-4 py-3 text-slate-500 dark:text-slate-400 cursor-pointer hover:text-emerald-600 dark:hover:text-emerald-400"
                 >
@@ -573,11 +560,6 @@ export const DomainTable: React.FC<DomainTableProps> = ({
                       {renderStatus(item.status, item.graceDaysLeft)}
                     </td>
 
-                    {/* Threat Score */}
-                    <td className="px-4 py-3 font-mono text-emerald-600 dark:text-emerald-400 font-semibold whitespace-nowrap">
-                      {((item.threatScore ?? 0) * 100).toFixed(0)}%
-                    </td>
-
                     {/* First Seen */}
                     <td className="px-4 py-3 font-mono text-slate-400 dark:text-slate-500 whitespace-nowrap">
                       {item.firstSeen}
@@ -603,13 +585,6 @@ export const DomainTable: React.FC<DomainTableProps> = ({
                           >
                             <ShieldCheck className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                             <span>Thêm allowlist</span>
-                          </button>
-                          <button
-                            onClick={() => onViewEvidence(item)}
-                            className="w-full px-3.5 py-1.5 text-slate-700 dark:text-slate-200 hover:bg-purple-50 dark:hover:bg-purple-950/50 hover:text-purple-700 dark:hover:text-purple-300 flex items-center space-x-2 text-xs font-medium"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-                            <span>Ảnh crawl</span>
                           </button>
                           <div className="border-t border-slate-100 dark:border-slate-700 my-1"></div>
                           <button

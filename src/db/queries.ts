@@ -371,7 +371,7 @@ export async function getDashboardStats() {
   try {
     const activeFilter = eq(domains.status, 'active');
 
-    const [totalActiveRows, totalAllRows, categoryRows, tldRows, asnRows, statusRows, recentHighThreat] = await Promise.all([
+    const [totalActiveRows, totalAllRows, categoryRows, tldRows, statusRows, recentActive] = await Promise.all([
       db.select({ count: sql<number>`count(*)` }).from(domains).where(activeFilter),
       db.select({ count: sql<number>`count(*)` }).from(domains),
       db
@@ -388,13 +388,6 @@ export async function getDashboardStats() {
         .groupBy(domains.tld)
         .orderBy(desc(sql`count(*)`))
         .limit(6),
-      db
-        .select({ asn: domains.asn, count: sql<number>`count(*)` })
-        .from(domains)
-        .where(activeFilter)
-        .groupBy(domains.asn)
-        .orderBy(desc(sql`count(*)`))
-        .limit(6),
       // Every status, not just 'active' — this is what backs the real
       // "Active / Ân hạn / Allowlist / Đã thôi chặn" breakdown in the
       // dashboard's total-blocked detail modal (see MetricDetailModal.tsx).
@@ -402,11 +395,15 @@ export async function getDashboardStats() {
         .select({ status: domains.status, count: sql<number>`count(*)` })
         .from(domains)
         .groupBy(domains.status),
+      // Most recently detected active domains — real data (lastSeen), unlike
+      // the old "ranked by threatScore" version: threatScore was never a
+      // real computed score (see schema.ts), so sorting by it was ranking on
+      // a fixed constant, not a genuine signal.
       db
         .select()
         .from(domains)
         .where(activeFilter)
-        .orderBy(desc(domains.threatScore), desc(domains.lastSeen))
+        .orderBy(desc(domains.lastSeen))
         .limit(6),
     ]);
 
@@ -426,13 +423,12 @@ export async function getDashboardStats() {
         count: Number(t.count),
         percent: totalActive > 0 ? (Number(t.count) / totalActive) * 100 : 0,
       })),
-      asnBreakdown: asnRows.map((a) => ({ asn: a.asn || 'Unknown ASN', count: Number(a.count) })),
       statusBreakdown: statusRows.map((s) => ({
         status: s.status,
         count: Number(s.count),
         percent: totalAll > 0 ? (Number(s.count) / totalAll) * 100 : 0,
       })),
-      recentHighThreat,
+      recentActive,
     };
   } catch (error) {
     console.error('getDashboardStats failed:', error);
@@ -445,7 +441,6 @@ const DOMAIN_SORT_COLUMNS = {
   domain: domains.domain,
   firstSeen: domains.firstSeen,
   lastSeen: domains.lastSeen,
-  threatScore: domains.threatScore,
 } as const;
 
 export async function getDomains(params: {
@@ -525,14 +520,10 @@ export async function updateDomain(
   patch: {
     categories?: string[];
     status?: string;
-    asn?: string;
-    domainAge?: string;
     sourceDetail?: string;
     tags?: string[];
-    evidenceUrl?: string;
     isProtected?: boolean;
     graceDaysLeft?: number;
-    threatScore?: number;
   },
   meta: { userEmail?: string; reason?: string } = {}
 ) {
@@ -542,14 +533,10 @@ export async function updateDomain(
     // "auto-unblocked by a paused source" marker regardless of which status
     // it's changing to, so a later resumeFeedSource never second-guesses it.
     if (patch.status !== undefined) { setValues.status = patch.status; setValues.unblockedBySourcePause = false; }
-    if (patch.asn !== undefined) setValues.asn = patch.asn;
-    if (patch.domainAge !== undefined) setValues.domainAge = patch.domainAge;
     if (patch.sourceDetail !== undefined) setValues.sourceDetail = patch.sourceDetail;
     if (patch.tags !== undefined) setValues.tags = patch.tags;
-    if (patch.evidenceUrl !== undefined) setValues.evidenceUrl = patch.evidenceUrl;
     if (patch.isProtected !== undefined) setValues.isProtected = patch.isProtected;
     if (patch.graceDaysLeft !== undefined) setValues.graceDaysLeft = patch.graceDaysLeft;
-    if (patch.threatScore !== undefined) setValues.threatScore = patch.threatScore;
 
     let updated = await db.update(domains).set(setValues).where(eq(domains.id, id)).returning();
     if (!updated[0]) throw new Error(`Domain id ${id} not found`);
@@ -627,14 +614,6 @@ export async function createDomain(data: {
         source: sourceLabel,
         sourceDetail: `Thêm bởi ${data.userEmail || 'Analyst'} - Lý do: ${data.reason || 'Bổ sung IOC thủ công'}`,
         status: 'active',
-        // No WHOIS/ASN lookup pipeline exists yet — 'Unknown ASN'/'Unknown'
-        // (the column defaults) are the honest values here, not a
-        // specific-looking fabricated ASN or age. threatScore 0.85 mirrors
-        // bulkCreateDomains' manual-entry default: a human analyst adding a
-        // domain has already made a judgment call that it's malicious.
-        asn: 'Unknown ASN',
-        domainAge: 'Unknown',
-        threatScore: 0.85,
         timeline: [
           {
             time: new Date().toISOString(),
@@ -738,9 +717,6 @@ export async function bulkCreateDomains(data: {
         source: sourceLabel,
         sourceDetail: `Nhập bởi ${data.userEmail || 'Analyst'} - Lý do: ${data.reason || 'Nhập hàng loạt IOC'}`,
         status: 'active',
-        asn: 'Unknown ASN',
-        domainAge: 'Unknown',
-        threatScore: 0.85,
         timeline: [
           {
             time: now.toISOString(),
@@ -754,7 +730,8 @@ export async function bulkCreateDomains(data: {
 
     // Chunk the insert so very large feeds/pasted lists stay well under
     // Postgres' ~65535 bound-parameter limit per statement. Each row here
-    // binds 10 params, so 2000 rows/chunk = ~20,000 params — a wide safety
+    // binds 7 params (down from 10 before asn/domainAge/threatScore were
+    // removed), so 2000 rows/chunk = ~14,000 params — a wide safety
     // margin under the limit while cutting round-trips ~4x versus the
     // previous, overly conservative 500/chunk (376 round-trips -> 94 for a
     // 188K-domain sync): each round-trip carries fixed latency regardless
