@@ -294,7 +294,11 @@ async function addDomainCategoryMemberships(
   rows: { domainId: number; categoryId: string; sourceLabel?: string | null; feedSourceId?: string | null }[]
 ) {
   if (rows.length === 0) return;
-  const CHUNK_SIZE = 1000;
+  // 4 params/row -> 5000/chunk = 20,000 params, well under Postgres' bound-
+  // parameter limit. Same round-trip-reduction reasoning as bulkCreateDomains'
+  // CHUNK_SIZE above (was 1000) — this runs once per bulkCreateDomains chunk
+  // too, so halving/quartering its own round-trip count compounds with that.
+  const CHUNK_SIZE = 5000;
   for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
     const chunk = rows.slice(i, i + CHUNK_SIZE);
     // A single INSERT statement can't target the same conflict key (domainId)
@@ -470,7 +474,16 @@ export async function getDomains(params: {
       conditions.push(ilike(domains.domain, `%${search.trim()}%`));
     }
     if (category && category !== 'all') {
-      conditions.push(sql`${domains.categories} @> ${JSON.stringify([category])}::jsonb`);
+      // primaryCategory, not the jsonb `categories` array — a domain belongs
+      // to exactly ONE category (domain_categories.domainId is uniquely
+      // constrained, see schema.ts), so the trigger-maintained primaryCategory
+      // always equals categories[0] anyway. Filtering on it directly uses
+      // domains_primary_category_idx (a plain btree index); the equivalent
+      // `categories @> '[...]'::jsonb` containment check has no matching
+      // index at all, forcing a full sequential scan on every single
+      // category-filtered Domain Explorer load — the single most common
+      // query this table sees.
+      conditions.push(eq(domains.primaryCategory, category));
     }
     if (status && status.trim() !== '') {
       const statusList = status.split(',').map((s) => s.trim()).filter(Boolean);
@@ -740,8 +753,13 @@ export async function bulkCreateDomains(data: {
     });
 
     // Chunk the insert so very large feeds/pasted lists stay well under
-    // Postgres' ~65535 bound-parameter limit per statement.
-    const CHUNK_SIZE = 500;
+    // Postgres' ~65535 bound-parameter limit per statement. Each row here
+    // binds 10 params, so 2000 rows/chunk = ~20,000 params — a wide safety
+    // margin under the limit while cutting round-trips ~4x versus the
+    // previous, overly conservative 500/chunk (376 round-trips -> 94 for a
+    // 188K-domain sync): each round-trip carries fixed latency regardless
+    // of chunk size, so fewer, larger statements finish materially faster.
+    const CHUNK_SIZE = 2000;
     const upserted: { id: number; domain: string }[] = [];
     for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
       const chunk = rows.slice(i, i + CHUNK_SIZE);
@@ -879,52 +897,60 @@ export async function getCategories() {
   }
 }
 
+// Quy chuẩn đặt id: slug ASCII sạch từ tên (vd. "Cờ bạc trực tuyến" ->
+// "co-bac-truc-tuyen"), KHÔNG có hậu tố ngẫu nhiên — chỉ khi trùng slug
+// với một category đã có mới thêm hậu tố số thứ tự (co-bac-truc-tuyen-2,
+// -3, ...), giống quy ước slug của GitHub repo/Notion page/Shopify handle.
+// Slug được sinh MỘT LẦN tại thời điểm tạo, không bao giờ đổi lại kể cả khi
+// đổi tên sau này (xem updateCategory) — đây là điều mọi bảng khác tham
+// chiếu category theo id (domain_categories, feed_sources.category,
+// review_queue.proposedCategory) cần: id ổn định vĩnh viễn.
+function slugifyVietnamese(name: string): string {
+  return name
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '') // tách dấu tổ hợp tiếng Việt (Kiểm -> Kiem, không bị mất chữ)
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D') // NFD không tách được đ/Đ — không có 'd'/'D' trần + dấu gạch tổ hợp
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+}
+
 export async function createCategory(data: {
   name: string;
   description?: string;
   color?: string;
   deltaThreshold?: number;
 }) {
-  try {
-    // The id is generated here, server-side, from the name at creation
-    // time ONLY — it never changes again afterward, including if the name
-    // is later renamed via updateCategory (see below). This is what makes
-    // it safe for every other table to reference by id (domain_categories,
-    // feed_sources.category, review_queue.proposedCategory): a rename can
-    // never silently break those references the way trusting a client-
-    // supplied id (or worse, deriving the id FROM the display name on every
-    // write, as the UI used to) could. Same slug+timestamp convention as
-    // createFeedSource's id, for the same reason: cheap, always unique,
-    // still human-legible in logs/DB browsing.
-    const slug = data.name
-      .normalize('NFD')
-      .replace(/[̀-ͯ]/g, '') // strip combining diacritics (Kiểm -> Kiem, not dropped entirely)
-      .replace(/đ/g, 'd')
-      .replace(/Đ/g, 'D') // NFD doesn't decompose đ/Đ — no bare 'd'/'D' + combining stroke
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)/g, '');
-    const id = `${slug || 'category'}-${Date.now().toString(36)}`;
+  const baseSlug = slugifyVietnamese(data.name) || 'nhom-danh-muc';
 
-    const res = await db
-      .insert(categories)
-      .values({
-        id,
-        name: data.name,
-        description: data.description || null,
-        color: data.color || '#10B981',
-        deltaThreshold: data.deltaThreshold || 3,
-      })
-      .returning();
-    return res[0];
-  } catch (error: any) {
-    if (error?.code === '23505' || error?.cause?.code === '23505') {
-      throw new Error(`Nhóm danh mục "${data.name}" đã tồn tại (trùng mã tự sinh) — vui lòng thử lại.`);
+  // Thử slug sạch trước; chỉ thêm hậu tố số khi thật sự trùng. Bắt lỗi
+  // unique-violation (23505) để retry thay vì query kiểm tra trước rồi
+  // insert sau (tránh race condition giữa 2 lần tạo category đồng thời).
+  const MAX_ATTEMPTS = 50;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const id = attempt === 1 ? baseSlug : `${baseSlug}-${attempt}`;
+    try {
+      const res = await db
+        .insert(categories)
+        .values({
+          id,
+          name: data.name,
+          description: data.description || null,
+          color: data.color || '#10B981',
+          deltaThreshold: data.deltaThreshold || 3,
+        })
+        .returning();
+      return res[0];
+    } catch (error: any) {
+      const code = error?.code || error?.cause?.code;
+      if (code === '23505') continue; // id này đã tồn tại — thử hậu tố tiếp theo
+      console.error('createCategory failed:', error);
+      throw new Error('Failed to create category', { cause: error });
     }
-    console.error('createCategory failed:', error);
-    throw new Error('Failed to create category', { cause: error });
   }
+  throw new Error(`Không thể tạo mã định danh duy nhất cho "${data.name}" — vui lòng thử lại.`);
 }
 
 export async function updateCategory(
@@ -1413,7 +1439,9 @@ export async function bulkCreateReviewItems(data: {
   const toInsert = cleanDomains.filter((d) => !alreadyPending.has(d));
   if (toInsert.length === 0) return { insertedCount: 0, skippedCount: cleanDomains.length };
 
-  const INSERT_CHUNK = 1000;
+  // 8 params/row -> 4000/chunk = 32,000 params, well under Postgres' bound-
+  // parameter limit. Same round-trip-reduction reasoning as bulkCreateDomains.
+  const INSERT_CHUNK = 4000;
   let inserted = 0;
   for (let i = 0; i < toInsert.length; i += INSERT_CHUNK) {
     const chunk = toInsert.slice(i, i + INSERT_CHUNK);

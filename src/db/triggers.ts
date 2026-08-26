@@ -148,3 +148,38 @@ export async function ensureDomainCategoryTriggers() {
     throw error;
   }
 }
+
+// Two indexes drizzle-kit's schema.ts DSL can't express (a trigram GIN
+// index needs the pg_trgm extension + a non-default operator class; a
+// partial index needs a WHERE clause) — applied idempotently at startup the
+// same way as the trigger above, instead of living in schema.ts.
+//
+// 1. domains_domain_trgm_idx: getDomains' search filter is
+//    `ilike(domains.domain, '%term%')` — a LEADING wildcard, which a normal
+//    btree index (like the one domains.domain already has from its UNIQUE
+//    constraint) cannot use at all; Postgres falls back to scanning every
+//    row. A trigram GIN index is what makes a leading-wildcard ILIKE
+//    index-backed instead.
+// 2. domains_active_threat_idx: backs getDashboardStats' "recentHighThreat"
+//    query (`WHERE status='active' ORDER BY threat_score DESC, last_seen
+//    DESC LIMIT 6`) — a partial index (only 'active' rows, which is also
+//    the only status this query ever filters on) pre-sorted in exactly the
+//    order that query needs, so it's a direct index scan + LIMIT instead of
+//    sorting every active domain on each dashboard load.
+export async function ensureSearchIndexes() {
+  try {
+    await db.execute(sql`CREATE EXTENSION IF NOT EXISTS pg_trgm;`);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS domains_domain_trgm_idx
+      ON domains USING gin (domain gin_trgm_ops);
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS domains_active_threat_idx
+      ON domains (threat_score DESC, last_seen DESC)
+      WHERE status = 'active';
+    `);
+  } catch (error) {
+    console.error('Failed to install search/dashboard indexes:', error);
+    throw error;
+  }
+}

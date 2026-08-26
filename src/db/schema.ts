@@ -152,10 +152,21 @@ export const domains = pgTable(
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
   (table) => [
-    index('domains_domain_idx').on(table.domain),
+    // No separate index on `domain` here — .unique() above already creates
+    // one (Postgres backs a UNIQUE constraint with its own btree index), so
+    // an explicit index('...').on(table.domain) would be a second, fully
+    // redundant index on the exact same single column: identical lookup
+    // performance, but double the index-maintenance cost on every insert/
+    // update — real write overhead on every domain in every sync, for zero
+    // read benefit. (This existed as `domains_domain_idx` until this fix.)
     index('domains_status_idx').on(table.status),
     index('domains_primary_category_idx').on(table.primaryCategory),
     index('domains_tld_idx').on(table.tld),
+    // Backs the Domain Explorer's default sort (getDomains defaults to
+    // lastSeen desc when no sortField is requested) — without this, every
+    // unsorted-by-choice page load had to fully sort the entire filtered
+    // result set before applying LIMIT.
+    index('domains_last_seen_idx').on(table.lastSeen),
   ]
 );
 

@@ -13,7 +13,7 @@ import http from 'http';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { ensureSuperAdmin } from './src/db/queries.ts';
-import { ensureDomainCategoryTriggers } from './src/db/triggers.ts';
+import { ensureDomainCategoryTriggers, ensureSearchIndexes } from './src/db/triggers.ts';
 import {
   getDashboardStats,
   getDomains,
@@ -106,6 +106,7 @@ async function startServer() {
   // primaryCategory and categories.count correct), so this is awaited
   // before the (fire-and-forget) data seed runs.
   await ensureDomainCategoryTriggers();
+  await ensureSearchIndexes();
   // Guarantees the system always has at least one Admin account to log in
   // with — must be awaited (not fire-and-forget) so the credentials print
   // to the console before anyone tries to sign in.

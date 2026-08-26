@@ -66,7 +66,11 @@ export const createPool = () => {
   if (!global._postgresPool) {
     global._postgresPool = new Pool({
       ...resolvePoolConfig(),
-      max: 10,
+      // A feed sync holds one connection for its whole (now much shorter,
+      // see bulkCreateDomains/addDomainCategoryMemberships chunk sizes)
+      // duration — 10 left too little headroom for concurrent Dashboard/
+      // Domain Explorer reads from other analysts while a sync is running.
+      max: 20,
       connectionTimeoutMillis: 15000,
     });
 
