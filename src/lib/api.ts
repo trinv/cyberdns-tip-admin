@@ -108,6 +108,21 @@ export async function fetchMe(): Promise<AppUser> {
   return data.user;
 }
 
+// Used only for the "restore session from a stored token on page load"
+// check (see App.tsx) — a 401 here just means a leftover token expired or
+// was invalidated, an expected/silent scenario, not a failed user action.
+// Deliberately does NOT go through checkResponse/the global
+// unauthorizedHandler, which would otherwise pop the "please log in"
+// warning toast right on top of the login page the user is about to see.
+// Every other authenticated call still goes through fetchMe/checkResponse
+// as normal, so a session that expires mid-use is still surfaced.
+export async function fetchMeSilently(): Promise<AppUser | null> {
+  const res = await fetch(`${API_BASE}/auth/me`, { headers: await authHeaders() });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.user;
+}
+
 // ---- User account management (Admin-only) ----
 export async function fetchUsers(): Promise<AppUser[]> {
   const res = await fetch(`${API_BASE}/users`, { headers: await authHeaders() });

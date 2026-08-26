@@ -26,7 +26,7 @@ import {
   resolveReviewItemApi,
   loginApi,
   logoutApi,
-  fetchMe,
+  fetchMeSilently,
   getStoredToken,
   setStoredToken,
   fetchUsers,
@@ -130,9 +130,11 @@ export default function App() {
       setIsAuthLoading(false);
       return;
     }
-    fetchMe()
-      .then((user) => setCurrentUser(user))
-      .catch(() => setStoredToken(null)) // expired/invalid token
+    fetchMeSilently()
+      .then((user) => {
+        if (user) setCurrentUser(user);
+        else setStoredToken(null); // expired/invalid token — no toast, see fetchMeSilently
+      })
       .finally(() => setIsAuthLoading(false));
   }, []);
 

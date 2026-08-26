@@ -90,6 +90,8 @@ Xem đầy đủ chú thích trong [`.env.example`](.env.example). Tóm tắt:
 | `DB_SSL` | Không | `true`/`false` — mặc định tắt cho host local, bật cho host khác |
 | `PORT` | Không | Mặc định `3000` |
 | `SUPERADMIN_EMAIL` / `SUPERADMIN_PASSWORD` | Khuyến nghị | Tài khoản Admin đầu tiên, tự tạo nếu chưa có Admin nào |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_SECURE` / `SMTP_FROM` | Không | Máy chủ SMTP để gửi email cảnh báo đăng nhập IP mới — để trống `SMTP_HOST` để tắt tính năng này (cảnh báo trong ứng dụng vẫn hoạt động) |
+| `SECURITY_ALERT_EMAIL` | Không | Địa chỉ nhận email cảnh báo đăng nhập từ IP mới |
 
 ## Kiến trúc & cấu trúc thư mục
 

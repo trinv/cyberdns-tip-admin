@@ -15,6 +15,7 @@ import {
 import { eq, desc, asc, sql, ilike, and, inArray } from 'drizzle-orm';
 import { parseFeedText } from './feedParser.ts';
 import { hashPassword, verifyPassword, generateSessionToken, generateTempPassword } from '../lib/password.ts';
+import { sendNewIpLoginAlert } from '../lib/mailer.ts';
 
 const SESSION_TTL_MS = 30 * 24 * 3600 * 1000; // 30 days
 
@@ -101,6 +102,19 @@ export async function recordLoginAttempt(params: {
       isNewIp,
       failureReason: params.failureReason || null,
     });
+
+    // Fire-and-forget: email delivery must never slow down or block the
+    // actual login response (same reasoning as this whole function never
+    // throwing — see sendNewIpLoginAlert for why it's already safe to call
+    // unconditionally, including when no SMTP/alert-recipient is configured).
+    if (isNewIp) {
+      sendNewIpLoginAlert({
+        userEmail: params.email.toLowerCase().trim(),
+        ipAddress: params.ipAddress,
+        userAgent: params.userAgent,
+        time: new Date(),
+      }).catch(() => {});
+    }
 
     return { isNewIp };
   } catch (error) {
