@@ -157,27 +157,45 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
         </button>
       </div>
 
-      {/* TRẠNG THÁI SECTION — single-select dropdown (was a multi-checkbox
-          list) matching how a saved filter/category selection already only
-          ever carries ONE status at a time. */}
+      {/* TRẠNG THÁI SECTION — single-select toggle group (was a dropdown)
+          matching how a saved filter/category selection already only ever
+          carries ONE status at a time. */}
       <div>
         <div className="px-2 mb-2.5 text-slate-400 dark:text-slate-500 font-bold tracking-wider text-xs uppercase">
           TRẠNG THÁI BLOCKLIST
         </div>
-        <select
-          value={selectedStatus}
-          onChange={(e) => {
-            onSelectStatus(e.target.value as DomainStatus | 'all');
-            if (onCloseMobile) onCloseMobile();
-          }}
-          className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 focus:outline-none focus:border-emerald-500 cursor-pointer"
-        >
-          {STATUS_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label} ({opt.value === 'all' ? formatNumber(allStatusCount) : formatStatusCount(opt.value)})
-            </option>
-          ))}
-        </select>
+        <div className="flex flex-col rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-900">
+          {STATUS_OPTIONS.map((opt, idx) => {
+            const isSelected = selectedStatus === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                aria-pressed={isSelected}
+                onClick={() => {
+                  onSelectStatus(opt.value);
+                  if (onCloseMobile) onCloseMobile();
+                }}
+                className={`w-full flex items-center justify-between px-3 py-2 text-left text-xs font-semibold transition-colors cursor-pointer ${
+                  idx !== 0 ? 'border-t border-slate-100 dark:border-slate-800' : ''
+                } ${
+                  isSelected
+                    ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
+              >
+                <span>{opt.label}</span>
+                <span className={`font-mono text-xs px-1.5 py-0.5 rounded ${
+                  isSelected
+                    ? 'bg-emerald-100/80 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 font-bold'
+                    : 'text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800'
+                }`}>
+                  {opt.value === 'all' ? formatNumber(allStatusCount) : formatStatusCount(opt.value)}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* BỘ LỌC ĐÃ LƯU SECTION */}
