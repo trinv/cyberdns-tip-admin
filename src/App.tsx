@@ -399,14 +399,27 @@ export default function App() {
     }
   }, [selectedCategory, statusFilters, selectedTld, selectedSource, debouncedSearchQuery, domainsPage, domainsPageSize, sortField, sortDirection]);
 
-  // Same filters as refreshDomains, but with no limit/offset — the backend
-  // then returns every matching row instead of one page. Used by the Export
-  // modal's "toàn bộ danh mục" scope and by the quick-export toolbar buttons
-  // so exporting is never silently capped at whatever happens to be on
-  // screen.
+  // Same filters as refreshDomains, but paginated through in chunks instead
+  // of one unbounded request — used by the Export modal's "toàn bộ danh
+  // mục" scope and by the quick-export toolbar buttons so exporting is
+  // never silently capped at whatever happens to be on screen.
+  //
+  // Used to fetch with no limit/offset at all — for a category with
+  // hundreds of thousands of domains (this system's real scale, see the
+  // Dashboard's own IOC count), that's one query/response covering the
+  // ENTIRE result set: a huge Postgres scan+sort+serialize and a huge JSON
+  // payload over the wire, all as a single all-or-nothing request — exactly
+  // the kind of request most likely to outlast a proxy/client timeout
+  // (especially alongside any other slow-DB-write contention, e.g. a
+  // checkpoint stall). Paging through in fixed-size chunks via the same
+  // limit/offset the Domain Explorer's own pagination already uses turns
+  // that into many small, fast, index-backed requests instead — far less
+  // likely to fail at all, and if one page IS transiently slow/fails, a
+  // couple of retries there is cheap compared to redoing the whole export.
+  const EXPORT_PAGE_SIZE = 5000;
   const fetchAllFilteredDomains = useCallback(async (): Promise<DomainItem[]> => {
     const activeStatuses = (Object.keys(statusFilters) as DomainStatus[]).filter((k) => statusFilters[k]);
-    const res = await fetchDomains({
+    const baseParams = {
       category: selectedCategory !== 'all' ? selectedCategory : undefined,
       status: activeStatuses.length > 0 ? activeStatuses.join(',') : undefined,
       tld: selectedTld || undefined,
@@ -414,8 +427,27 @@ export default function App() {
       search: debouncedSearchQuery || undefined,
       sortField,
       sortDirection,
-    });
-    return res.domains;
+    };
+
+    const fetchPageWithRetry = async (offset: number, attempt = 1): Promise<{ domains: DomainItem[]; total: number }> => {
+      try {
+        return await fetchDomains({ ...baseParams, limit: EXPORT_PAGE_SIZE, offset });
+      } catch (err) {
+        if (attempt >= 3) throw err;
+        await new Promise((r) => setTimeout(r, 500 * attempt));
+        return fetchPageWithRetry(offset, attempt + 1);
+      }
+    };
+
+    const all: DomainItem[] = [];
+    let offset = 0;
+    for (;;) {
+      const page = await fetchPageWithRetry(offset);
+      all.push(...page.domains);
+      if (page.domains.length < EXPORT_PAGE_SIZE || all.length >= page.total) break;
+      offset += EXPORT_PAGE_SIZE;
+    }
+    return all;
   }, [selectedCategory, statusFilters, selectedTld, selectedSource, debouncedSearchQuery, sortField, sortDirection]);
 
   useEffect(() => {
