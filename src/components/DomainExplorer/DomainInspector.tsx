@@ -91,11 +91,19 @@ export const DomainInspector: React.FC<DomainInspectorProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center justify-between">
-          <span className="text-slate-400 dark:text-slate-500 uppercase text-xs font-bold tracking-wider">
+        {/* Stacked (label above value), not the side-by-side layout the
+            other rows use — sourceDetail can be a long sentence (e.g. a
+            feed-synced domain's "Đồng bộ tự động từ nguồn feed ..."
+            reason), and forcing a long value into a narrow
+            `justify-between` column made it wrap unevenly, reading as if
+            it were centered rather than simply wrapped. */}
+        <div className="space-y-1">
+          <span className="text-slate-400 dark:text-slate-500 uppercase text-xs font-bold tracking-wider block">
             NGUỒN
           </span>
-          <span className="font-mono text-slate-800 dark:text-slate-200 font-semibold">{domain.sourceDetail || domain.source}</span>
+          <span className="font-mono text-slate-800 dark:text-slate-200 font-medium text-xs leading-relaxed block">
+            {domain.sourceDetail || domain.source}
+          </span>
         </div>
 
         <div className="flex items-center justify-between">
