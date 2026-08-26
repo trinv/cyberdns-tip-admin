@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, ShieldAlert, CheckCircle2 } from 'lucide-react';
 import { CategoryInfo, DomainItem } from '../../types';
 
@@ -19,7 +19,18 @@ export const AddEditDomainModal: React.FC<AddEditDomainModalProps> = ({
 }) => {
   const isEditing = !!domainToEdit;
   const [domainName, setDomainName] = useState(domainToEdit ? domainToEdit.domain : '');
-  const [selectedCat, setSelectedCat] = useState(domainToEdit ? domainToEdit.primaryCategory : 'gambling');
+  // For a new domain, starts empty rather than a hardcoded guess like
+  // 'gambling' — see the same fix in SourcesView.tsx for why: an id that
+  // doesn't actually exist in this install's categories table passes
+  // client-side validation fine but fails at the DB's foreign key the
+  // moment it's actually used. Editing keeps the domain's real category.
+  const [selectedCat, setSelectedCat] = useState(domainToEdit ? domainToEdit.primaryCategory : '');
+  useEffect(() => {
+    if (isEditing || categories.length === 0) return;
+    if (!categories.some((c) => c.id === selectedCat)) {
+      setSelectedCat(categories[0].id);
+    }
+  }, [categories, isEditing, selectedCat]);
   const [reason, setReason] = useState(isEditing ? 'Cập nhật phân loại theo bằng chứng mới' : 'Thêm mới domain phát hiện qua query log');
   const [status, setStatus] = useState(domainToEdit ? domainToEdit.status : 'active');
 
@@ -27,7 +38,7 @@ export const AddEditDomainModal: React.FC<AddEditDomainModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!domainName.trim() || !reason.trim()) return;
+    if (!domainName.trim() || !reason.trim() || !selectedCat) return;
 
     onSave(
       {

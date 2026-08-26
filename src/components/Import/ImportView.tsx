@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CategoryInfo } from '../../types';
 import {
   Upload, FileText, Globe, CheckCircle2, AlertTriangle, ShieldCheck,
@@ -15,7 +15,17 @@ export const ImportView: React.FC<ImportViewProps> = ({ categories, onImportDoma
   // Starts empty — a pre-filled example list here would risk being bulk-
   // imported for real if a user submits without reading it first.
   const [rawText, setRawText] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('gambling');
+  // Starts empty rather than a hardcoded guess like 'gambling' — see the
+  // same fix in SourcesView.tsx for why: an id that doesn't actually exist
+  // in this install's categories table passes client-side validation fine
+  // but fails at the DB's foreign key the moment it's actually used.
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  useEffect(() => {
+    if (categories.length === 0) return;
+    if (!categories.some((c) => c.id === selectedCategory)) {
+      setSelectedCategory(categories[0].id);
+    }
+  }, [categories, selectedCategory]);
   const [reason, setReason] = useState('');
   const [urlInput, setUrlInput] = useState('');
   const [isParsing, setIsParsing] = useState(false);
@@ -70,7 +80,7 @@ export const ImportView: React.FC<ImportViewProps> = ({ categories, onImportDoma
 
   const handleImportSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (parsed.uniqueValid.length === 0 || !reason.trim()) return;
+    if (parsed.uniqueValid.length === 0 || !reason.trim() || !selectedCategory) return;
 
     setIsParsing(true);
     setTimeout(() => {

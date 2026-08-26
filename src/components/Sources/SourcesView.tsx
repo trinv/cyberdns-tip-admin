@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FeedSource, CategoryInfo } from '../../types';
 import {
   RefreshCw, Plus, Globe, CheckCircle2, AlertTriangle,
@@ -29,7 +29,23 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newSourceName, setNewSourceName] = useState('');
   const [newSourceUrl, setNewSourceUrl] = useState('');
-  const [newSourceCategory, setNewSourceCategory] = useState('malware-phishing');
+  // Starts empty rather than a hardcoded guess like 'malware-phishing' — an
+  // id that only happens to exist on some installs. `categories` comes from
+  // the real DB and can differ (or not have loaded yet) on any given
+  // deployment; the effect below picks a REAL category id once `categories`
+  // is available, and re-anchors if the previously-picked one is deleted.
+  // Submitting an id that isn't in `categories` fails at the DB's foreign
+  // key (domain_categories.category_id references categories.id) the
+  // moment a sync from this source tries to write a domain — this bug once
+  // let that happen silently, since the <select> below still visually shows
+  // its first real option regardless of what the controlled value actually is.
+  const [newSourceCategory, setNewSourceCategory] = useState('');
+  useEffect(() => {
+    if (categories.length === 0) return;
+    if (!categories.some((c) => c.id === newSourceCategory)) {
+      setNewSourceCategory(categories[0].id);
+    }
+  }, [categories, newSourceCategory]);
   const [newSourceInterval, setNewSourceInterval] = useState('4 giờ');
 
   // Sync IS whatever `src.status === 'syncing'` says, straight from the
@@ -44,7 +60,7 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
 
   const handleAddSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newSourceName.trim() || !newSourceUrl.trim()) return;
+    if (!newSourceName.trim() || !newSourceUrl.trim() || !newSourceCategory) return;
 
     // domainCount/lastSync/status are intentionally NOT sent — a source
     // that has never been synced has no real value for any of them; the

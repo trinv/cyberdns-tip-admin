@@ -290,24 +290,48 @@ async function addDomainCategoryMemberships(
     const byDomainId = new Map<number, (typeof chunk)[number]>();
     for (const r of chunk) byDomainId.set(r.domainId, r);
 
-    await db
-      .insert(domainCategories)
-      .values(
-        Array.from(byDomainId.values()).map((r) => ({
-          domainId: r.domainId,
-          categoryId: r.categoryId,
-          sourceLabel: r.sourceLabel || null,
-          feedSourceId: r.feedSourceId || null,
-        }))
-      )
-      .onConflictDoUpdate({
-        target: domainCategories.domainId,
-        set: {
-          categoryId: sql`excluded.category_id`,
-          sourceLabel: sql`excluded.source_label`,
-          feedSourceId: sql`excluded.feed_source_id`,
-        },
-      });
+    try {
+      await db
+        .insert(domainCategories)
+        .values(
+          Array.from(byDomainId.values()).map((r) => ({
+            domainId: r.domainId,
+            categoryId: r.categoryId,
+            sourceLabel: r.sourceLabel || null,
+            feedSourceId: r.feedSourceId || null,
+          }))
+        )
+        .onConflictDoUpdate({
+          target: domainCategories.domainId,
+          set: {
+            categoryId: sql`excluded.category_id`,
+            sourceLabel: sql`excluded.source_label`,
+            feedSourceId: sql`excluded.feed_source_id`,
+          },
+        });
+    } catch (error: any) {
+      // Postgres FK violation (categoryId not present in `categories`) is a
+      // real, actionable data-entry mistake — e.g. a feed source or a bulk
+      // action was configured with a category id that got renamed/deleted,
+      // or (the original instance of this bug) a category-picker's stale
+      // hardcoded default slipped through untouched — surface WHICH id(s)
+      // are bad instead of letting the raw constraint-violation stack trace
+      // reach the UI as an opaque 500.
+      const code = error?.code || error?.cause?.code;
+      if (code === '23503') {
+        const realCategories = await db.select({ id: categories.id }).from(categories);
+        const validIds = new Set(realCategories.map((c) => c.id));
+        const badIds = Array.from(new Set(Array.from(byDomainId.values()).map((r) => r.categoryId))).filter(
+          (id) => !validIds.has(id)
+        );
+        throw new Error(
+          badIds.length > 0
+            ? `Nhóm danh mục không tồn tại: ${badIds.join(', ')}. Vui lòng chọn lại nhóm hợp lệ.`
+            : 'Nhóm danh mục không hợp lệ (đã bị xoá hoặc đổi tên).'
+        );
+      }
+      throw error;
+    }
   }
 }
 
@@ -630,8 +654,13 @@ export async function createDomain(data: {
     });
 
     return finalRows[0];
-  } catch (error) {
+  } catch (error: any) {
     console.error('createDomain failed:', error);
+    // A validation error thrown deliberately above (e.g. an invalid
+    // category id — see addDomainCategoryMemberships) already has a clear,
+    // actionable Vietnamese message and no `cause` — preserve it verbatim
+    // instead of burying it behind a generic message the UI would show.
+    if (error instanceof Error && !error.cause) throw error;
     throw new Error('Failed to create domain record', { cause: error });
   }
 }
@@ -750,8 +779,12 @@ export async function bulkCreateDomains(data: {
     });
 
     return { domains: inserted, insertedCount: inserted.length, newCount, existingCount };
-  } catch (error) {
+  } catch (error: any) {
     console.error('bulkCreateDomains failed:', error);
+    // See createDomain's identical check — preserve a deliberately-thrown,
+    // already-clear validation message (e.g. an invalid category id from
+    // addDomainCategoryMemberships) instead of masking it.
+    if (error instanceof Error && !error.cause) throw error;
     throw new Error('Failed to bulk import domains', { cause: error });
   }
 }
@@ -1501,8 +1534,12 @@ export async function resolveReviewItem(
     }
 
     return item[0];
-  } catch (error) {
+  } catch (error: any) {
     console.error('resolveReviewItem failed:', error);
+    // See createDomain's identical check — preserve a deliberately-thrown,
+    // already-clear validation message (e.g. an invalid category override)
+    // instead of masking it, since createDomain above can itself throw one.
+    if (error instanceof Error && !error.cause) throw error;
     throw new Error('Failed to resolve review item', { cause: error });
   }
 }

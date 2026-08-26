@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, AlertTriangle, CheckCircle2, Lock } from 'lucide-react';
 import { CategoryInfo, DomainItem } from '../../types';
 
@@ -16,13 +16,25 @@ export const DomainBulkModal: React.FC<DomainBulkModalProps> = ({
   isOpen,
   onClose,
   actionType,
-  targetCategory: initialTargetCategory = 'malware-phishing',
+  targetCategory: initialTargetCategory,
   selectedDomains,
   categories,
   onConfirm,
 }) => {
   const [reason, setReason] = useState('');
-  const [selectedCat, setSelectedCat] = useState(initialTargetCategory);
+  // Starts empty rather than defaulting to a hardcoded guess like
+  // 'malware-phishing' when no explicit targetCategory prop is passed (the
+  // normal case — App.tsx never passes one) — see the same fix in
+  // SourcesView.tsx for why: an id that doesn't actually exist in this
+  // install's categories table passes client-side validation fine but
+  // fails at the DB's foreign key the moment it's actually used.
+  const [selectedCat, setSelectedCat] = useState(initialTargetCategory || '');
+  useEffect(() => {
+    if (initialTargetCategory || categories.length === 0) return;
+    if (!categories.some((c) => c.id === selectedCat)) {
+      setSelectedCat(categories[0].id);
+    }
+  }, [categories, initialTargetCategory, selectedCat]);
   const [isProcessing, setIsProcessing] = useState(false);
 
   if (!isOpen) return null;
@@ -50,6 +62,7 @@ export const DomainBulkModal: React.FC<DomainBulkModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!reason.trim() || count === 0 || isProcessing) return;
+    if (actionType === 'add_group' && !selectedCat) return;
 
     setIsProcessing(true);
     try {
