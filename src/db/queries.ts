@@ -1031,6 +1031,46 @@ export async function createFeedSource(data: {
   }
 }
 
+// Runs once at server startup, right alongside ensureSuperAdmin — recovers
+// any feed source whose row got stuck showing status='syncing' because the
+// PREVIOUS server process died (crashed, or was restarted via `docker
+// compose down/up` — including deliberately, e.g. after deploying an
+// update) while a sync job was actually in flight. `activeSyncs` (below) is
+// an in-memory Set: it starts empty on every process boot, but a row's
+// `status` column persists in Postgres regardless — so without this, that
+// row is stuck at 'syncing' FOREVER, showing whatever progress text it last
+// reached before the process died, with no way to recover: startFeedSourceSync
+// checks `source.status === 'syncing'` and, seeing it still true, assumes a
+// job must already be running and refuses to start a new one — clicking
+// "Đồng bộ" again silently does nothing.
+//
+// Any row still 'syncing' at this exact moment (server startup, before this
+// process has started any sync of its own) can only be leftover from a dead
+// process — reset it to a real, honest 'error' state instead of a silently
+// frozen fake "still in progress" one. Any domains that sync had already
+// written before dying stay exactly as they are (this never touches
+// domains/domain_categories) — only the source row's own status.
+export async function recoverInterruptedSyncs() {
+  try {
+    const recovered = await db
+      .update(feedSources)
+      .set({
+        status: 'error',
+        errorMessage: 'Đồng bộ bị gián đoạn do máy chủ khởi động lại — vui lòng bấm "Đồng bộ" để thử lại.',
+        syncProgress: 0,
+        syncPhase: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(feedSources.status, 'syncing'))
+      .returning({ id: feedSources.id, name: feedSources.name });
+    if (recovered.length > 0) {
+      console.log(`Đã khôi phục ${recovered.length} nguồn feed bị kẹt ở trạng thái "syncing" từ phiên chạy trước: ${recovered.map((r) => r.name).join(', ')}`);
+    }
+  } catch (error) {
+    console.error('recoverInterruptedSyncs failed:', error);
+  }
+}
+
 // Feed sync is a real background job, not a request/response round-trip:
 // startFeedSourceSync() flips the row to 'syncing' and returns immediately
 // (a few ms); runFeedSourceSyncJob() then keeps running server-side to

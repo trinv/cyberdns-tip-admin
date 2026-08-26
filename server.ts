@@ -12,7 +12,7 @@ import express from 'express';
 import http from 'http';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
-import { ensureSuperAdmin } from './src/db/queries.ts';
+import { ensureSuperAdmin, recoverInterruptedSyncs } from './src/db/queries.ts';
 import { ensureDomainCategoryTriggers, ensureSearchIndexes } from './src/db/triggers.ts';
 import {
   getDashboardStats,
@@ -119,6 +119,11 @@ async function startServer() {
   // (POST /api/sources/:id/sync), the Import tab, or manual entry — never
   // a hardcoded default list, however "real-looking" the values are.
   await ensureSuperAdmin();
+  // Must run before any client can hit POST /api/sources/:id/sync — a feed
+  // source row left at status='syncing' by the PREVIOUS process (killed
+  // mid-sync by this very restart) would otherwise block every future sync
+  // attempt on that source forever (see recoverInterruptedSyncs' comment).
+  await recoverInterruptedSyncs();
 
   // ===================== REST API ROUTES =====================
 
