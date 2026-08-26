@@ -2,18 +2,30 @@ import React from 'react';
 import { CategoryInfo, SavedFilter, DomainStatus } from '../../types';
 import { Plus, Tag, Bookmark, CheckSquare, Square, FolderPlus, Sparkles, Filter, X } from 'lucide-react';
 
+const STATUS_OPTIONS: { value: DomainStatus | 'all'; label: string }[] = [
+  { value: 'all', label: 'Tất cả' },
+  { value: 'active', label: 'Đang chặn' },
+  { value: 'grace_period', label: 'Trong ân hạn' },
+  { value: 'unblocked', label: 'Đã thôi chặn' },
+  { value: 'allowlist', label: 'Trong allowlist' },
+];
+
 interface SidebarFiltersProps {
   categories: CategoryInfo[];
   selectedCategory: string;
   onSelectCategory: (categoryId: string) => void;
-  statusFilters: Record<DomainStatus, boolean>;
-  onToggleStatus: (status: DomainStatus) => void;
+  selectedStatus: DomainStatus | 'all';
+  onSelectStatus: (status: DomainStatus | 'all') => void;
   savedFilters: SavedFilter[];
   activeSavedFilter: string | null;
   onSelectSavedFilter: (filter: SavedFilter) => void;
   onOpenAddCategory: () => void;
   onSaveCurrentFilter: () => void;
   totalDomainCount: number;
+  // Real count across every status (dashboardStats.totalAll) — the
+  // "Tất cả" option's own count, distinct from totalDomainCount above
+  // (which is active-only, used by the CATEGORY section's "Tất cả nhóm").
+  allStatusCount: number;
   // Real per-status counts from GET /api/dashboard/stats — undefined/null
   // while stats haven't loaded yet, rendered as "…" rather than a guessed
   // number.
@@ -26,14 +38,15 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
   categories,
   selectedCategory,
   onSelectCategory,
-  statusFilters,
-  onToggleStatus,
+  selectedStatus,
+  onSelectStatus,
   savedFilters,
   activeSavedFilter,
   onSelectSavedFilter,
   onOpenAddCategory,
   onSaveCurrentFilter,
   totalDomainCount,
+  allStatusCount,
   statusCounts,
   isOpenMobile = false,
   onCloseMobile,
@@ -145,64 +158,27 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
         </button>
       </div>
 
-      {/* TRẠNG THÁI SECTION */}
+      {/* TRẠNG THÁI SECTION — single-select dropdown (was a multi-checkbox
+          list) matching how a saved filter/category selection already only
+          ever carries ONE status at a time. */}
       <div>
         <div className="px-2 mb-2.5 text-slate-400 dark:text-slate-500 font-bold tracking-wider text-xs uppercase">
           TRẠNG THÁI BLOCKLIST
         </div>
-        <div className="space-y-1">
-          <label className="flex items-center justify-between px-3 py-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 cursor-pointer group">
-            <div className="flex items-center space-x-2.5">
-              <input
-                type="checkbox"
-                checked={statusFilters.active}
-                onChange={() => onToggleStatus('active')}
-                className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-emerald-600 focus:ring-0 cursor-pointer accent-emerald-600"
-              />
-              <span className="group-hover:text-slate-900 dark:group-hover:text-white font-medium">Đang chặn</span>
-            </div>
-            <span className="font-mono text-xs text-slate-500 dark:text-slate-400 font-semibold">{formatStatusCount('active')}</span>
-          </label>
-
-          <label className="flex items-center justify-between px-3 py-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 cursor-pointer group">
-            <div className="flex items-center space-x-2.5">
-              <input
-                type="checkbox"
-                checked={statusFilters.grace_period}
-                onChange={() => onToggleStatus('grace_period')}
-                className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-emerald-600 focus:ring-0 cursor-pointer accent-emerald-600"
-              />
-              <span className="group-hover:text-slate-900 dark:group-hover:text-white font-medium">Trong ân hạn</span>
-            </div>
-            <span className="font-mono text-xs text-amber-600 dark:text-amber-400 font-bold px-1.5 py-0.5 bg-amber-50 dark:bg-amber-950/60 rounded">{formatStatusCount('grace_period')}</span>
-          </label>
-
-          <label className="flex items-center justify-between px-3 py-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 cursor-pointer group">
-            <div className="flex items-center space-x-2.5">
-              <input
-                type="checkbox"
-                checked={statusFilters.unblocked}
-                onChange={() => onToggleStatus('unblocked')}
-                className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-emerald-600 focus:ring-0 cursor-pointer accent-emerald-600"
-              />
-              <span className="group-hover:text-slate-900 dark:group-hover:text-white font-medium">Đã thôi chặn</span>
-            </div>
-            <span className="font-mono text-xs text-slate-400 dark:text-slate-500">{formatStatusCount('unblocked')}</span>
-          </label>
-
-          <label className="flex items-center justify-between px-3 py-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 cursor-pointer group">
-            <div className="flex items-center space-x-2.5">
-              <input
-                type="checkbox"
-                checked={statusFilters.allowlist}
-                onChange={() => onToggleStatus('allowlist')}
-                className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-emerald-600 focus:ring-0 cursor-pointer accent-emerald-600"
-              />
-              <span className="group-hover:text-slate-900 dark:group-hover:text-white font-medium">Trong allowlist</span>
-            </div>
-            <span className="font-mono text-xs text-emerald-600 dark:text-emerald-400 font-bold px-1.5 py-0.5 bg-emerald-50 dark:bg-emerald-950/60 rounded">{formatStatusCount('allowlist')}</span>
-          </label>
-        </div>
+        <select
+          value={selectedStatus}
+          onChange={(e) => {
+            onSelectStatus(e.target.value as DomainStatus | 'all');
+            if (onCloseMobile) onCloseMobile();
+          }}
+          className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 focus:outline-none focus:border-emerald-500 cursor-pointer"
+        >
+          {STATUS_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label} ({opt.value === 'all' ? formatNumber(allStatusCount) : formatStatusCount(opt.value)})
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* BỘ LỌC ĐÃ LƯU SECTION */}

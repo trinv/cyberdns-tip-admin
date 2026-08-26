@@ -1,14 +1,20 @@
 import React, { useState } from 'react';
-import { DomainItem, CategoryInfo } from '../../types';
+import { DomainItem, CategoryInfo, DomainStatus } from '../../types';
 import { X, Clock, Globe, Copy, Check } from 'lucide-react';
+
+const STATUS_OPTIONS: { value: DomainStatus; label: string }[] = [
+  { value: 'active', label: 'Đang chặn' },
+  { value: 'grace_period', label: 'Trong ân hạn' },
+  { value: 'unblocked', label: 'Đã thôi chặn' },
+  { value: 'allowlist', label: 'Allowlist' },
+];
 
 interface DomainInspectorProps {
   domain: DomainItem | null;
   categories: CategoryInfo[];
   onClose: () => void;
   onEditGroup: (domain: DomainItem) => void;
-  onAddToAllowlist: (domain: DomainItem) => void;
-  onUnblock: (domain: DomainItem) => void;
+  onChangeStatus: (domain: DomainItem, status: DomainStatus) => void;
 }
 
 export const DomainInspector: React.FC<DomainInspectorProps> = ({
@@ -16,8 +22,7 @@ export const DomainInspector: React.FC<DomainInspectorProps> = ({
   categories,
   onClose,
   onEditGroup,
-  onAddToAllowlist,
-  onUnblock,
+  onChangeStatus,
 }) => {
   const [copied, setCopied] = useState(false);
 
@@ -151,27 +156,28 @@ export const DomainInspector: React.FC<DomainInspectorProps> = ({
         <div className="text-slate-400 dark:text-slate-500 font-bold tracking-wider text-xs uppercase">
           THAO TÁC NHANH
         </div>
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            onClick={() => onEditGroup(domain)}
-            className="px-3 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold transition-colors cursor-pointer shadow-xs active-press"
-          >
-            Sửa nhóm
-          </button>
-          <button
-            onClick={() => onAddToAllowlist(domain)}
-            className="px-3 py-2 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-800 dark:text-emerald-300 rounded-xl border border-emerald-200 dark:border-emerald-800 text-xs font-bold transition-colors cursor-pointer shadow-xs active-press"
-          >
-            Thêm allowlist
-          </button>
-        </div>
-
         <button
-          onClick={() => onUnblock(domain)}
-          className="w-full px-3 py-2 bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 text-rose-800 dark:text-rose-300 rounded-xl border border-rose-200 dark:border-rose-800 text-xs font-bold transition-colors cursor-pointer shadow-xs active-press"
+          onClick={() => onEditGroup(domain)}
+          className="w-full px-3 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold transition-colors cursor-pointer shadow-xs active-press"
         >
-          Thôi chặn
+          Sửa nhóm
         </button>
+
+        {/* One generic status changer instead of separate fixed "Thêm
+            allowlist"/"Thôi chặn" buttons — covers all 4 user-facing
+            statuses (not just those 2), applies immediately on selection. */}
+        <div className="space-y-1">
+          <label className="block text-xs text-slate-400 dark:text-slate-500 font-semibold">Thay đổi trạng thái</label>
+          <select
+            value={domain.status}
+            onChange={(e) => onChangeStatus(domain, e.target.value as DomainStatus)}
+            className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-emerald-500 cursor-pointer"
+          >
+            {STATUS_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </div>
       </div>
     </div>
   );

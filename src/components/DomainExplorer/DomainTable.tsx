@@ -2,12 +2,23 @@ import React, { useState, useMemo, useRef } from 'react';
 import { DomainItem, CategoryInfo, DomainStatus } from '../../types';
 import { useClickOutside } from '../../hooks/useClickOutside';
 import {
-  Search, X, Plus, Download, ShieldAlert, ShieldCheck,
-  Trash2, Edit3, MoreHorizontal, ArrowUpDown,
+  Search, X, Plus, Download, ShieldAlert,
+  Edit3, MoreHorizontal, ArrowUpDown,
   Copy, Check, Filter,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
   FileText, FileSpreadsheet, Database
 } from 'lucide-react';
+
+// Same 4 user-facing statuses as DomainInspector's quick-status-changer —
+// 'protected' is deliberately excluded (system-managed, not a manual
+// action; also never actually written as domains.status by any backend
+// path, see queries.ts).
+const STATUS_OPTIONS: { value: DomainStatus; label: string }[] = [
+  { value: 'active', label: 'Đang chặn' },
+  { value: 'grace_period', label: 'Trong ân hạn' },
+  { value: 'unblocked', label: 'Đã thôi chặn' },
+  { value: 'allowlist', label: 'Allowlist' },
+];
 
 interface DomainTableProps {
   // Exactly the current server-side page for the active filters (see
@@ -43,8 +54,7 @@ interface DomainTableProps {
   onQuickExportTxt: () => void;
   onQuickExportCsv: () => void;
   onEditDomain: (domain: DomainItem) => void;
-  onUnblockSingle: (domain: DomainItem) => void;
-  onMoveToAllowlistSingle: (domain: DomainItem) => void;
+  onChangeStatus: (domain: DomainItem, status: DomainStatus) => void;
   onSaveFilter: () => void;
   onOpenMobileFilters?: () => void;
 }
@@ -80,8 +90,7 @@ export const DomainTable: React.FC<DomainTableProps> = ({
   onQuickExportTxt,
   onQuickExportCsv,
   onEditDomain,
-  onUnblockSingle,
-  onMoveToAllowlistSingle,
+  onChangeStatus,
   onSaveFilter,
   onOpenMobileFilters,
 }) => {
@@ -586,21 +595,21 @@ export const DomainTable: React.FC<DomainTableProps> = ({
                             <Edit3 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                             <span>Sửa nhóm</span>
                           </button>
-                          <button
-                            onClick={() => onMoveToAllowlistSingle(item)}
-                            className="w-full px-3.5 py-1.5 text-slate-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-700 dark:hover:text-blue-300 flex items-center space-x-2 text-xs font-medium"
-                          >
-                            <ShieldCheck className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                            <span>Thêm allowlist</span>
-                          </button>
                           <div className="border-t border-slate-100 dark:border-slate-700 my-1"></div>
-                          <button
-                            onClick={() => onUnblockSingle(item)}
-                            className="w-full px-3.5 py-1.5 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 flex items-center space-x-2 text-xs font-medium"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            <span>Thôi chặn</span>
-                          </button>
+                          <div className="px-3.5 py-1 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                            Đổi trạng thái
+                          </div>
+                          {STATUS_OPTIONS.map((opt) => (
+                            <button
+                              key={opt.value}
+                              onClick={() => onChangeStatus(item, opt.value)}
+                              disabled={item.status === opt.value}
+                              className="w-full px-3.5 py-1.5 text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 hover:text-emerald-700 dark:hover:text-emerald-300 flex items-center justify-between text-xs font-medium disabled:opacity-40 disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-slate-700 dark:disabled:hover:text-slate-200"
+                            >
+                              <span>{opt.label}</span>
+                              {item.status === opt.value && <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />}
+                            </button>
+                          ))}
                         </div>
                       </div>
                     </td>

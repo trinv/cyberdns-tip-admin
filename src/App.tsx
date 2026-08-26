@@ -296,13 +296,12 @@ export default function App() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedTld, setSelectedTld] = useState<string>('');
   const [selectedSource, setSelectedSource] = useState<string>('');
-  const [statusFilters, setStatusFilters] = useState<Record<DomainStatus, boolean>>({
-    active: true,
-    grace_period: false,
-    unblocked: false,
-    allowlist: false,
-    protected: false,
-  });
+  // Single-select (was a multi-checkbox Record<DomainStatus, boolean>) — a
+  // dropdown of "Tất cả" + the 4 real statuses matches how this was already
+  // effectively used (handleSelectSavedFilter below only ever restored ONE
+  // status at a time; nothing in the UI let a user meaningfully pick more
+  // than one at once either).
+  const [selectedStatus, setSelectedStatus] = useState<DomainStatus | 'all'>('active');
   const [activeSavedFilter, setActiveSavedFilter] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
   // Debounced so typing a search term doesn't fire a request per keystroke.
@@ -376,10 +375,9 @@ export default function App() {
   const refreshDomains = useCallback(async () => {
     setIsDomainsLoading(true);
     try {
-      const activeStatuses = (Object.keys(statusFilters) as DomainStatus[]).filter((k) => statusFilters[k]);
       const res = await fetchDomains({
         category: selectedCategory !== 'all' ? selectedCategory : undefined,
-        status: activeStatuses.length > 0 ? activeStatuses.join(',') : undefined,
+        status: selectedStatus !== 'all' ? selectedStatus : undefined,
         tld: selectedTld || undefined,
         source: selectedSource || undefined,
         search: debouncedSearchQuery || undefined,
@@ -397,7 +395,7 @@ export default function App() {
     } finally {
       setIsDomainsLoading(false);
     }
-  }, [selectedCategory, statusFilters, selectedTld, selectedSource, debouncedSearchQuery, domainsPage, domainsPageSize, sortField, sortDirection]);
+  }, [selectedCategory, selectedStatus, selectedTld, selectedSource, debouncedSearchQuery, domainsPage, domainsPageSize, sortField, sortDirection]);
 
   // Same filters as refreshDomains, but paginated through in chunks instead
   // of one unbounded request — used by the Export modal's "toàn bộ danh
@@ -418,10 +416,9 @@ export default function App() {
   // couple of retries there is cheap compared to redoing the whole export.
   const EXPORT_PAGE_SIZE = 5000;
   const fetchAllFilteredDomains = useCallback(async (): Promise<DomainItem[]> => {
-    const activeStatuses = (Object.keys(statusFilters) as DomainStatus[]).filter((k) => statusFilters[k]);
     const baseParams = {
       category: selectedCategory !== 'all' ? selectedCategory : undefined,
-      status: activeStatuses.length > 0 ? activeStatuses.join(',') : undefined,
+      status: selectedStatus !== 'all' ? selectedStatus : undefined,
       tld: selectedTld || undefined,
       source: selectedSource || undefined,
       search: debouncedSearchQuery || undefined,
@@ -448,7 +445,7 @@ export default function App() {
       offset += EXPORT_PAGE_SIZE;
     }
     return all;
-  }, [selectedCategory, statusFilters, selectedTld, selectedSource, debouncedSearchQuery, sortField, sortDirection]);
+  }, [selectedCategory, selectedStatus, selectedTld, selectedSource, debouncedSearchQuery, sortField, sortDirection]);
 
   useEffect(() => {
     refreshAllData();
@@ -520,7 +517,7 @@ export default function App() {
     setDomainsPage(1);
     setSelectedDomainIds(new Set());
     setActiveDomainId(null);
-  }, [selectedCategory, statusFilters, selectedTld, selectedSource, debouncedSearchQuery]);
+  }, [selectedCategory, selectedStatus, selectedTld, selectedSource, debouncedSearchQuery]);
 
   // Keyboard shortcut listener
   useEffect(() => {
@@ -578,12 +575,9 @@ export default function App() {
     return domains.every((d) => selectedDomainIds.has(d.id));
   }, [domains, selectedDomainIds]);
 
-  // Status checkbox toggle
-  const handleToggleStatus = (statusKey: DomainStatus) => {
-    setStatusFilters((prev) => ({
-      ...prev,
-      [statusKey]: !prev[statusKey],
-    }));
+  // Status filter dropdown selection
+  const handleSelectStatus = (status: DomainStatus | 'all') => {
+    setSelectedStatus(status);
   };
 
   // Saved Filter select
@@ -592,13 +586,7 @@ export default function App() {
     if (sf.category) setSelectedCategory(sf.category);
     if (sf.query) setSearchQuery(sf.query);
     if (sf.status) {
-      setStatusFilters({
-        active: sf.status === 'active',
-        grace_period: sf.status === 'grace_period',
-        unblocked: sf.status === 'unblocked',
-        allowlist: sf.status === 'allowlist',
-        protected: sf.status === 'protected',
-      });
+      setSelectedStatus(sf.status as DomainStatus);
     }
     showToast(`Đã áp dụng bộ lọc: ${sf.name}`, 'info');
   };
@@ -679,33 +667,41 @@ export default function App() {
     setIsAddDomainModalOpen(false);
   };
 
-  // Single Quick Actions — refetch the current page afterward rather than
-  // patching the row in place, since a status change can make it stop
-  // matching the active status filter (e.g. unblocking while "active" is
-  // the only checked status should make the row disappear).
-  const handleUnblockSingle = async (domain: DomainItem) => {
-    const numericId = Number(domain.id);
-    try {
-      if (Number.isNaN(numericId)) throw new Error('Invalid domain id');
-      await updateDomainApi(numericId, { status: 'unblocked' }, 'Gỡ chặn thủ công từ giao diện quản trị');
-      showToast(`Đã gỡ chặn tên miền ${domain.domain}`, 'info');
-      await refreshDomains();
-    } catch (err) {
-      console.warn('Backend unblock notice:', err);
-      showToast(`Không thể gỡ chặn ${domain.domain} — vui lòng thử lại.`, 'warning');
-    }
+  // Single Quick Action — one generic "đổi trạng thái" covering all 4
+  // user-facing statuses (Chặn/Ân hạn/Thôi chặn/Allowlist — 'protected' is
+  // deliberately not offered here, it's system-managed, not a manual quick
+  // action) instead of two separate fixed buttons (previously only
+  // "Thêm allowlist" and "Thôi chặn" existed — there was no quick way to
+  // set a domain back to 'active' or to 'grace_period' at all). Refetches
+  // the current page afterward rather than patching the row in place,
+  // since a status change can make it stop matching the active status
+  // filter (e.g. unblocking while filtered to "Đang chặn" should make the
+  // row disappear).
+  const STATUS_LABELS: Record<DomainStatus, string> = {
+    active: 'Đang chặn',
+    grace_period: 'Trong ân hạn',
+    unblocked: 'Đã thôi chặn',
+    allowlist: 'Allowlist',
+    protected: 'Được bảo vệ',
   };
-
-  const handleMoveToAllowlist = async (domain: DomainItem) => {
+  const STATUS_CHANGE_REASONS: Record<DomainStatus, string> = {
+    active: 'Chuyển lại trạng thái Đang chặn từ giao diện quản trị',
+    grace_period: 'Chuyển sang Ân hạn từ giao diện quản trị',
+    unblocked: 'Gỡ chặn thủ công từ giao diện quản trị',
+    allowlist: 'Chuyển vào Allowlist từ giao diện quản trị',
+    protected: 'Đánh dấu bảo vệ từ giao diện quản trị',
+  };
+  const handleChangeDomainStatus = async (domain: DomainItem, status: DomainStatus) => {
+    if (status === domain.status) return;
     const numericId = Number(domain.id);
     try {
       if (Number.isNaN(numericId)) throw new Error('Invalid domain id');
-      await updateDomainApi(numericId, { status: 'allowlist' }, 'Chuyển vào Allowlist từ giao diện quản trị');
-      showToast(`Đã chuyển ${domain.domain} vào danh sách cho phép (Allowlist)`, 'warning');
+      await updateDomainApi(numericId, { status }, STATUS_CHANGE_REASONS[status]);
+      showToast(`Đã chuyển ${domain.domain} sang trạng thái "${STATUS_LABELS[status]}"`, status === 'allowlist' ? 'warning' : 'info');
       await refreshDomains();
     } catch (err) {
-      console.warn('Backend allowlist notice:', err);
-      showToast(`Không thể chuyển ${domain.domain} vào Allowlist — vui lòng thử lại.`, 'warning');
+      console.warn('Backend change status notice:', err);
+      showToast(`Không thể đổi trạng thái ${domain.domain} — vui lòng thử lại.`, 'warning');
     }
   };
 
@@ -811,12 +807,16 @@ export default function App() {
     }
   };
 
-  const handleRejectReview = async (id: string, reason: string) => {
+  // ReviewQueueView's "Từ chối" button has no reason-input UI of its own —
+  // this used to declare a second `reason` param that was never actually
+  // supplied by the only real caller (see ReviewQueueView.tsx's onReject),
+  // so the toast below always printed the literal text "(undefined)".
+  const handleRejectReview = async (id: string) => {
     const item = reviewItems.find((r) => r.id === id);
     try {
       await resolveReviewItemApi(id, 'rejected');
       setReviewItems((prev) => prev.filter((r) => r.id !== id));
-      showToast(`Đã từ chối tên miền ${item?.domain || ''} (${reason})`, 'info');
+      showToast(`Đã từ chối tên miền ${item?.domain || ''}`, 'info');
     } catch (err) {
       console.warn('Backend reject review notice:', err);
       showToast(`Từ chối thất bại cho ${item?.domain || ''} — vui lòng thử lại.`, 'warning');
@@ -1015,14 +1015,15 @@ export default function App() {
                 categories={categories}
                 selectedCategory={selectedCategory}
                 onSelectCategory={setSelectedCategory}
-                statusFilters={statusFilters}
-                onToggleStatus={handleToggleStatus}
+                selectedStatus={selectedStatus}
+                onSelectStatus={handleSelectStatus}
                 savedFilters={savedFilters}
                 activeSavedFilter={activeSavedFilter}
                 onSelectSavedFilter={handleSelectSavedFilter}
                 onOpenAddCategory={() => setIsCategoryModalOpen(true)}
                 onSaveCurrentFilter={() => showToast('Đã lưu bộ lọc tìm kiếm hiện tại vào danh sách!', 'info')}
                 totalDomainCount={dashboardStats?.totalActive ?? 0}
+                allStatusCount={dashboardStats?.totalAll ?? 0}
                 statusCounts={statusCountsMap}
                 isOpenMobile={isMobileFiltersOpen}
                 onCloseMobile={() => setIsMobileFiltersOpen(false)}
@@ -1066,8 +1067,7 @@ export default function App() {
                   setDomainToEdit(d);
                   setIsAddDomainModalOpen(true);
                 }}
-                onUnblockSingle={handleUnblockSingle}
-                onMoveToAllowlistSingle={handleMoveToAllowlist}
+                onChangeStatus={handleChangeDomainStatus}
                 onSaveFilter={() => showToast('Đã lưu bộ lọc tìm kiếm hiện tại vào danh sách!', 'info')}
                 onOpenMobileFilters={() => setIsMobileFiltersOpen(true)}
               />
@@ -1081,8 +1081,7 @@ export default function App() {
                   setDomainToEdit(d);
                   setIsAddDomainModalOpen(true);
                 }}
-                onAddToAllowlist={handleMoveToAllowlist}
-                onUnblock={handleUnblockSingle}
+                onChangeStatus={handleChangeDomainStatus}
               />
             </div>
           )}
@@ -1099,7 +1098,7 @@ export default function App() {
               onOpenCrawlerAlert={() => setCurrentTab('sources')}
               onOpenAllowlistAlert={() => {
                 setCurrentTab('domain');
-                setStatusFilters((prev) => ({ ...prev, allowlist: true }));
+                setSelectedStatus('allowlist');
               }}
               unreleasedCount={unreleasedCount}
               onOpenDiff={() => setIsDiffModalOpen(true)}
