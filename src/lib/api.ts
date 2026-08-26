@@ -366,6 +366,16 @@ export async function fetchAuditLogs(): Promise<AuditLog[]> {
   return res.json();
 }
 
+export async function rollbackAuditLogApi(logId: string, reason?: string): Promise<{ success: boolean; summary: string }> {
+  const res = await fetch(`${API_BASE}/audit-logs/${encodeURIComponent(logId)}/rollback`, {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify({ reason }),
+  });
+  await checkResponse(res, 'Hoàn tác giao dịch thất bại');
+  return res.json();
+}
+
 export async function fetchReleases(): Promise<ReleaseItem[]> {
   const res = await fetch(`${API_BASE}/releases`);
   if (!res.ok) throw new Error('Failed to fetch releases');

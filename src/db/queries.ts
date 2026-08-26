@@ -528,6 +528,13 @@ export async function updateDomain(
   meta: { userEmail?: string; reason?: string } = {}
 ) {
   try {
+    // Snapshot the pre-change row so the audit log entry can carry enough
+    // structured state to actually reverse this specific edit later (see
+    // rollbackAuditLog) — not just describe it in prose.
+    const beforeRows = await db.select().from(domains).where(eq(domains.id, id)).limit(1);
+    if (!beforeRows[0]) throw new Error(`Domain id ${id} not found`);
+    const before = beforeRows[0];
+
     const setValues: Record<string, any> = { updatedAt: new Date() };
     // Any explicit status change here is a human decision — clear the
     // "auto-unblocked by a paused source" marker regardless of which status
@@ -573,6 +580,17 @@ export async function updateDomain(
       reason: meta.reason || 'Cập nhật phân loại theo bằng chứng mới',
       canRollback: true,
       rollbackExpiresAt: new Date(Date.now() + 48 * 3600 * 1000),
+      rollbackData: {
+        type: 'edit_group',
+        domainId: id,
+        before: {
+          status: before.status,
+          categories: before.categories,
+          sourceDetail: before.sourceDetail,
+          tags: before.tags,
+          isProtected: before.isProtected,
+        },
+      },
       details: [`Tên miền: ${updated[0].domain}`, `Trạng thái: ${updated[0].status}`],
     });
 
@@ -601,6 +619,19 @@ export async function createDomain(data: {
     const tld = parts.length > 1 ? parts[parts.length - 1] : 'vn';
     const etld1 = parts.length > 2 ? `${parts[parts.length - 2]}.${tld}` : cleanDomain;
     const sourceLabel = data.source || 'Thủ công (SOC Analyst)';
+
+    // Snapshot whether this domain already existed (and its prior status)
+    // BEFORE the upsert below, so the audit log entry can carry enough
+    // structured state for rollbackAuditLog to actually reverse an "add"
+    // later — restore the previous status if it existed, or soft-revert a
+    // brand-new row to "unblocked" (never a hard delete — see rollbackAuditLog).
+    const beforeRows = await db
+      .select({ status: domains.status })
+      .from(domains)
+      .where(eq(domains.domain, cleanDomain))
+      .limit(1);
+    const existedBefore = beforeRows.length > 0;
+    const previousStatus = existedBefore ? beforeRows[0].status : null;
 
     // Upsert the domain identity row itself (categories are NOT set here —
     // see addDomainCategoryMemberships below and the note on schema.ts).
@@ -655,6 +686,7 @@ export async function createDomain(data: {
       reason: data.reason || 'Bổ sung IOC thủ công',
       canRollback: true,
       rollbackExpiresAt: new Date(Date.now() + 48 * 3600 * 1000),
+      rollbackData: { type: 'add', domainId, existedBefore, previousStatus },
       details: [`Tên miền: ${cleanDomain}`, `Nhóm: ${data.categories.join(', ')}`],
     });
 
@@ -781,9 +813,21 @@ export async function bulkCreateDomains(data: {
       targetCount: inserted.length,
       summary: `Nhập hàng loạt ${inserted.length} tên miền vào nhóm ${data.categories.join(', ')} (${newCount.toLocaleString('vi-VN')} mới, ${existingCount.toLocaleString('vi-VN')} đã tồn tại)`,
       reason: data.reason || 'Nhập hàng loạt IOC',
-      canRollback: true,
-      rollbackExpiresAt: new Date(now.getTime() + 48 * 3600 * 1000),
-      details: [`Số lượng: ${inserted.length}`, `Nhóm: ${data.categories.join(', ')}`, `Mới: ${newCount}`, `Đã tồn tại: ${existingCount}`],
+      // This path is only ever called from a feed sync now (the manual bulk-
+      // import UI/route was removed) and can touch hundreds of thousands of
+      // domains in one call — recording a per-domain "before" snapshot here
+      // (like the other actions below do) would add real write overhead to
+      // every sync. The real, safe undo for a feed's effect already exists
+      // as its own dedicated action: "Tạm dừng nguồn" (pause) instantly
+      // unblocks every domain that source added — no generic rollback here.
+      canRollback: false,
+      details: [
+        `Số lượng: ${inserted.length}`,
+        `Nhóm: ${data.categories.join(', ')}`,
+        `Mới: ${newCount}`,
+        `Đã tồn tại: ${existingCount}`,
+        'Để hoàn tác: dùng "Tạm dừng nguồn" ở tab Nguồn cấp dữ liệu.',
+      ],
     });
 
     return { domains: inserted, insertedCount: inserted.length, newCount, existingCount };
@@ -813,6 +857,15 @@ export async function bulkUpdateDomains(params: {
     const { action, domainIds = [], category, reason, userEmail = 'Admin' } = params;
 
     if (domainIds.length === 0) return { updatedCount: 0 };
+
+    // Snapshot each domain's pre-change status/category BEFORE mutating —
+    // bounded by whatever the admin checked in the UI (never feed-sync
+    // scale), so this is cheap and lets rollbackAuditLog actually restore
+    // it later instead of just describing what happened.
+    const beforeRows = await db
+      .select({ id: domains.id, status: domains.status, primaryCategory: domains.primaryCategory })
+      .from(domains)
+      .where(inArray(domains.id, domainIds));
 
     if (action === 'allowlist') {
       await db
@@ -855,6 +908,11 @@ export async function bulkUpdateDomains(params: {
       reason: reason || 'SOC Bulk Policy Update',
       canRollback: true,
       rollbackExpiresAt: new Date(Date.now() + 48 * 3600 * 1000),
+      rollbackData: {
+        type: 'bulk_action',
+        action,
+        items: beforeRows.map((r) => ({ domainId: r.id, status: r.status, primaryCategory: r.primaryCategory })),
+      },
       details: [`Hành động: ${action}`, `Số lượng: ${domainIds.length}`, `Lý do: ${reason}`],
     });
 
@@ -1653,10 +1711,133 @@ export async function resolveReviewItem(
 // 7. Audit Logs Queries
 export async function getAuditLogs() {
   try {
-    return await db.select().from(auditLogs).orderBy(desc(auditLogs.createdAt)).limit(100);
+    const rows = await db.select().from(auditLogs).orderBy(desc(auditLogs.createdAt)).limit(100);
+    // The DB column is `createdAt` (a Date) — the frontend's AuditLog type
+    // expects a `timestamp` string field, which never existed in the raw
+    // row. That mismatch is why "THỜI GIAN" rendered blank: the frontend
+    // was reading a field this endpoint never sent. `rollbackData` is
+    // internal-only (consumed by rollbackAuditLog on the server), so it's
+    // left out of the response.
+    return rows.map(({ createdAt, rollbackData, id, ...rest }) => ({
+      ...rest,
+      id: String(id),
+      timestamp: createdAt.toISOString(),
+      hasRollbackData: !!rollbackData,
+    }));
   } catch (error) {
     console.error('getAuditLogs failed:', error);
     throw new Error('Failed to retrieve audit logs', { cause: error });
+  }
+}
+
+// Actually reverses a logged transaction, using the structured "before"
+// state captured in rollbackData at the time of the original action (see
+// updateDomain/createDomain/bulkUpdateDomains above) — not a simulated
+// "success" toast. Each `type` below mirrors exactly one of those call
+// sites; anything without rollbackData (canRollback: false, or a log
+// entry written before this feature existed) fails with a clear reason
+// instead of silently doing nothing.
+export async function rollbackAuditLog(logId: number, userEmail: string, reason?: string) {
+  try {
+    const rows = await db.select().from(auditLogs).where(eq(auditLogs.id, logId)).limit(1);
+    const log = rows[0];
+    if (!log) throw new Error('Không tìm thấy giao dịch trong nhật ký.');
+    if (!log.canRollback) throw new Error('Giao dịch này không hỗ trợ hoàn tác.');
+    if (log.rollbackExpiresAt && log.rollbackExpiresAt.getTime() < Date.now()) {
+      throw new Error('Đã quá hạn hoàn tác (48 giờ kể từ khi thực hiện).');
+    }
+    const data = log.rollbackData as Record<string, any> | null;
+    if (!data) {
+      throw new Error('Giao dịch này không có dữ liệu để hoàn tác (được ghi trước khi tính năng Hoàn tác hỗ trợ việc này).');
+    }
+
+    let summary: string;
+
+    if (data.type === 'edit_group') {
+      const target = await db.select().from(domains).where(eq(domains.id, data.domainId)).limit(1);
+      if (!target[0]) throw new Error('Tên miền không còn tồn tại — không thể hoàn tác.');
+
+      const desired = new Set<string>(data.before.categories || []);
+      const current = new Set<string>(target[0].categories || []);
+      const toAdd = [...desired].filter((c) => !current.has(c));
+      const toRemove = [...current].filter((c) => !desired.has(c));
+      if (toAdd.length > 0) {
+        await addDomainCategoryMemberships(
+          toAdd.map((categoryId) => ({ domainId: data.domainId, categoryId, sourceLabel: 'Hoàn tác (Rollback)' }))
+        );
+      }
+      for (const categoryId of toRemove) {
+        await removeDomainCategoryMemberships([data.domainId], categoryId);
+      }
+
+      await db
+        .update(domains)
+        .set({
+          status: data.before.status,
+          sourceDetail: data.before.sourceDetail,
+          tags: data.before.tags,
+          isProtected: data.before.isProtected,
+          updatedAt: new Date(),
+        })
+        .where(eq(domains.id, data.domainId));
+
+      summary = `Hoàn tác cập nhật tên miền: ${target[0].domain}`;
+    } else if (data.type === 'add') {
+      const target = await db.select({ domain: domains.domain }).from(domains).where(eq(domains.id, data.domainId)).limit(1);
+      if (!target[0]) throw new Error('Tên miền không còn tồn tại — không thể hoàn tác.');
+
+      // existedBefore: restore its real prior status. Otherwise this domain
+      // row didn't exist until this "add" created it — soft-revert to
+      // "unblocked" (never a hard delete, consistent with how pausing/
+      // deleting a feed source already un-does its effect elsewhere).
+      await db
+        .update(domains)
+        .set({ status: data.existedBefore ? data.previousStatus : 'unblocked', updatedAt: new Date() })
+        .where(eq(domains.id, data.domainId));
+
+      summary = `Hoàn tác thêm tên miền: ${target[0].domain}`;
+    } else if (data.type === 'bulk_action') {
+      const items = (data.items || []) as { domainId: number; status: string; primaryCategory: string | null }[];
+      for (const item of items) {
+        await db.update(domains).set({ status: item.status, updatedAt: new Date() }).where(eq(domains.id, item.domainId));
+        // Only "add_group" ever changed category membership — restore it,
+        // best-effort (skip silently if the original category no longer exists).
+        if (data.action === 'add_group' && item.primaryCategory) {
+          await addDomainCategoryMemberships([
+            { domainId: item.domainId, categoryId: item.primaryCategory, sourceLabel: 'Hoàn tác (Rollback)' },
+          ]).catch(() => {});
+        }
+      }
+      summary = `Hoàn tác thao tác hàng loạt trên ${items.length} tên miền`;
+    } else if (data.type === 'release') {
+      await rollbackRelease(data.version, userEmail, reason || `Hoàn tác từ Nhật ký thao tác (giao dịch #${logId})`);
+      summary = `Hoàn tác bản phát hành ${data.version}`;
+    } else {
+      throw new Error('Loại giao dịch này chưa hỗ trợ hoàn tác tự động.');
+    }
+
+    // Once rolled back, the original entry can't be rolled back again.
+    await db.update(auditLogs).set({ canRollback: false }).where(eq(auditLogs.id, logId));
+
+    await db.insert(auditLogs).values({
+      user: userEmail || 'Admin',
+      role: 'Admin',
+      action: 'rollback',
+      targetCount: log.targetCount,
+      summary,
+      reason: reason || `Hoàn tác giao dịch #${logId}: ${log.summary}`,
+      canRollback: false,
+      details: [`Hoàn tác giao dịch gốc #${logId}`, log.summary],
+    });
+
+    return { success: true, summary };
+  } catch (error: any) {
+    console.error('rollbackAuditLog failed:', error);
+    // A deliberately-thrown, already-clear message above (e.g. "expired",
+    // "no rollback data") has no `cause` — preserve it verbatim instead of
+    // burying it behind a generic message the UI would show.
+    if (error instanceof Error && !error.cause) throw error;
+    throw new Error('Hoàn tác giao dịch thất bại', { cause: error });
   }
 }
 
@@ -1688,6 +1869,7 @@ export async function deployRemainingRelease(version: string, userEmail?: string
       reason: 'Deploy remaining nodes sau khi cổng an toàn được xử lý',
       canRollback: true,
       rollbackExpiresAt: new Date(Date.now() + 48 * 3600 * 1000),
+      rollbackData: { type: 'release', version },
       details: [`Phiên bản: ${version}`],
     });
 
@@ -1727,6 +1909,7 @@ export async function overrideReleaseSafetyGate(version: string, userEmail: stri
       reason: reason || 'Ghi đè cổng an toàn (Admin Override)',
       canRollback: true,
       rollbackExpiresAt: new Date(Date.now() + 48 * 3600 * 1000),
+      rollbackData: { type: 'release', version },
       details: [`Phiên bản: ${version}`, 'Ghi đè toàn bộ cổng an toàn chưa đạt (failed/warning) sang passed'],
     });
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Plus, Tag, ShieldCheck, Trash2, Edit3 } from 'lucide-react';
 import { CategoryInfo } from '../../types';
+import { ConfirmModal } from './ConfirmModal';
 
 interface CategoryManagerModalProps {
   isOpen: boolean;
@@ -31,6 +32,13 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editDelta, setEditDelta] = useState(3.0);
+
+  // Pending delete awaiting confirmation via the shared ConfirmModal —
+  // replaces window.confirm(), which renders as an unstyled native browser
+  // prompt that can't match the app's theme. Declared here (before the
+  // isOpen early return below) so this hook is always called in the same
+  // order across renders.
+  const [deleteTarget, setDeleteTarget] = useState<CategoryInfo | null>(null);
 
   if (!isOpen) return null;
 
@@ -73,11 +81,13 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
     setEditingId(null);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = (cat: CategoryInfo) => {
     if (!onDeleteCategory) return;
-    if (window.confirm(`Xóa nhóm danh mục "${id}"? Các tên miền đang gắn nhóm này sẽ không tự động bị gỡ.`)) {
-      onDeleteCategory(id);
-    }
+    setDeleteTarget(cat);
+  };
+  const confirmDelete = () => {
+    if (deleteTarget && onDeleteCategory) onDeleteCategory(deleteTarget.id);
+    setDeleteTarget(null);
   };
 
   return (
@@ -167,7 +177,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleDelete(c.id)}
+                        onClick={() => handleDelete(c)}
                         title="Xóa nhóm"
                         className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-white dark:hover:bg-slate-700 cursor-pointer"
                       >
@@ -256,6 +266,20 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
           </form>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={!!deleteTarget}
+        tone="danger"
+        title="Xoá nhóm danh mục?"
+        message={
+          deleteTarget
+            ? `Xoá nhóm danh mục "${deleteTarget.name}"? Các tên miền đang gắn nhóm này sẽ không tự động bị gỡ.`
+            : ''
+        }
+        confirmLabel="Xoá nhóm"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 };

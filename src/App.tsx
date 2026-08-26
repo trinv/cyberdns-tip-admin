@@ -7,6 +7,7 @@ import {
   fetchFeedSources,
   fetchReleases,
   fetchAuditLogs,
+  rollbackAuditLogApi,
   fetchReviewQueue,
   proposeDomainApi,
   proposeBulkDomainsApi,
@@ -808,20 +809,30 @@ export default function App() {
     );
   };
 
-  // Rollback Transaction in Audit Log — NOTE: there is no backend endpoint
-  // that actually reverses a logged action yet (each action type would need
-  // its own "undo" logic — e.g. re-adding a removed category membership,
-  // restoring a domain's prior status — and the audit log doesn't currently
-  // store enough structured before/after state to do that generically).
-  // Showing a fake "success" toast here would be exactly the kind of
-  // simulated result this system moved away from, so this is honest about
-  // not being implemented yet instead.
-  const handleRollbackTransaction = (log: AuditLog) => {
+  // Rollback Transaction in Audit Log — actually reverses the logged action
+  // using the structured "before" state the backend captured at the time
+  // (see rollbackAuditLog in queries.ts). Entries with no such data (logged
+  // before this existed, or a feed-sync bulk add that's too large to snapshot
+  // cheaply) are already filtered out of the UI's rollback button — see
+  // AuditLogsView — so a failure here means something else went wrong server-side.
+  const handleRollbackTransaction = async (log: AuditLog) => {
     if (userRole !== 'Admin') {
       showToast('Chỉ tài khoản Admin mới có quyền thực hiện Hoàn tác giao dịch!', 'warning');
       return;
     }
-    showToast(`Hoàn tác tự động cho giao dịch "${log.summary}" chưa được triển khai — vui lòng chỉnh sửa thủ công tại Domain Explorer nếu cần.`, 'warning');
+    try {
+      const { summary } = await rollbackAuditLogApi(log.id, `Hoàn tác thủ công từ Nhật ký thao tác — giao dịch: ${log.summary}`);
+      showToast(summary, 'success');
+      await Promise.all([
+        refreshDomains(),
+        fetchDashboardStats().then(setDashboardStats).catch(() => {}),
+        fetchCategories().then(setCategories).catch(() => {}),
+        fetchAuditLogs().then(setAuditLogs).catch(() => {}),
+      ]);
+    } catch (err: any) {
+      console.warn('Backend rollback transaction notice:', err);
+      showToast(err?.message || 'Hoàn tác giao dịch thất bại — vui lòng thử lại.', 'warning');
+    }
   };
 
   // Release Canary Actions

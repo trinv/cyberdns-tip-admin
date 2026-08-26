@@ -105,6 +105,11 @@ export interface AuditLog {
   reason: string;
   canRollback: boolean;
   rollbackExpiresAt?: string;
+  // false when canRollback is true but this entry predates structured
+  // rollback data (or is a feed-sync bulk add, which never gets one — see
+  // rollbackAuditLog in queries.ts) — the UI treats this the same as
+  // !canRollback rather than showing a button that would just error.
+  hasRollbackData?: boolean;
   details?: string[];
 }
 

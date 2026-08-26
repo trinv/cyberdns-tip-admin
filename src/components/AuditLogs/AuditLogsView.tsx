@@ -7,7 +7,7 @@ import {
 
 interface AuditLogsViewProps {
   logs: AuditLog[];
-  onRollbackTransaction: (log: AuditLog) => void;
+  onRollbackTransaction: (log: AuditLog) => Promise<void> | void;
 }
 
 // Real initials computed from the log's actual `user` string (an email or a
@@ -25,6 +25,18 @@ function getInitials(user: string): string {
 
 export const AuditLogsView: React.FC<AuditLogsViewProps> = ({ logs, onRollbackTransaction }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  // Tracks which single row's rollback is in flight — id-keyed so only that
+  // row's button shows "Đang xử lý...", the rest of the table stays usable.
+  const [rollingBackId, setRollingBackId] = useState<string | null>(null);
+
+  const handleRollbackClick = async (log: AuditLog) => {
+    setRollingBackId(log.id);
+    try {
+      await onRollbackTransaction(log);
+    } finally {
+      setRollingBackId(null);
+    }
+  };
 
   const filteredLogs = logs.filter((l) =>
     l.summary.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -73,7 +85,7 @@ export const AuditLogsView: React.FC<AuditLogsViewProps> = ({ logs, onRollbackTr
               {filteredLogs.map((log) => (
                 <tr key={log.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
                   <td className="px-5 py-3.5 text-slate-400 dark:text-slate-500 whitespace-nowrap">
-                    {log.timestamp}
+                    {new Date(log.timestamp).toLocaleString('vi-VN')}
                   </td>
 
                   <td className="px-5 py-3.5">
@@ -105,16 +117,24 @@ export const AuditLogsView: React.FC<AuditLogsViewProps> = ({ logs, onRollbackTr
                       const expiresAt = log.rollbackExpiresAt ? new Date(log.rollbackExpiresAt).getTime() : null;
                       const hoursLeft = expiresAt ? Math.max(0, Math.round((expiresAt - Date.now()) / 3600000)) : null;
                       const isExpired = hoursLeft !== null && hoursLeft <= 0;
-                      if (!log.canRollback || isExpired) {
+                      // hasRollbackData === false: canRollback is true but no
+                      // structured "before" state was captured for this entry
+                      // (logged before this feature existed, or a feed-sync
+                      // bulk add — too large to snapshot cheaply, see
+                      // rollbackAuditLog). Treated the same as !canRollback
+                      // rather than showing a button that would just error.
+                      if (!log.canRollback || isExpired || log.hasRollbackData === false) {
                         return <span className="text-slate-300 dark:text-slate-600 text-xs">—</span>;
                       }
+                      const isRollingBack = rollingBackId === log.id;
                       return (
                         <button
-                          onClick={() => onRollbackTransaction(log)}
-                          className="px-3.5 py-1.5 bg-amber-50 dark:bg-amber-950/60 hover:bg-amber-100 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-xl text-xs font-bold flex items-center space-x-1 ml-auto cursor-pointer transition-colors shadow-xs active-press"
+                          onClick={() => handleRollbackClick(log)}
+                          disabled={isRollingBack}
+                          className="px-3.5 py-1.5 bg-amber-50 dark:bg-amber-950/60 hover:bg-amber-100 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-xl text-xs font-bold flex items-center space-x-1 ml-auto cursor-pointer transition-colors shadow-xs active-press disabled:opacity-60 disabled:cursor-not-allowed"
                         >
-                          <RotateCcw className="w-3.5 h-3.5" />
-                          <span>Hoàn tác{hoursLeft !== null ? ` (còn ${hoursLeft}h)` : ''}</span>
+                          <RotateCcw className={`w-3.5 h-3.5 ${isRollingBack ? 'animate-spin' : ''}`} />
+                          <span>{isRollingBack ? 'Đang hoàn tác...' : `Hoàn tác${hoursLeft !== null ? ` (còn ${hoursLeft}h)` : ''}`}</span>
                         </button>
                       );
                     })()}

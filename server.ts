@@ -34,6 +34,7 @@ import {
   getReviewQueue,
   resolveReviewItem,
   getAuditLogs,
+  rollbackAuditLog,
   getReleases,
   deployRemainingRelease,
   overrideReleaseSafetyGate,
@@ -556,6 +557,22 @@ async function startServer() {
       const list = await getAuditLogs();
       res.json(list);
     } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/audit-logs/:id/rollback', requireAuth, requireRole('Admin'), async (req: AuthRequest, res) => {
+    try {
+      const { reason } = req.body;
+      const logId = parseInt(req.params.id, 10);
+      if (!Number.isInteger(logId)) {
+        res.status(400).json({ error: 'ID giao dịch không hợp lệ' });
+        return;
+      }
+      const result = await rollbackAuditLog(logId, req.user?.email || 'Admin', reason);
+      res.json(result);
+    } catch (error: any) {
+      console.error('API POST /api/audit-logs/:id/rollback error:', error);
       res.status(500).json({ error: error.message });
     }
   });

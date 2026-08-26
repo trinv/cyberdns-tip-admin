@@ -4,6 +4,7 @@ import {
   RefreshCw, Plus, Globe, CheckCircle2, AlertTriangle,
   Trash2, Edit3, Clock, ArrowRight, ShieldCheck, Activity, Pause, Play
 } from 'lucide-react';
+import { ConfirmModal, ConfirmTone } from '../Modals/ConfirmModal';
 
 interface SourcesViewProps {
   sources: FeedSource[];
@@ -47,6 +48,30 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
     }
   }, [categories, newSourceCategory]);
   const [newSourceInterval, setNewSourceInterval] = useState('4 giờ');
+
+  // Pending destructive/state-changing action awaiting confirmation via the
+  // shared ConfirmModal — replaces window.confirm(), which renders as an
+  // unstyled native browser prompt that can't match the app's theme.
+  const [confirmAction, setConfirmAction] = useState<{
+    source: FeedSource;
+    kind: 'pause' | 'delete';
+  } | null>(null);
+  const [isConfirmProcessing, setIsConfirmProcessing] = useState(false);
+
+  const handleConfirmAction = async () => {
+    if (!confirmAction) return;
+    setIsConfirmProcessing(true);
+    try {
+      if (confirmAction.kind === 'pause') {
+        await onPauseSource(confirmAction.source.id);
+      } else {
+        await onDeleteSource(confirmAction.source.id);
+      }
+      setConfirmAction(null);
+    } finally {
+      setIsConfirmProcessing(false);
+    }
+  };
 
   // Sync IS whatever `src.status === 'syncing'` says, straight from the
   // server (see App.tsx's polling effect) — no local "isSyncing" flag here.
@@ -242,11 +267,7 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
 
                 {!src.isPaused && (
                   <button
-                    onClick={() => {
-                      if (window.confirm(`Tạm dừng nguồn "${src.name}"? Mọi tên miền đang chặn nhờ nguồn này sẽ chuyển sang "Thôi chặn" ngay lập tức.`)) {
-                        onPauseSource(src.id);
-                      }
-                    }}
+                    onClick={() => setConfirmAction({ source: src, kind: 'pause' })}
                     disabled={src.status === 'syncing'}
                     title="Tạm dừng nguồn"
                     className="p-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 rounded-xl transition-colors cursor-pointer active-press disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
@@ -256,11 +277,7 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
                 )}
 
                 <button
-                  onClick={() => {
-                    if (window.confirm(`Xoá vĩnh viễn nguồn "${src.name}"? Mọi tên miền đang chặn nhờ nguồn này sẽ chuyển sang "Thôi chặn". Không thể hoàn tác.`)) {
-                      onDeleteSource(src.id);
-                    }
-                  }}
+                  onClick={() => setConfirmAction({ source: src, kind: 'delete' })}
                   disabled={src.status === 'syncing'}
                   title="Xoá nguồn"
                   className="p-1.5 bg-white dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/60 text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-700 hover:border-rose-200 dark:hover:border-rose-800 rounded-xl transition-colors cursor-pointer active-press disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
@@ -352,6 +369,23 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={!!confirmAction}
+        tone={(confirmAction?.kind === 'delete' ? 'danger' : 'warning') as ConfirmTone}
+        title={confirmAction?.kind === 'delete' ? 'Xoá vĩnh viễn nguồn?' : 'Tạm dừng nguồn?'}
+        message={
+          confirmAction?.kind === 'delete'
+            ? `Xoá vĩnh viễn nguồn "${confirmAction.source.name}"? Mọi tên miền đang chặn nhờ nguồn này sẽ chuyển sang "Thôi chặn". Không thể hoàn tác.`
+            : confirmAction
+            ? `Tạm dừng nguồn "${confirmAction.source.name}"? Mọi tên miền đang chặn nhờ nguồn này sẽ chuyển sang "Thôi chặn" ngay lập tức.`
+            : ''
+        }
+        confirmLabel={confirmAction?.kind === 'delete' ? 'Xoá vĩnh viễn' : 'Tạm dừng'}
+        isProcessing={isConfirmProcessing}
+        onConfirm={handleConfirmAction}
+        onCancel={() => setConfirmAction(null)}
+      />
     </div>
   );
 };

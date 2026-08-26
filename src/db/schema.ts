@@ -334,6 +334,14 @@ export const auditLogs = pgTable(
     reason: text('reason').notNull(),
     canRollback: boolean('can_rollback').default(false).notNull(),
     rollbackExpiresAt: timestamp('rollback_expires_at'),
+    // Structured "before" state needed to actually reverse this specific
+    // transaction — null for log entries that predate this feature (their
+    // "Hoàn tác" button shows a clear "no data to undo" message instead of
+    // silently doing nothing) and for entries that are deliberately never
+    // rollbackable (canRollback: false), e.g. a feed-sync bulk add, which
+    // can touch hundreds of thousands of domains — see rollbackAuditLog in
+    // queries.ts for the shape per action type.
+    rollbackData: jsonb('rollback_data').$type<Record<string, unknown> | null>(),
     details: jsonb('details').$type<string[]>().default([]).notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
