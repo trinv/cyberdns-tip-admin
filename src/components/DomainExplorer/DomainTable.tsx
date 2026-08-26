@@ -3,22 +3,11 @@ import { DomainItem, CategoryInfo, DomainStatus } from '../../types';
 import { useClickOutside } from '../../hooks/useClickOutside';
 import {
   Search, X, Plus, Download, ShieldAlert,
-  Edit3, MoreHorizontal, ArrowUpDown,
+  ArrowUpDown,
   Copy, Check, Filter,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
   FileText, FileSpreadsheet, Database
 } from 'lucide-react';
-
-// Same 4 user-facing statuses as DomainInspector's quick-status-changer —
-// 'protected' is deliberately excluded (system-managed, not a manual
-// action; also never actually written as domains.status by any backend
-// path, see queries.ts).
-const STATUS_OPTIONS: { value: DomainStatus; label: string }[] = [
-  { value: 'active', label: 'Đang chặn' },
-  { value: 'grace_period', label: 'Trong ân hạn' },
-  { value: 'unblocked', label: 'Đã thôi chặn' },
-  { value: 'allowlist', label: 'Allowlist' },
-];
 
 interface DomainTableProps {
   // Exactly the current server-side page for the active filters (see
@@ -49,12 +38,10 @@ interface DomainTableProps {
   setSelectedTld: (tld: string) => void;
   selectedSource: string;
   setSelectedSource: (source: string) => void;
-  onOpenBulkModal: (actionType: 'add_group' | 'remove_group' | 'allowlist' | 'unblock') => void;
+  onOpenBulkModal: (actionType: 'add_group' | 'allowlist' | 'unblock') => void;
   onOpenExportModal: () => void;
   onQuickExportTxt: () => void;
   onQuickExportCsv: () => void;
-  onEditDomain: (domain: DomainItem) => void;
-  onChangeStatus: (domain: DomainItem, status: DomainStatus) => void;
   onSaveFilter: () => void;
   onOpenMobileFilters?: () => void;
 }
@@ -89,8 +76,6 @@ export const DomainTable: React.FC<DomainTableProps> = ({
   onOpenExportModal,
   onQuickExportTxt,
   onQuickExportCsv,
-  onEditDomain,
-  onChangeStatus,
   onSaveFilter,
   onOpenMobileFilters,
 }) => {
@@ -147,20 +132,13 @@ export const DomainTable: React.FC<DomainTableProps> = ({
     }
   };
 
-  const renderStatus = (status: DomainStatus, graceDays?: number) => {
+  const renderStatus = (status: DomainStatus) => {
     switch (status) {
       case 'active':
         return (
           <div className="flex items-center space-x-1.5 text-xs text-slate-700 dark:text-slate-300 font-medium">
             <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
             <span>đang chặn</span>
-          </div>
-        );
-      case 'grace_period':
-        return (
-          <div className="flex items-center space-x-1.5 text-xs text-amber-700 dark:text-amber-300 font-semibold bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-full border border-amber-200/80 dark:border-amber-800 inline-flex">
-            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-            <span>ân hạn - còn {graceDays || 5} ngày</span>
           </div>
         );
       case 'protected':
@@ -426,13 +404,7 @@ export const DomainTable: React.FC<DomainTableProps> = ({
               onClick={() => onOpenBulkModal('add_group')}
               className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all shadow-xs cursor-pointer active-press"
             >
-              Thêm vào nhóm...
-            </button>
-            <button
-              onClick={() => onOpenBulkModal('remove_group')}
-              className="px-3 py-1.5 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600 font-semibold rounded-xl transition-colors cursor-pointer shadow-xs active-press"
-            >
-              Gỡ khỏi nhóm...
+              Chuyển nhóm...
             </button>
             <button
               onClick={() => onOpenBulkModal('allowlist')}
@@ -491,7 +463,6 @@ export const DomainTable: React.FC<DomainTableProps> = ({
                     )}
                   </div>
                 </th>
-                <th className="w-12 px-4 py-3 text-center"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
@@ -573,45 +544,12 @@ export const DomainTable: React.FC<DomainTableProps> = ({
 
                     {/* Status */}
                     <td className="px-4 py-3 whitespace-nowrap">
-                      {renderStatus(item.status, item.graceDaysLeft)}
+                      {renderStatus(item.status)}
                     </td>
 
                     {/* First Seen */}
                     <td className="px-4 py-3 font-mono text-slate-400 dark:text-slate-500 whitespace-nowrap">
                       {item.firstSeen}
-                    </td>
-
-                    {/* Actions dropdown */}
-                    <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
-                      <div className="relative group/menu">
-                        <button className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </button>
-                        <div className="hidden group-hover/menu:block absolute right-0 bottom-full mb-1 w-44 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl py-1.5 z-30 text-left">
-                          <button
-                            onClick={() => onEditDomain(item)}
-                            className="w-full px-3.5 py-1.5 text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 hover:text-emerald-700 dark:hover:text-emerald-300 flex items-center space-x-2 text-xs font-medium"
-                          >
-                            <Edit3 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                            <span>Sửa nhóm</span>
-                          </button>
-                          <div className="border-t border-slate-100 dark:border-slate-700 my-1"></div>
-                          <div className="px-3.5 py-1 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-                            Đổi trạng thái
-                          </div>
-                          {STATUS_OPTIONS.map((opt) => (
-                            <button
-                              key={opt.value}
-                              onClick={() => onChangeStatus(item, opt.value)}
-                              disabled={item.status === opt.value}
-                              className="w-full px-3.5 py-1.5 text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 hover:text-emerald-700 dark:hover:text-emerald-300 flex items-center justify-between text-xs font-medium disabled:opacity-40 disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-slate-700 dark:disabled:hover:text-slate-200"
-                            >
-                              <span>{opt.label}</span>
-                              {item.status === opt.value && <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
                     </td>
                   </tr>
                 );

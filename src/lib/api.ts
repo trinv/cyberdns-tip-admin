@@ -180,7 +180,9 @@ export async function createCategoryApi(category: Partial<CategoryInfo>): Promis
 export async function fetchDomains(params: {
   search?: string;
   category?: string;
-  // Comma-separated, e.g. "active,grace_period" — see getDomains() in queries.ts.
+  // Normally a single status value (the sidebar's status filter is a
+  // single-select dropdown); comma-separated multi-status is still
+  // accepted server-side, see getDomains() in queries.ts.
   status?: string;
   tld?: string;
   source?: string;
@@ -252,7 +254,7 @@ export async function proposeBulkDomainsApi(data: {
 }
 
 export async function bulkActionDomainsApi(data: {
-  action: 'add_group' | 'remove_group' | 'allowlist' | 'unblock';
+  action: 'add_group' | 'allowlist' | 'unblock';
   domainIds: (string | number)[];
   category?: string;
   reason: string;

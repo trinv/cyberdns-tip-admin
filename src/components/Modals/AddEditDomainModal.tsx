@@ -114,7 +114,6 @@ export const AddEditDomainModal: React.FC<AddEditDomainModalProps> = ({
                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-800 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-slate-200 font-medium focus:outline-none cursor-pointer"
               >
                 <option value="active">Đang chặn (Active block)</option>
-                <option value="grace_period">Trong ân hạn (Grace period)</option>
                 <option value="allowlist">Trong allowlist (Miễn trừ)</option>
                 <option value="unblocked">Đã thôi chặn (Unblock)</option>
               </select>

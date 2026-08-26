@@ -8,7 +8,10 @@ export type DomainCategory =
   | 'crypto-scam'
   | string;
 
-export type DomainStatus = 'active' | 'grace_period' | 'unblocked' | 'allowlist' | 'protected';
+// 'grace_period' removed per explicit request — only 3 user-facing statuses
+// now (plus 'protected', system-managed, never actually written by any
+// backend path — see queries.ts).
+export type DomainStatus = 'active' | 'unblocked' | 'allowlist' | 'protected';
 
 export interface CategoryInfo {
   id: string;
@@ -32,7 +35,6 @@ export interface DomainItem {
   source: string;
   sourceDetail?: string;
   status: DomainStatus;
-  graceDaysLeft?: number;
   firstSeen: string;
   lastSeen: string;
   isProtected?: boolean;

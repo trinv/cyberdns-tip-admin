@@ -1,28 +1,23 @@
 import React, { useState } from 'react';
-import { DomainItem, CategoryInfo, DomainStatus } from '../../types';
+import { DomainItem, CategoryInfo } from '../../types';
 import { X, Clock, Globe, Copy, Check } from 'lucide-react';
 
-const STATUS_OPTIONS: { value: DomainStatus; label: string }[] = [
-  { value: 'active', label: 'Đang chặn' },
-  { value: 'grace_period', label: 'Trong ân hạn' },
-  { value: 'unblocked', label: 'Đã thôi chặn' },
-  { value: 'allowlist', label: 'Allowlist' },
-];
-
+// No per-domain quick actions here anymore (Sửa nhóm / Thay đổi trạng
+// thái were removed per explicit request) — every domain action, single
+// or multiple, now goes through checkbox-select + the bulk action toolbar
+// (DomainTable.tsx) instead of maintaining 3 separate action surfaces
+// (this panel, a per-row "..." menu, and the bulk bar) offering the same
+// things. This panel is now purely informational.
 interface DomainInspectorProps {
   domain: DomainItem | null;
   categories: CategoryInfo[];
   onClose: () => void;
-  onEditGroup: (domain: DomainItem) => void;
-  onChangeStatus: (domain: DomainItem, status: DomainStatus) => void;
 }
 
 export const DomainInspector: React.FC<DomainInspectorProps> = ({
   domain,
   categories,
   onClose,
-  onEditGroup,
-  onChangeStatus,
 }) => {
   const [copied, setCopied] = useState(false);
 
@@ -117,7 +112,6 @@ export const DomainInspector: React.FC<DomainInspectorProps> = ({
           </span>
           <span className={`font-mono font-bold px-2 py-0.5 rounded-md ${
             domain.status === 'active' ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800' :
-            domain.status === 'grace_period' ? 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800' :
             domain.status === 'allowlist' ? 'text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800' :
             'text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800'
           }`}>
@@ -151,34 +145,6 @@ export const DomainInspector: React.FC<DomainInspectorProps> = ({
         </div>
       </div>
 
-      {/* HÀNH ĐỘNG */}
-      <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-        <div className="text-slate-400 dark:text-slate-500 font-bold tracking-wider text-xs uppercase">
-          THAO TÁC NHANH
-        </div>
-        <button
-          onClick={() => onEditGroup(domain)}
-          className="w-full px-3 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold transition-colors cursor-pointer shadow-xs active-press"
-        >
-          Sửa nhóm
-        </button>
-
-        {/* One generic status changer instead of separate fixed "Thêm
-            allowlist"/"Thôi chặn" buttons — covers all 4 user-facing
-            statuses (not just those 2), applies immediately on selection. */}
-        <div className="space-y-1">
-          <label className="block text-xs text-slate-400 dark:text-slate-500 font-semibold">Thay đổi trạng thái</label>
-          <select
-            value={domain.status}
-            onChange={(e) => onChangeStatus(domain, e.target.value as DomainStatus)}
-            className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-emerald-500 cursor-pointer"
-          >
-            {STATUS_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-        </div>
-      </div>
     </div>
   );
 

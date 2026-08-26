@@ -74,20 +74,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const categoryBreakdownSource = liveCategoryBreakdown || [];
   const totalActiveDisplay = stats ? stats.totalActive.toLocaleString('vi-VN') : '—';
 
-  // Processing-status breakdown (active / grace_period / allowlist /
-  // unblocked / protected) — real counts across ALL domains, not just
-  // active ones, replacing what used to be a fabricated QPS/telemetry chart
-  // with no backing data pipeline.
+  // Processing-status breakdown (active / allowlist / unblocked /
+  // protected — 'grace_period' removed per explicit request) — real
+  // counts across ALL domains, not just active ones, replacing what used
+  // to be a fabricated QPS/telemetry chart with no backing data pipeline.
   const STATUS_LABELS: Record<string, string> = {
     active: 'Đang chặn',
-    grace_period: 'Trong ân hạn',
     allowlist: 'Allowlist',
     unblocked: 'Đã thôi chặn',
     protected: 'Được bảo vệ',
   };
   const STATUS_COLORS: Record<string, string> = {
     active: 'bg-emerald-500',
-    grace_period: 'bg-amber-500',
     allowlist: 'bg-blue-500',
     unblocked: 'bg-slate-400',
     protected: 'bg-slate-300',

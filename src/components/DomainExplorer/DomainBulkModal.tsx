@@ -5,11 +5,11 @@ import { CategoryInfo, DomainItem } from '../../types';
 interface DomainBulkModalProps {
   isOpen: boolean;
   onClose: () => void;
-  actionType: 'add_group' | 'remove_group' | 'allowlist' | 'unblock';
+  actionType: 'add_group' | 'allowlist' | 'unblock';
   targetCategory?: string;
   selectedDomains: DomainItem[];
   categories: CategoryInfo[];
-  onConfirm: (action: 'add_group' | 'remove_group' | 'allowlist' | 'unblock', targetCategories: string[], reason: string) => Promise<void> | void;
+  onConfirm: (action: 'add_group' | 'allowlist' | 'unblock', targetCategories: string[], reason: string) => Promise<void> | void;
 }
 
 export const DomainBulkModal: React.FC<DomainBulkModalProps> = ({
@@ -49,9 +49,7 @@ export const DomainBulkModal: React.FC<DomainBulkModalProps> = ({
   const getActionTitle = () => {
     switch (actionType) {
       case 'add_group':
-        return `Thêm ${count.toLocaleString('vi-VN')} domain vào nhóm ${selectedCat}`;
-      case 'remove_group':
-        return `Gỡ ${count.toLocaleString('vi-VN')} domain khỏi nhóm ${selectedCat}`;
+        return `Chuyển ${count.toLocaleString('vi-VN')} domain vào nhóm ${selectedCat}`;
       case 'allowlist':
         return `Chuyển ${count.toLocaleString('vi-VN')} domain sang Allowlist (Miễn trừ)`;
       case 'unblock':

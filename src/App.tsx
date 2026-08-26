@@ -327,7 +327,7 @@ export default function App() {
   // Modals States
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState<boolean>(false);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState<boolean>(false);
-  const [bulkActionType, setBulkActionType] = useState<'add_group' | 'remove_group' | 'allowlist' | 'unblock'>('add_group');
+  const [bulkActionType, setBulkActionType] = useState<'add_group' | 'allowlist' | 'unblock'>('add_group');
   const [isAddDomainModalOpen, setIsAddDomainModalOpen] = useState<boolean>(false);
   const [domainToEdit, setDomainToEdit] = useState<DomainItem | null>(null);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState<boolean>(false);
@@ -599,7 +599,7 @@ export default function App() {
   // DomainBulkModal.tsx's onConfirm type) and this trusts the real server
   // response instead of hand-simulating the result locally.
   const handleConfirmBulkAction = async (
-    action: 'add_group' | 'remove_group' | 'allowlist' | 'unblock',
+    action: 'add_group' | 'allowlist' | 'unblock',
     targetCategories: string[],
     reason: string
   ) => {
@@ -615,8 +615,7 @@ export default function App() {
       await Promise.all([refreshDomains(), fetchAuditLogs().then(setAuditLogs).catch(() => {}), fetchCategories().then(setCategories).catch(() => {})]);
       const n = result.updatedCount;
       showToast(
-        action === 'add_group' ? `Đã thêm nhóm vào ${n} tên miền!` :
-        action === 'remove_group' ? `Đã gỡ nhóm khỏi ${n} tên miền!` :
+        action === 'add_group' ? `Đã chuyển nhóm cho ${n} tên miền!` :
         action === 'allowlist' ? `Đã chuyển ${n} tên miền vào Allowlist!` :
         `Đã gỡ chặn hoàn toàn cho ${n} tên miền!`,
         action === 'allowlist' ? 'warning' : 'success'
@@ -667,43 +666,11 @@ export default function App() {
     setIsAddDomainModalOpen(false);
   };
 
-  // Single Quick Action — one generic "đổi trạng thái" covering all 4
-  // user-facing statuses (Chặn/Ân hạn/Thôi chặn/Allowlist — 'protected' is
-  // deliberately not offered here, it's system-managed, not a manual quick
-  // action) instead of two separate fixed buttons (previously only
-  // "Thêm allowlist" and "Thôi chặn" existed — there was no quick way to
-  // set a domain back to 'active' or to 'grace_period' at all). Refetches
-  // the current page afterward rather than patching the row in place,
-  // since a status change can make it stop matching the active status
-  // filter (e.g. unblocking while filtered to "Đang chặn" should make the
-  // row disappear).
-  const STATUS_LABELS: Record<DomainStatus, string> = {
-    active: 'Đang chặn',
-    grace_period: 'Trong ân hạn',
-    unblocked: 'Đã thôi chặn',
-    allowlist: 'Allowlist',
-    protected: 'Được bảo vệ',
-  };
-  const STATUS_CHANGE_REASONS: Record<DomainStatus, string> = {
-    active: 'Chuyển lại trạng thái Đang chặn từ giao diện quản trị',
-    grace_period: 'Chuyển sang Ân hạn từ giao diện quản trị',
-    unblocked: 'Gỡ chặn thủ công từ giao diện quản trị',
-    allowlist: 'Chuyển vào Allowlist từ giao diện quản trị',
-    protected: 'Đánh dấu bảo vệ từ giao diện quản trị',
-  };
-  const handleChangeDomainStatus = async (domain: DomainItem, status: DomainStatus) => {
-    if (status === domain.status) return;
-    const numericId = Number(domain.id);
-    try {
-      if (Number.isNaN(numericId)) throw new Error('Invalid domain id');
-      await updateDomainApi(numericId, { status }, STATUS_CHANGE_REASONS[status]);
-      showToast(`Đã chuyển ${domain.domain} sang trạng thái "${STATUS_LABELS[status]}"`, status === 'allowlist' ? 'warning' : 'info');
-      await refreshDomains();
-    } catch (err) {
-      console.warn('Backend change status notice:', err);
-      showToast(`Không thể đổi trạng thái ${domain.domain} — vui lòng thử lại.`, 'warning');
-    }
-  };
+  // No single-domain quick "đổi trạng thái" action anymore (per explicit
+  // request) — status changes now go exclusively through checkbox-select +
+  // the bulk action toolbar (Allowlist/Thôi chặn — see handleConfirmBulkAction),
+  // even for just one selected domain, instead of maintaining a separate
+  // single-domain status changer alongside it.
 
   // Quick Plain Text (.txt) download — exports the current selection, or
   // otherwise EVERY domain matching the active filters (the whole category),
@@ -1063,25 +1030,16 @@ export default function App() {
                 onOpenExportModal={() => setIsExportModalOpen(true)}
                 onQuickExportTxt={handleQuickExportTxt}
                 onQuickExportCsv={handleQuickExportCsv}
-                onEditDomain={(d) => {
-                  setDomainToEdit(d);
-                  setIsAddDomainModalOpen(true);
-                }}
-                onChangeStatus={handleChangeDomainStatus}
                 onSaveFilter={() => showToast('Đã lưu bộ lọc tìm kiếm hiện tại vào danh sách!', 'info')}
                 onOpenMobileFilters={() => setIsMobileFiltersOpen(true)}
               />
 
-              {/* Right Domain Inspector Drawer */}
+              {/* Right Domain Inspector Drawer — purely informational now,
+                  no per-domain actions here (see DomainInspector.tsx). */}
               <DomainInspector
                 domain={activeDomain}
                 categories={categories}
                 onClose={() => setActiveDomainId(null)}
-                onEditGroup={(d) => {
-                  setDomainToEdit(d);
-                  setIsAddDomainModalOpen(true);
-                }}
-                onChangeStatus={handleChangeDomainStatus}
               />
             </div>
           )}

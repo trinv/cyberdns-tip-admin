@@ -5,7 +5,6 @@ import { Plus, Tag, Bookmark, CheckSquare, Square, FolderPlus, Sparkles, Filter,
 const STATUS_OPTIONS: { value: DomainStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'Tất cả' },
   { value: 'active', label: 'Đang chặn' },
-  { value: 'grace_period', label: 'Trong ân hạn' },
   { value: 'unblocked', label: 'Đã thôi chặn' },
   { value: 'allowlist', label: 'Trong allowlist' },
 ];

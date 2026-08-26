@@ -12,7 +12,7 @@ import express from 'express';
 import http from 'http';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
-import { ensureSuperAdmin, recoverInterruptedSyncs } from './src/db/queries.ts';
+import { ensureSuperAdmin, recoverInterruptedSyncs, migrateAwayFromGracePeriod } from './src/db/queries.ts';
 import { ensureDomainCategoryTriggers, ensureSearchIndexes } from './src/db/triggers.ts';
 import {
   getDashboardStats,
@@ -124,6 +124,7 @@ async function startServer() {
   // mid-sync by this very restart) would otherwise block every future sync
   // attempt on that source forever (see recoverInterruptedSyncs' comment).
   await recoverInterruptedSyncs();
+  await migrateAwayFromGracePeriod();
 
   // ===================== REST API ROUTES =====================
 

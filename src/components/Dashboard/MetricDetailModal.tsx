@@ -32,7 +32,6 @@ function getSeverityBand(score: number): 'Critical' | 'High' | 'Medium' {
 
 const STATUS_LABELS: Record<string, string> = {
   active: 'Active (đang chặn)',
-  grace_period: 'Ân hạn (Grace)',
   allowlist: 'Allowlist',
   unblocked: 'Đã thôi chặn',
   protected: 'Được bảo vệ',
@@ -114,7 +113,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {metricType === 'total_blocked' && (
               stats ? (
-                (['active', 'grace_period', 'allowlist', 'unblocked'] as const).map((statusKey) => {
+                (['active', 'allowlist', 'unblocked'] as const).map((statusKey) => {
                   const row = stats.statusBreakdown.find((s) => s.status === statusKey);
                   return (
                     <div key={statusKey} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-800">

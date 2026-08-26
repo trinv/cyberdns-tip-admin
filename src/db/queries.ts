@@ -389,8 +389,8 @@ export async function getDashboardStats() {
         .orderBy(desc(sql`count(*)`))
         .limit(6),
       // Every status, not just 'active' — this is what backs the real
-      // "Active / Ân hạn / Allowlist / Đã thôi chặn" breakdown in the
-      // dashboard's total-blocked detail modal (see MetricDetailModal.tsx).
+      // "Active / Allowlist / Đã thôi chặn" breakdown in the dashboard's
+      // total-blocked detail modal (see MetricDetailModal.tsx).
       db
         .select({ status: domains.status, count: sql<number>`count(*)` })
         .from(domains)
@@ -446,8 +446,9 @@ const DOMAIN_SORT_COLUMNS = {
 export async function getDomains(params: {
   search?: string;
   category?: string;
-  // Comma-separated list of statuses (matches the Domain Explorer's
-  // multi-select status checkboxes), e.g. "active,grace_period".
+  // The sidebar's status filter is a single-select dropdown, so this is
+  // normally just one value — comma-separated multi-status is still
+  // accepted here (see below) in case a future caller ever needs it.
   status?: string;
   tld?: string;
   source?: string;
@@ -523,7 +524,6 @@ export async function updateDomain(
     sourceDetail?: string;
     tags?: string[];
     isProtected?: boolean;
-    graceDaysLeft?: number;
   },
   meta: { userEmail?: string; reason?: string } = {}
 ) {
@@ -536,7 +536,6 @@ export async function updateDomain(
     if (patch.sourceDetail !== undefined) setValues.sourceDetail = patch.sourceDetail;
     if (patch.tags !== undefined) setValues.tags = patch.tags;
     if (patch.isProtected !== undefined) setValues.isProtected = patch.isProtected;
-    if (patch.graceDaysLeft !== undefined) setValues.graceDaysLeft = patch.graceDaysLeft;
 
     let updated = await db.update(domains).set(setValues).where(eq(domains.id, id)).returning();
     if (!updated[0]) throw new Error(`Domain id ${id} not found`);
@@ -799,7 +798,12 @@ export async function bulkCreateDomains(data: {
 }
 
 export async function bulkUpdateDomains(params: {
-  action: 'add_group' | 'remove_group' | 'allowlist' | 'unblock';
+  // 'remove_group' removed per explicit request — every domain always
+  // belongs to exactly one category (domain_categories.domainId is
+  // uniquely constrained), so "remove from group with no replacement"
+  // never had a coherent end state; 'add_group' (a move, since it
+  // replaces the existing membership) is the only group-changing action now.
+  action: 'add_group' | 'allowlist' | 'unblock';
   domainIds?: number[];
   category?: string;
   reason: string;
@@ -832,16 +836,13 @@ export async function bulkUpdateDomains(params: {
         .where(inArray(domains.id, domainIds));
     } else if (action === 'add_group' && category) {
       // Idempotent: domains already in this category are silently skipped
-      // (DB-enforced unique membership), not duplicated.
+      // (DB-enforced unique membership), not duplicated. For a domain
+      // already in a DIFFERENT category, this MOVES it (addDomainCategoryMemberships
+      // upserts on domainId) — there's no separate "remove from group"
+      // action; a domain always belongs to exactly one category.
       await addDomainCategoryMemberships(
         domainIds.map((domainId) => ({ domainId, categoryId: category, sourceLabel: reason || 'Bulk action' }))
       );
-    } else if (action === 'remove_group' && category) {
-      // Deleting the membership row is enough — the sync trigger
-      // automatically reassigns primaryCategory for any domain that just
-      // lost its primary membership (promotes its oldest remaining one, or
-      // clears it to null if this was its only category).
-      await removeDomainCategoryMemberships(domainIds, category);
     }
 
     // Insert Audit Log
@@ -1071,6 +1072,32 @@ export async function recoverInterruptedSyncs() {
   }
 }
 
+// Runs once at server startup, right alongside recoverInterruptedSyncs —
+// 'grace_period' was removed as a status (per explicit request; only
+// 'active'/'unblocked'/'allowlist' remain user-facing now), but any domain
+// row already sitting at that value from before this change needs an
+// actual real status, not just a UI that no longer offers it as an option.
+// Converted to 'active' (still genuinely blocked) rather than 'unblocked'
+// — grace_period always meant "still blocking, just provisionally", so
+// this is the smaller behavior change of the two options: it keeps
+// currently-enforced blocks enforced instead of silently un-blocking them.
+// Idempotent (a plain UPDATE ... WHERE, safe to run on every boot; a no-op
+// once no rows are left at that value).
+export async function migrateAwayFromGracePeriod() {
+  try {
+    const migrated = await db
+      .update(domains)
+      .set({ status: 'active', updatedAt: new Date() })
+      .where(eq(domains.status, 'grace_period'))
+      .returning({ id: domains.id });
+    if (migrated.length > 0) {
+      console.log(`Đã chuyển ${migrated.length} tên miền từ trạng thái "grace_period" (đã loại bỏ) sang "active".`);
+    }
+  } catch (error) {
+    console.error('migrateAwayFromGracePeriod failed:', error);
+  }
+}
+
 // Feed sync is a real background job, not a request/response round-trip:
 // startFeedSourceSync() flips the row to 'syncing' and returns immediately
 // (a few ms); runFeedSourceSyncJob() then keeps running server-side to
@@ -1128,10 +1155,10 @@ async function setSyncProgress(id: string, progress: number, phase: string) {
 // at every stage so GET /api/sources always reflects real, current state.
 //
 // Scope note: this only ADDS domains. It does not yet detect "this domain
-// used to be in the feed and just disappeared" and react to it (e.g. move to
-// grace_period) — that needs a proper diff-against-last-sync + safety-gate
-// flow, which is what the Releases feature is headed toward, not something
-// to bolt on here silently.
+// used to be in the feed and just disappeared" and react to it — that
+// needs a proper diff-against-last-sync + safety-gate flow, which is what
+// the Releases feature is headed toward, not something to bolt on here
+// silently.
 async function runFeedSourceSyncJob(id: string) {
   const fail = async (message: string) => {
     await db
@@ -1278,7 +1305,7 @@ async function getDomainIdsForFeedSource(feedSourceId: string): Promise<number[]
 // Pauses a feed source: excludes it from future syncs (see
 // startFeedSourceSync's isPaused guard and "Đồng bộ tất cả" in the
 // frontend, which should skip paused sources) AND moves every domain it
-// currently owns from active/grace_period to 'unblocked' — marked
+// currently owns from active to 'unblocked' — marked
 // unblockedBySourcePause so resumeFeedSource can undo exactly this, and
 // only this, later. Domains a human separately moved to allowlist/protected
 // are left untouched (those are deliberate overrides, not "just being
@@ -1299,7 +1326,7 @@ export async function pauseFeedSource(id: string, userEmail: string) {
         const updated = await db
           .update(domains)
           .set({ status: 'unblocked', unblockedBySourcePause: true, updatedAt: new Date() })
-          .where(and(inArray(domains.id, chunk), inArray(domains.status, ['active', 'grace_period'])))
+          .where(and(inArray(domains.id, chunk), eq(domains.status, 'active')))
           .returning({ id: domains.id });
         affectedCount += updated.length;
       }
@@ -1401,7 +1428,7 @@ export async function deleteFeedSource(id: string, userEmail: string) {
         const updated = await db
           .update(domains)
           .set({ status: 'unblocked', unblockedBySourcePause: false, updatedAt: new Date() })
-          .where(and(inArray(domains.id, chunk), inArray(domains.status, ['active', 'grace_period'])))
+          .where(and(inArray(domains.id, chunk), eq(domains.status, 'active')))
           .returning({ id: domains.id });
         affectedCount += updated.length;
       }
