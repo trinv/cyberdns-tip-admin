@@ -269,7 +269,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
             <div className="flex items-center space-x-1.5 mt-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
               <CheckCircle2 className="w-4 h-4" />
-              <span>{stats ? 'Cập nhật trực tiếp từ PostgreSQL' : 'Đang tải...'}</span>
+              <span>{stats ? 'Cập nhật trực tiếp từ CyberDNSTIP-DB' : 'Đang tải...'}</span>
               <span className="text-slate-400 dark:text-slate-500 font-normal">· Nhấp để xem đồ thị</span>
             </div>
           </div>
@@ -354,13 +354,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   Phân Bổ Theo Trạng Thái Xử Lý
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Số lượng tên miền thật trong PostgreSQL theo từng trạng thái (đang chặn, ân hạn, allowlist, đã thôi chặn...)
+                  Số lượng tên miền thật trong CyberDNSTIP-DB theo từng trạng thái (đang chặn, ân hạn, allowlist, đã thôi chặn...)
                 </p>
               </div>
             </div>
 
             {!stats ? (
-              <div className="py-10 text-center text-slate-400 dark:text-slate-500 text-xs">Đang tải dữ liệu từ PostgreSQL...</div>
+              <div className="py-10 text-center text-slate-400 dark:text-slate-500 text-xs">Đang tải dữ liệu từ CyberDNSTIP-DB...</div>
             ) : statusBreakdown.length === 0 || statusBreakdown.every((s) => s.count === 0) ? (
               <div className="py-10 text-center text-slate-400 dark:text-slate-500 text-xs">Chưa có tên miền nào trong hệ thống.</div>
             ) : (
@@ -417,7 +417,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             {donutSlices.length === 0 ? (
               <div className="py-16 text-center text-slate-400 dark:text-slate-500 text-xs">
-                {stats ? 'Chưa có domain đang chặn nào để phân bổ.' : 'Đang tải dữ liệu từ PostgreSQL...'}
+                {stats ? 'Chưa có domain đang chặn nào để phân bổ.' : 'Đang tải dữ liệu từ CyberDNSTIP-DB...'}
               </div>
             ) : (
             <>
@@ -653,7 +653,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </h3>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Xếp hạng theo threat score, lấy trực tiếp từ PostgreSQL (không phải luồng thời gian thực — cần pipeline sensor DNS để có mốc thời gian phát hiện chính xác)
+              Xếp hạng theo threat score, lấy trực tiếp từ CyberDNSTIP-DB (không phải luồng thời gian thực — cần pipeline sensor DNS để có mốc thời gian phát hiện chính xác)
             </p>
           </div>
 
@@ -690,7 +690,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               {recentHighThreatDomains.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-4 py-6 text-center text-slate-400 dark:text-slate-500">
-                    {stats ? 'Chưa có tên miền nào trong danh sách chặn.' : 'Đang tải dữ liệu từ PostgreSQL...'}
+                    {stats ? 'Chưa có tên miền nào trong danh sách chặn.' : 'Đang tải dữ liệu từ CyberDNSTIP-DB...'}
                   </td>
                 </tr>
               )}

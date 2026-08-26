@@ -123,7 +123,7 @@ async function startServer() {
 
   // Health Check
   app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', engine: 'CyberDNS TIP Backend (PostgreSQL + Express)', timestamp: new Date().toISOString() });
+    res.json({ status: 'ok', engine: 'CyberDNS TIP Backend', timestamp: new Date().toISOString() });
   });
 
   // ---- Authentication (self-hosted email/password) ----

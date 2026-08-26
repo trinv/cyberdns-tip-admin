@@ -114,7 +114,7 @@ export default function App() {
       setTimeout(() => {
         showToast(
           status === 401
-            ? 'Vui lòng đăng nhập để thao tác này được lưu vào PostgreSQL.'
+            ? 'Vui lòng đăng nhập để thao tác này được lưu vào CyberDNSTIP-DB.'
             : 'Tài khoản của bạn không có quyền thực hiện thao tác này.',
           'warning'
         );
@@ -618,7 +618,7 @@ export default function App() {
       try {
         if (Number.isNaN(numericId)) throw new Error('Invalid domain id');
         await updateDomainApi(numericId, domainData, reason);
-        showToast(`Đã cập nhật và lưu cấu hình cho ${domainData.domain} vào PostgreSQL`, 'success');
+        showToast(`Đã cập nhật và lưu cấu hình cho ${domainData.domain} vào CyberDNSTIP-DB`, 'success');
         await Promise.all([refreshDomains(), fetchCategories().then(setCategories).catch(() => {})]);
       } catch (err) {
         console.warn('Backend update domain notice:', err);
@@ -1186,7 +1186,7 @@ export default function App() {
                 try {
                   const created = await createFeedSourceApi(newSrc);
                   setSources((prev) => [...prev, created]);
-                  showToast(`Đã thêm nguồn feed ${created.name} (đã lưu vào PostgreSQL) — bấm "Đồng bộ" để nạp dữ liệu.`);
+                  showToast(`Đã thêm nguồn feed ${created.name} (đã lưu vào CyberDNSTIP-DB) — bấm "Đồng bộ" để nạp dữ liệu.`);
                 } catch (err: any) {
                   console.warn('Backend create source notice:', err);
                   showToast(err?.message || `Không thể thêm nguồn feed "${newSrc.name}" — vui lòng thử lại.`, 'warning');
@@ -1308,7 +1308,7 @@ export default function App() {
           try {
             const created = await createCategoryApi(cat);
             setCategories((prev) => [...prev, created]);
-            showToast(`Đã tạo nhóm danh mục mới: ${created.name} (đã lưu vào PostgreSQL)`);
+            showToast(`Đã tạo nhóm danh mục mới: ${created.name} (đã lưu vào CyberDNSTIP-DB)`);
           } catch (err: any) {
             console.warn('Backend create category notice:', err);
             showToast(err?.message || `Không thể tạo nhóm danh mục "${cat.name}" — vui lòng thử lại.`, 'warning');

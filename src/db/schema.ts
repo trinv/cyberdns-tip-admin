@@ -179,8 +179,8 @@ export const feedSources = pgTable(
     // background sync job (see runFeedSourceSyncJob in queries.ts) — 0-100.
     syncProgress: integer('sync_progress').default(0).notNull(),
     // Human-readable current step, e.g. "Đang tải dữ liệu (42%)...",
-    // "Đang phân tích...", "Đang ghi vào PostgreSQL (3/12)..." — null when
-    // not currently syncing.
+    // "Đang phân tích...", "Đang ghi vào CyberDNSTIP-DB (3/12)..." — null
+    // when not currently syncing.
     syncPhase: text('sync_phase'),
     // When true: excluded from "Đồng bộ tất cả" / the sync button is
     // disabled, and every domain this source is currently linked to (via

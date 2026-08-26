@@ -125,7 +125,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
                   );
                 })
               ) : (
-                <div className="col-span-4 text-center py-4 text-slate-400">Đang tải dữ liệu từ PostgreSQL...</div>
+                <div className="col-span-4 text-center py-4 text-slate-400">Đang tải dữ liệu từ CyberDNSTIP-DB...</div>
               )
             )}
 
@@ -286,7 +286,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
         {/* Modal Footer with Direct Actions */}
         <div className="px-5 py-3.5 border-t border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 flex flex-wrap items-center justify-between gap-3">
           <div className="text-xs text-slate-500 dark:text-slate-400">
-            Dữ liệu tổng hợp trực tiếp từ PostgreSQL
+            Dữ liệu tổng hợp trực tiếp từ CyberDNSTIP-DB
           </div>
 
           <div className="flex items-center space-x-2">

@@ -503,7 +503,7 @@ export async function getDomains(params: {
     };
   } catch (error) {
     console.error('getDomains failed:', error);
-    throw new Error('Failed to retrieve domains from PostgreSQL', { cause: error });
+    throw new Error('Failed to retrieve domains from CyberDNSTIP-DB', { cause: error });
   }
 }
 
@@ -1181,7 +1181,7 @@ async function runFeedSourceSyncJob(id: string) {
       return;
     }
 
-    await setSyncProgress(id, 58, `Đã phân tích ${parsedDomains.length.toLocaleString('vi-VN')} domain — đang kiểm tra trùng lặp và ghi vào PostgreSQL...`);
+    await setSyncProgress(id, 58, `Đã phân tích ${parsedDomains.length.toLocaleString('vi-VN')} domain — đang kiểm tra trùng lặp và ghi vào CyberDNSTIP-DB...`);
 
     // --- Phase 3: write DIRECTLY to PostgreSQL/domains (58-100%) ---
     // Feed-synced domains always go straight into the blocklist — a feed
@@ -1197,7 +1197,7 @@ async function runFeedSourceSyncJob(id: string) {
       feedSourceId: id,
       onChunkProgress: async (processed, total) => {
         const percent = 58 + (processed / total) * 42;
-        await setSyncProgress(id, percent, `Đang ghi vào PostgreSQL (${processed.toLocaleString('vi-VN')}/${total.toLocaleString('vi-VN')})...`);
+        await setSyncProgress(id, percent, `Đang ghi vào CyberDNSTIP-DB (${processed.toLocaleString('vi-VN')}/${total.toLocaleString('vi-VN')})...`);
       },
     });
 
