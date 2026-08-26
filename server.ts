@@ -12,7 +12,7 @@ import express from 'express';
 import http from 'http';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
-import { ensureSuperAdmin, ensureDefaultCategories } from './src/db/queries.ts';
+import { ensureSuperAdmin } from './src/db/queries.ts';
 import { ensureDomainCategoryTriggers } from './src/db/triggers.ts';
 import {
   getDashboardStats,
@@ -110,20 +110,14 @@ async function startServer() {
   // with — must be awaited (not fire-and-forget) so the credentials print
   // to the console before anyone tries to sign in.
   //
-  // NOTE: there is deliberately no demo/mock DOMAIN data seeder here — all
-  // domains/sources/releases/audit-logs/review-queue data comes only from
-  // real syncs (POST /api/sources/:id/sync), the Import tab, or manual
-  // entry. See the memory log for why this was removed.
-  //
-  // ensureDefaultCategories below is different: it's not sample data, it's
-  // declaring the real, fixed taxonomy the rest of the codebase already
-  // hardcodes references to (types.ts' DomainCategory union, DomainTable's
-  // badge colors, every "add domain/source" form's category picker) — so
-  // those ids are guaranteed to actually exist as real rows instead of an
-  // admin needing to have manually pre-created each one by the exact right
-  // id first (the root cause of a real FK-violation bug on first deploy).
+  // NOTE: there is deliberately no demo/mock data seeder here — this
+  // includes categories. `categories` starts genuinely empty on a fresh
+  // install; a row is created if and only if an admin explicitly declares
+  // one via "Quản lý danh mục" in the UI. All domains/categories/sources/
+  // releases/audit-logs/review-queue data comes only from real syncs
+  // (POST /api/sources/:id/sync), the Import tab, or manual entry — never
+  // a hardcoded default list, however "real-looking" the values are.
   await ensureSuperAdmin();
-  await ensureDefaultCategories();
 
   // ===================== REST API ROUTES =====================
 
@@ -366,13 +360,17 @@ async function startServer() {
     }
   });
 
+  // No `id` accepted from the client — createCategory generates it
+  // server-side at creation time so it stays stable forever afterward,
+  // independent of the display name (which IS freely editable — see
+  // PATCH below).
   app.post('/api/categories', requireAuth, async (req: AuthRequest, res) => {
     try {
-      const { id, name, description, color, deltaThreshold } = req.body;
-      if (!id || !name) {
-        return res.status(400).json({ error: 'id and name are required.' });
+      const { name, description, color, deltaThreshold } = req.body;
+      if (!name) {
+        return res.status(400).json({ error: 'name is required.' });
       }
-      const created = await createCategory({ id, name, description, color, deltaThreshold });
+      const created = await createCategory({ name, description, color, deltaThreshold });
       res.status(201).json({ success: true, category: created });
     } catch (error: any) {
       res.status(500).json({ error: error.message });

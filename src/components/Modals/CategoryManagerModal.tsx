@@ -6,7 +6,10 @@ interface CategoryManagerModalProps {
   isOpen: boolean;
   onClose: () => void;
   categories: CategoryInfo[];
-  onAddCategory: (cat: CategoryInfo) => void;
+  // No `id` here — the server generates and owns it (see createCategory in
+  // queries.ts) so it's guaranteed unique and stays stable even if the name
+  // is renamed later. This form only ever supplies the human-facing fields.
+  onAddCategory: (cat: { name: string; description?: string; color?: string; deltaThreshold?: number }) => void;
   onUpdateCategory?: (id: string, patch: Partial<CategoryInfo>) => void;
   onDeleteCategory?: (id: string) => void;
 }
@@ -35,19 +38,21 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
     e.preventDefault();
     if (!name.trim()) return;
 
-    const id = name.toLowerCase().replace(/\s+/g, '-');
+    // The real typed display name — NOT slugified into an id here anymore.
+    // The server generates its own stable id from this name at creation
+    // time (see createCategory), so this form never needs to think about
+    // ids at all.
     onAddCategory({
-      id,
-      name: id,
-      count: 0,
+      name: name.trim(),
+      description: description.trim() || undefined,
       color,
-      borderColor: color,
-      badgeBg: `${color}15`,
-      badgeText: color,
-      description,
       deltaThreshold,
     });
 
+    setName('');
+    setDescription('');
+    setColor('#10b981');
+    setDeltaThreshold(3.0);
     onClose();
   };
 
@@ -182,15 +187,18 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
             </div>
 
             <div className="space-y-1">
-              <label className="block text-slate-800 dark:text-slate-200 font-bold">Tên nhóm (Category ID / Name)</label>
+              <label className="block text-slate-800 dark:text-slate-200 font-bold">Tên nhóm danh mục</label>
               <input
                 type="text"
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="ví dụ: fake-news, piracy, crypto-miner"
-                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-800 rounded-xl px-3.5 py-2 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 font-mono text-xs focus:outline-none"
+                placeholder="ví dụ: Tin giả (Fake News), Vi phạm bản quyền"
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-800 rounded-xl px-3.5 py-2 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 text-xs focus:outline-none"
               />
+              <p className="text-xs text-slate-400 dark:text-slate-500">
+                Mã định danh (id) sẽ được hệ thống tự sinh và giữ nguyên vĩnh viễn — đổi tên ở đây sau này sẽ không làm thay đổi mã đó.
+              </p>
             </div>
 
             <div className="space-y-1">
