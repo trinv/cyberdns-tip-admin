@@ -525,7 +525,7 @@ export async function updateDomain(
     tags?: string[];
     isProtected?: boolean;
   },
-  meta: { userEmail?: string; reason?: string } = {}
+  meta: { userEmail?: string; userRole?: string; reason?: string } = {}
 ) {
   try {
     // Snapshot the pre-change row so the audit log entry can carry enough
@@ -573,7 +573,7 @@ export async function updateDomain(
 
     await db.insert(auditLogs).values({
       user: meta.userEmail || 'Analyst (Manual)',
-      role: 'SecOps',
+      role: meta.userRole || 'SecOps',
       action: 'edit_group',
       targetCount: 1,
       summary: `Cập nhật cấu hình tên miền: ${updated[0].domain}`,
@@ -607,6 +607,7 @@ export async function createDomain(data: {
   source?: string;
   reason?: string;
   userEmail?: string;
+  userRole?: string;
   // Set when this call originates from a feed (directly, or via an
   // approved review-queue item that was itself reported by a feed — see
   // resolveReviewItem) so the resulting domain_categories row stays
@@ -679,7 +680,7 @@ export async function createDomain(data: {
     // Log to audit log
     await db.insert(auditLogs).values({
       user: data.userEmail || 'Analyst (Manual)',
-      role: 'SecOps',
+      role: data.userRole || 'SecOps',
       action: 'add',
       targetCount: 1,
       summary: `Thêm thủ công tên miền: ${cleanDomain}`,
@@ -708,6 +709,7 @@ export async function bulkCreateDomains(data: {
   source?: string;
   reason?: string;
   userEmail?: string;
+  userRole?: string;
   feedSourceId?: string;
   // Called after each insert chunk with how many of the deduplicated input
   // domains have been written so far — lets a caller (feed sync) surface
@@ -807,8 +809,11 @@ export async function bulkCreateDomains(data: {
     }
 
     await db.insert(auditLogs).values({
-      user: data.userEmail || 'Analyst (Batch Import)',
-      role: 'SecOps',
+      // data.userEmail is the person who clicked "Đồng bộ" — threaded in via
+      // startFeedSourceSync/runFeedSourceSyncJob. The fallback only fires if
+      // this is ever called from a context with no acting user at all.
+      user: data.userEmail || 'Feed Sync (không rõ người khởi chạy)',
+      role: data.userRole || 'SecOps',
       action: 'add',
       targetCount: inserted.length,
       summary: `Nhập hàng loạt ${inserted.length} tên miền vào nhóm ${data.categories.join(', ')} (${newCount.toLocaleString('vi-VN')} mới, ${existingCount.toLocaleString('vi-VN')} đã tồn tại)`,
@@ -852,9 +857,10 @@ export async function bulkUpdateDomains(params: {
   category?: string;
   reason: string;
   userEmail?: string;
+  userRole?: string;
 }) {
   try {
-    const { action, domainIds = [], category, reason, userEmail = 'Admin' } = params;
+    const { action, domainIds = [], category, reason, userEmail = 'Admin', userRole } = params;
 
     if (domainIds.length === 0) return { updatedCount: 0 };
 
@@ -901,7 +907,7 @@ export async function bulkUpdateDomains(params: {
     // Insert Audit Log
     await db.insert(auditLogs).values({
       user: userEmail,
-      role: 'Admin',
+      role: userRole || 'Admin',
       action: 'bulk_action',
       targetCount: domainIds.length,
       summary: `Thực hiện thao tác hàng loạt [${action}] trên ${domainIds.length} tên miền`,
@@ -1166,7 +1172,7 @@ export async function migrateAwayFromGracePeriod() {
 // tab switch: there is no client-side "isSyncing" state to lose.
 const activeSyncs = new Set<string>();
 
-export async function startFeedSourceSync(id: string) {
+export async function startFeedSourceSync(id: string, actingUser?: { email?: string; role?: string }) {
   const existing = await db.select().from(feedSources).where(eq(feedSources.id, id)).limit(1);
   const source = existing[0];
   if (!source) throw new Error(`Feed source ${id} not found`);
@@ -1187,7 +1193,11 @@ export async function startFeedSourceSync(id: string) {
     .returning();
 
   // Deliberately not awaited — this is the fire-and-forget background job.
-  runFeedSourceSyncJob(id).finally(() => activeSyncs.delete(id));
+  // actingUser is whoever clicked "Đồng bộ" — carried through so the
+  // resulting audit log entry shows a real person, not a generic label
+  // (there's no scheduled/automated sync in this app; every sync is
+  // triggered by a click).
+  runFeedSourceSyncJob(id, actingUser).finally(() => activeSyncs.delete(id));
 
   return started[0];
 }
@@ -1217,7 +1227,7 @@ async function setSyncProgress(id: string, progress: number, phase: string) {
 // needs a proper diff-against-last-sync + safety-gate flow, which is what
 // the Releases feature is headed toward, not something to bolt on here
 // silently.
-async function runFeedSourceSyncJob(id: string) {
+async function runFeedSourceSyncJob(id: string, actingUser?: { email?: string; role?: string }) {
   const fail = async (message: string) => {
     await db
       .update(feedSources)
@@ -1322,6 +1332,8 @@ async function runFeedSourceSyncJob(id: string) {
       categories: [source.category],
       source: `Feed: ${source.name}`,
       reason: `Đồng bộ tự động từ nguồn feed ${source.name}`,
+      userEmail: actingUser?.email,
+      userRole: actingUser?.role,
       feedSourceId: id,
       onChunkProgress: async (processed, total) => {
         const percent = 58 + (processed / total) * 42;
@@ -1580,6 +1592,7 @@ export async function proposeDomain(data: {
   category: string;
   reason?: string;
   userEmail?: string;
+  userRole?: string;
 }) {
   try {
     const result = await bulkCreateReviewItems({
@@ -1591,7 +1604,7 @@ export async function proposeDomain(data: {
 
     await db.insert(auditLogs).values({
       user: data.userEmail || 'Analyst (Manual)',
-      role: 'SecOps',
+      role: data.userRole || 'SecOps',
       action: 'add',
       targetCount: result.insertedCount,
       summary:
@@ -1617,6 +1630,7 @@ export async function proposeDomainsBulk(data: {
   category: string;
   reason?: string;
   userEmail?: string;
+  userRole?: string;
 }) {
   try {
     const result = await bulkCreateReviewItems({
@@ -1628,7 +1642,7 @@ export async function proposeDomainsBulk(data: {
 
     await db.insert(auditLogs).values({
       user: data.userEmail || 'Analyst (Batch Import)',
-      role: 'SecOps',
+      role: data.userRole || 'SecOps',
       action: 'add',
       targetCount: result.insertedCount,
       summary: `Đề xuất ${result.insertedCount.toLocaleString('vi-VN')} tên miền vào Hàng đợi duyệt (nhóm ${data.category})`,
@@ -1666,7 +1680,8 @@ export async function resolveReviewItem(
   id: number,
   decision: 'approved' | 'rejected',
   reviewerEmail: string,
-  categoryOverride?: string
+  categoryOverride?: string,
+  reviewerRole?: string
 ) {
   try {
     const item = await db
@@ -1693,6 +1708,7 @@ export async function resolveReviewItem(
         source: `Báo cáo: ${item[0].reportedBy}`,
         reason: item[0].reason,
         userEmail: reviewerEmail,
+        userRole: reviewerRole,
         feedSourceId: item[0].feedSourceId || undefined,
       });
     }

@@ -288,6 +288,7 @@ async function startServer() {
       const { reason, ...patch } = req.body;
       const updated = await updateDomain(id, patch, {
         userEmail: req.user?.email,
+        userRole: req.user?.role,
         reason,
       });
       res.json({ success: true, domain: updated });
@@ -311,6 +312,7 @@ async function startServer() {
         category: categories[0],
         reason,
         userEmail: req.user?.email,
+        userRole: req.user?.role,
       });
       res.status(201).json({ success: true, ...result });
     } catch (error: any) {
@@ -333,6 +335,7 @@ async function startServer() {
         category: cats[0],
         reason,
         userEmail: req.user?.email,
+        userRole: req.user?.role,
       });
       res.status(201).json({ success: true, ...result });
     } catch (error: any) {
@@ -350,6 +353,7 @@ async function startServer() {
         category,
         reason,
         userEmail: req.user?.email || 'SOC Team',
+        userRole: req.user?.role,
       });
       res.json(result);
     } catch (error: any) {
@@ -437,7 +441,7 @@ async function startServer() {
   // away (see startFeedSourceSync / runFeedSourceSyncJob in queries.ts).
   app.post('/api/sources/:id/sync', requireAuth, async (req: AuthRequest, res) => {
     try {
-      const started = await startFeedSourceSync(req.params.id);
+      const started = await startFeedSourceSync(req.params.id, { email: req.user?.email, role: req.user?.role });
       res.status(202).json({ success: true, source: started });
     } catch (error: any) {
       console.error('API POST /api/sources/:id/sync error:', error);
@@ -498,7 +502,7 @@ async function startServer() {
       if (!decision || !['approved', 'rejected'].includes(decision)) {
         return res.status(400).json({ error: 'Invalid decision' });
       }
-      const resolved = await resolveReviewItem(id, decision, req.user?.email || 'SOC Approver', category);
+      const resolved = await resolveReviewItem(id, decision, req.user?.email || 'SOC Approver', category, req.user?.role);
       res.json({ success: true, item: resolved });
     } catch (error: any) {
       res.status(500).json({ error: error.message });

@@ -2,15 +2,21 @@
 @custom-variant dark (&:is(.dark, .dark *));
 
 @theme inline {
-  /* Must list fonts in the SAME order as `*`/`body` below — this feeds
-     Tailwind's `font-sans` utility class, which is applied throughout
-     every page (every page header uses it: `font-bold font-sans`, etc.).
-     It previously listed Arial before Inter while `*`/`body` listed Inter
-     before Arial — on any system where both are actually installed,
-     `font-sans`-tagged text (headings) rendered in a visibly different
-     typeface than plain body text on the very same page. */
-  --font-sans: "Inter", "Arial", "Segoe UI", sans-serif;
-  --font-mono: "IBM Plex Mono", "SFMono-Regular", monospace;
+  /* The app uses exactly ONE font stack everywhere — declared once on
+     `body` below and inherited by every element via `* { font-family:
+     inherit }`. Tailwind's `font-sans`/`font-mono` utilities are still
+     used throughout the codebase (buttons, tables, numeric/id columns),
+     but a Tailwind utility class always wins over that base-layer `*`
+     rule regardless of selector specificity (utilities is a later cascade
+     layer than base) — so those classes would otherwise still render
+     their OWN typeface (Inter vs. IBM Plex Mono) instead of truly
+     inheriting. Pointing both theme tokens at `inherit` itself makes
+     Tailwind generate `.font-sans`/`.font-mono` as `font-family: inherit`
+     directly, so every existing (and future) use of those classes is a
+     no-op for typeface — one real font stack, no exceptions, without
+     having to hunt down and edit every className that mentions them. */
+  --font-sans: inherit;
+  --font-mono: inherit;
   --color-background: var(--bg-main);
   --color-foreground: var(--text-primary);
   --color-card: var(--bg-card);
