@@ -265,6 +265,45 @@ export async function ensureSuperAdmin() {
   }
 }
 
+// Runs once on every server startup, right alongside ensureSuperAdmin —
+// guarantees the category ids the REST of the codebase already assumes
+// exist (DomainCategory type in types.ts, DomainTable's badge-color
+// switch, and the "pick the first real category" fallback in
+// SourcesView/ImportView/AddEditDomainModal/DomainBulkModal) actually have
+// a real row in `categories` on every install, instead of relying on an
+// admin to have manually created each one by the exact right id/slug
+// first. This is what the "malware-phishing" FK-violation bug (an id
+// referenced everywhere in the UI but never guaranteed to exist in the
+// DB) should have been prevented by from the start.
+//
+// onConflictDoNothing on id: safe to run on every boot — never overwrites
+// an admin's own edits (renamed/recolored/deleted) to a category that
+// already exists.
+export async function ensureDefaultCategories() {
+  const DEFAULTS: {
+    id: string;
+    name: string;
+    description: string;
+    color: string;
+  }[] = [
+    { id: 'malware-phishing', name: 'Malware & Lừa đảo (Phishing)', description: 'Tên miền phát tán mã độc hoặc giả mạo để đánh cắp thông tin đăng nhập/tài chính.', color: '#f43f5e' },
+    { id: 'tracking-adware', name: 'Theo dõi & Quảng cáo (Tracking/Adware)', description: 'Tên miền thu thập dữ liệu theo dõi người dùng hoặc phát tán quảng cáo không mong muốn.', color: '#06b6d4' },
+    { id: 'nsfw', name: 'Nội dung người lớn (NSFW)', description: 'Tên miền chứa nội dung khiêu dâm/người lớn.', color: '#ec4899' },
+    { id: 'gambling', name: 'Cờ bạc trực tuyến (Gambling)', description: 'Tên miền cờ bạc, cá độ trực tuyến trái phép.', color: '#a855f7' },
+    { id: 'social', name: 'Mạng xã hội (Social)', description: 'Tên miền mạng xã hội — thường dùng cho chặn theo chính sách nội bộ, không phải mối đe dọa.', color: '#3b82f6' },
+    { id: 'crypto-scam', name: 'Lừa đảo tiền điện tử (Crypto Scam)', description: 'Tên miền lừa đảo đầu tư/giao dịch tiền điện tử.', color: '#f59e0b' },
+  ];
+
+  try {
+    await db
+      .insert(categories)
+      .values(DEFAULTS.map((c) => ({ id: c.id, name: c.name, description: c.description, color: c.color })))
+      .onConflictDoNothing({ target: categories.id });
+  } catch (error) {
+    console.error('ensureDefaultCategories failed:', error);
+  }
+}
+
 // 2b. Domain ↔ Category membership helpers (used by every write path below).
 // These are the ONLY places that should touch domain_categories — everything
 // else derives from it via the sync trigger (src/db/triggers.ts).

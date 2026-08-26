@@ -12,7 +12,7 @@ import express from 'express';
 import http from 'http';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
-import { ensureSuperAdmin } from './src/db/queries.ts';
+import { ensureSuperAdmin, ensureDefaultCategories } from './src/db/queries.ts';
 import { ensureDomainCategoryTriggers } from './src/db/triggers.ts';
 import {
   getDashboardStats,
@@ -110,11 +110,20 @@ async function startServer() {
   // with — must be awaited (not fire-and-forget) so the credentials print
   // to the console before anyone tries to sign in.
   //
-  // NOTE: there is deliberately no demo/mock data seeder here anymore — all
-  // domains/categories/sources/releases/audit-logs/review-queue data now
-  // comes only from real syncs (POST /api/sources/:id/sync), the Import tab,
-  // or manual entry. See the memory log for why this was removed.
+  // NOTE: there is deliberately no demo/mock DOMAIN data seeder here — all
+  // domains/sources/releases/audit-logs/review-queue data comes only from
+  // real syncs (POST /api/sources/:id/sync), the Import tab, or manual
+  // entry. See the memory log for why this was removed.
+  //
+  // ensureDefaultCategories below is different: it's not sample data, it's
+  // declaring the real, fixed taxonomy the rest of the codebase already
+  // hardcodes references to (types.ts' DomainCategory union, DomainTable's
+  // badge colors, every "add domain/source" form's category picker) — so
+  // those ids are guaranteed to actually exist as real rows instead of an
+  // admin needing to have manually pre-created each one by the exact right
+  // id first (the root cause of a real FK-violation bug on first deploy).
   await ensureSuperAdmin();
+  await ensureDefaultCategories();
 
   // ===================== REST API ROUTES =====================
 
