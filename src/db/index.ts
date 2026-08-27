@@ -87,3 +87,9 @@ const pool = createPool();
 
 // Initialize Drizzle with the pool and schema.
 export const db = drizzle(pool, { schema });
+
+// Exported for the one place that needs a raw pg client rather than
+// Drizzle's query builder: bulkCreateDomains' COPY-based bulk load (see
+// src/db/queries.ts) uses pg-copy-streams, which speaks directly to a
+// pg.PoolClient — Drizzle has no equivalent for the COPY wire protocol.
+export { pool };

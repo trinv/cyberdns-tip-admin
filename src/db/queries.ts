@@ -1,4 +1,4 @@
-import { db } from './index.ts';
+import { db, pool } from './index.ts';
 import {
   users,
   sessions,
@@ -16,6 +16,12 @@ import { eq, desc, asc, sql, ilike, and, inArray } from 'drizzle-orm';
 import { parseFeedText } from './feedParser.ts';
 import { hashPassword, verifyPassword, generateSessionToken, generateTempPassword } from '../lib/password.ts';
 import { sendNewIpLoginAlert } from '../lib/mailer.ts';
+// bulkCreateDomains' bulk load uses the real COPY wire protocol — the one
+// thing Drizzle's query builder has no equivalent for — so it needs a raw
+// pg client (see `pool` above) rather than going through `db`.
+import { from as copyFrom } from 'pg-copy-streams';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 
 const SESSION_TTL_MS = 30 * 24 * 3600 * 1000; // 30 days
 
@@ -703,111 +709,175 @@ export async function createDomain(data: {
   }
 }
 
+// Builds a byte stream of one domain per line (no CSV quoting needed — every
+// domain here already passed parseFeedText's strict character-class check,
+// so none can contain a comma/quote/newline) lazily from the deduplicated
+// set, instead of materializing one giant string/Buffer for the whole feed
+// up front (that's what caused the real OOM crash this whole rewrite is
+// fixing — see the note on the old bulkCreateDomains re-select).
+//
+// Batched into ~64KB chunks rather than yielding one Buffer per domain:
+// yielding per-line was measured actually SLOWER than the old chunked-VALUES
+// approach it was meant to replace (~340µs/domain vs ~600µs/domain — barely
+// better) — Node streams carry real per-chunk overhead (backpressure checks,
+// generator resumption, event-loop round-trips), and tens of thousands of
+// single-line chunks pay that cost tens of thousands of times. Batching
+// amortizes it across ~64KB worth of domains per chunk instead, while still
+// never holding more than one batch's worth of the feed in memory at once.
+const COPY_BATCH_BYTES = 64 * 1024;
+
+function domainCopyStream(domainList: Iterable<string>): Readable {
+  function* batches() {
+    let buf: string[] = [];
+    let bufBytes = 0;
+    for (const d of domainList) {
+      const line = d + '\n';
+      buf.push(line);
+      bufBytes += line.length;
+      if (bufBytes >= COPY_BATCH_BYTES) {
+        yield Buffer.from(buf.join(''), 'utf8');
+        buf = [];
+        bufBytes = 0;
+      }
+    }
+    if (buf.length > 0) yield Buffer.from(buf.join(''), 'utf8');
+  }
+  return Readable.from(batches());
+}
+
+// etld1/tld: last label = tld; second-to-last + tld = etld1 when there are
+// more than 2 labels, else etld1 = the domain itself. Every domain here has
+// passed parseFeedText's regex (which requires at least one dot), so
+// array_length(parts, 1) is always >= 2 — no "no dot" fallback needed.
+const UPSERT_DOMAINS_SQL = `
+  INSERT INTO domains (domain, etld1, tld, source, source_detail, status)
+  SELECT
+      t.domain,
+      CASE WHEN array_length(parts, 1) > 2
+           THEN parts[array_length(parts, 1) - 1] || '.' || parts[array_length(parts, 1)]
+           ELSE t.domain
+      END,
+      parts[array_length(parts, 1)],
+      $1, $2, 'active'
+  FROM (
+      SELECT domain, string_to_array(domain, '.') AS parts FROM tmp_sync_domains
+  ) t
+  ON CONFLICT (domain) DO UPDATE SET
+      status = 'active',
+      updated_at = now();
+`;
+
+// Joins staging -> domains on domain NAME for the id — no id bookkeeping in
+// JS between phases. ON CONFLICT (domain_id) DO UPDATE mirrors
+// addDomainCategoryMemberships' own onConflictDoUpdate exactly: since
+// domain_id is uniquely constrained (a domain belongs to exactly ONE
+// category at a time), re-syncing an already-categorized domain MOVES it
+// rather than erroring. is_primary is left at its column default (false) —
+// the sync_domain_category_cache trigger (src/db/triggers.ts) promotes it
+// once this statement commits, same as every other write path.
+const UPSERT_MEMBERSHIPS_SQL = `
+  INSERT INTO domain_categories (domain_id, category_id, feed_source_id, source_label)
+  SELECT d.id, $1, $2, $3
+  FROM tmp_sync_domains t
+  JOIN domains d ON d.domain = t.domain
+  ON CONFLICT (domain_id) DO UPDATE SET
+      category_id = EXCLUDED.category_id,
+      feed_source_id = EXCLUDED.feed_source_id,
+      source_label = EXCLUDED.source_label;
+`;
+
 export async function bulkCreateDomains(data: {
   domains: string[];
+  // A domain belongs to exactly one category (domain_categories.domainId is
+  // uniquely constrained) — only categories[0] is ever actually used. Kept
+  // as an array for backward compatibility with existing call sites, all of
+  // which already only ever pass a single-element array (see
+  // runFeedSourceSyncJob: `categories: [source.category]`).
   categories: string[];
   source?: string;
   reason?: string;
   userEmail?: string;
   userRole?: string;
   feedSourceId?: string;
-  // Called after each insert chunk with how many of the deduplicated input
-  // domains have been written so far — lets a caller (feed sync) surface
-  // real incremental progress instead of a single opaque "please wait".
-  onChunkProgress?: (processed: number, total: number) => void | Promise<void>;
+  // Called at each of the 3 real phase boundaries below (COPY / domains
+  // upsert / domain_categories upsert) with how far through this run is
+  // (0-1) and an honest label for what's happening — there's no longer a
+  // per-row "processed/total" count to report (see the note above
+  // UPSERT_DOMAINS_SQL for why one statement now covers the whole batch),
+  // so this reports coarser, real phase progress instead of a
+  // fabricated per-row tick.
+  onPhaseProgress?: (fraction: number, label: string) => void | Promise<void>;
 }) {
-  try {
-    const cleanDomains = Array.from(
-      new Set(data.domains.map((d) => d.toLowerCase().trim()).filter(Boolean))
-    );
-    if (cleanDomains.length === 0) return { domains: [], insertedCount: 0, newCount: 0, existingCount: 0 };
+  const cleanDomains = Array.from(new Set(data.domains.map((d) => d.toLowerCase().trim()).filter(Boolean)));
+  if (cleanDomains.length === 0) return { insertedCount: 0, newCount: 0, existingCount: 0 };
 
-    // Real dedup accounting: how many of these domains were already in the
-    // DB (from this or any other source) before this sync, vs genuinely new.
-    // Chunked (same reasoning as the inserts below) to stay under Postgres'
-    // bound-parameter limit for very large feeds.
-    const EXISTENCE_CHUNK_SIZE = 10_000;
-    const existingSet = new Set<string>();
-    for (let i = 0; i < cleanDomains.length; i += EXISTENCE_CHUNK_SIZE) {
-      const chunk = cleanDomains.slice(i, i + EXISTENCE_CHUNK_SIZE);
-      const existingRows = await db.select({ domain: domains.domain }).from(domains).where(inArray(domains.domain, chunk));
-      for (const r of existingRows) existingSet.add(r.domain);
-    }
-    const existingCount = existingSet.size;
+  const categoryId = data.categories[0];
+  if (!categoryId) throw new Error('bulkCreateDomains requires at least one category.');
+
+  const sourceLabel = data.source || 'Nhập hàng loạt (Batch Import)';
+  const sourceDetail = `Nhập bởi ${data.userEmail || 'Analyst'} - Lý do: ${data.reason || 'Nhập hàng loạt IOC'}`;
+
+  // A raw pg client (not the shared Drizzle `db`) is required here: the
+  // whole sequence below — CREATE TEMP TABLE, COPY, both upserts — must run
+  // as one session/transaction so the temp table (a) is visible across all
+  // of those statements and (b) is automatically isolated from any OTHER
+  // feed sync running concurrently (see MAX_CONCURRENT_SYNCS in
+  // startFeedSourceSync) — a second sync gets its own pooled connection and
+  // therefore its own, entirely separate temp table of the same name, with
+  // zero risk of the two runs' staged domains mixing. ON COMMIT DROP means
+  // no manual TRUNCATE/cleanup is needed either: Postgres drops the table
+  // automatically when the transaction ends, and since CREATE TABLE is
+  // itself transactional, a ROLLBACK undoes the table's existence too — no
+  // leaked table on failure.
+  const client = await pool.connect();
+  let failed = false;
+  try {
+    await client.query('BEGIN');
+    await client.query('CREATE TEMP TABLE tmp_sync_domains (domain text) ON COMMIT DROP;');
+
+    await pipeline(
+      domainCopyStream(cleanDomains),
+      client.query(copyFrom('COPY tmp_sync_domains (domain) FROM STDIN WITH (FORMAT csv)'))
+    );
+    await data.onPhaseProgress?.(0.4, `Đã tải ${cleanDomains.length.toLocaleString('vi-VN')} domain vào bảng tạm — đang ghi vào bảng domains...`);
+
+    // One query against the just-staged data gives the new-vs-existing
+    // split directly — no separate chunked existence pre-check needed
+    // (the old design's real cost: N/10,000 extra round-trips before any
+    // writing even started).
+    const existingResult = await client.query<{ count: string }>(
+      'SELECT count(*) FROM tmp_sync_domains t WHERE EXISTS (SELECT 1 FROM domains d WHERE d.domain = t.domain);'
+    );
+    const existingCount = Number(existingResult.rows[0].count);
     const newCount = cleanDomains.length - existingCount;
 
-    const sourceLabel = data.source || 'Nhập hàng loạt (Batch Import)';
-    const now = new Date();
+    await client.query(UPSERT_DOMAINS_SQL, [sourceLabel, sourceDetail]);
+    await data.onPhaseProgress?.(0.75, 'Đã ghi vào bảng domains — đang gán nhóm danh mục...');
 
-    const rows = cleanDomains.map((cleanDomain) => {
-      const parts = cleanDomain.split('.');
-      const tld = parts.length > 1 ? parts[parts.length - 1] : 'vn';
-      const etld1 = parts.length > 2 ? `${parts[parts.length - 2]}.${tld}` : cleanDomain;
-      return {
-        domain: cleanDomain,
-        etld1,
-        tld,
-        source: sourceLabel,
-        sourceDetail: `Nhập bởi ${data.userEmail || 'Analyst'} - Lý do: ${data.reason || 'Nhập hàng loạt IOC'}`,
-        status: 'active',
-        timeline: [
-          {
-            time: now.toISOString(),
-            description: `Nhập hàng loạt vào danh sách chặn (${data.categories.join(', ')})`,
-            source: data.userEmail || 'SOC Analyst',
-            type: 'manual' as const,
-          },
-        ],
-      };
-    });
-
-    // Chunk the insert so very large feeds/pasted lists stay well under
-    // Postgres' ~65535 bound-parameter limit per statement. Each row here
-    // binds 7 params (down from 10 before asn/domainAge/threatScore were
-    // removed), so 2000 rows/chunk = ~14,000 params — a wide safety
-    // margin under the limit while cutting round-trips ~4x versus the
-    // previous, overly conservative 500/chunk (376 round-trips -> 94 for a
-    // 188K-domain sync): each round-trip carries fixed latency regardless
-    // of chunk size, so fewer, larger statements finish materially faster.
-    const CHUNK_SIZE = 2000;
-    const upserted: { id: number; domain: string }[] = [];
-    for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
-      const chunk = rows.slice(i, i + CHUNK_SIZE);
-      const result = await db
-        .insert(domains)
-        .values(chunk)
-        .onConflictDoUpdate({
-          target: domains.domain,
-          set: { status: 'active', updatedAt: now },
-        })
-        .returning({ id: domains.id, domain: domains.domain });
-      upserted.push(...result);
-      await data.onChunkProgress?.(upserted.length, rows.length);
+    try {
+      await client.query(UPSERT_MEMBERSHIPS_SQL, [categoryId, data.feedSourceId || null, sourceLabel]);
+    } catch (error: any) {
+      // Same FK-violation translation as addDomainCategoryMemberships —
+      // just simpler here since a whole bulkCreateDomains batch only ever
+      // targets the one categoryId already resolved above.
+      if (error?.code === '23503') {
+        // No `cause` here, deliberately — the outer catch below preserves a
+        // thrown Error verbatim only when it has none (its way of telling
+        // "this message is already clear, don't wrap it in the generic
+        // failure message"). Setting one here would defeat that.
+        throw new Error(`Nhóm danh mục không tồn tại: ${categoryId}. Vui lòng chọn lại nhóm hợp lệ.`);
+      }
+      throw error;
     }
+    await data.onPhaseProgress?.(1, 'Hoàn tất ghi dữ liệu.');
 
-    // Idempotent per (domainId, categoryId): re-running the same import, or a
-    // feed re-listing a domain it already reported, creates zero duplicates.
-    await addDomainCategoryMemberships(
-      upserted.flatMap((d) =>
-        data.categories.map((categoryId) => ({
-          domainId: d.id,
-          categoryId,
-          sourceLabel,
-          feedSourceId: data.feedSourceId,
-        }))
-      )
-    );
+    await client.query('COMMIT');
 
-    // No re-select of the full final rows here (there used to be one,
-    // chunked the same way as the existence check above) — it re-fetched
-    // every column, including the `timeline` JSONB array, for every single
-    // domain in the batch, just to discard it: the only caller (feed sync,
-    // see runFeedSourceSyncJob) only ever reads newCount/existingCount. For
-    // a several-hundred-thousand-domain feed like Hagezi's, holding that
-    // many full row objects in memory at once was the actual cause of a
-    // real "JavaScript heap out of memory" crash observed in production —
-    // `upserted` (already built above) already has everything a caller
-    // could need (id + domain), at a fraction of the memory.
+    // Audit log insert goes through the normal Drizzle `db` pool, same as
+    // every other write path — it's intentionally not part of the
+    // transaction above (matches this function's pre-existing behavior:
+    // the audit entry has always been a separate statement after the data
+    // writes, not atomically bundled with them).
     await db.insert(auditLogs).values({
       // data.userEmail is the person who clicked "Đồng bộ" — threaded in via
       // startFeedSourceSync/runFeedSourceSyncJob. The fallback only fires if
@@ -815,34 +885,41 @@ export async function bulkCreateDomains(data: {
       user: data.userEmail || 'Feed Sync (không rõ người khởi chạy)',
       role: data.userRole || 'SecOps',
       action: 'add',
-      targetCount: upserted.length,
-      summary: `Nhập hàng loạt ${upserted.length} tên miền vào nhóm ${data.categories.join(', ')} (${newCount.toLocaleString('vi-VN')} mới, ${existingCount.toLocaleString('vi-VN')} đã tồn tại)`,
+      targetCount: cleanDomains.length,
+      summary: `Nhập hàng loạt ${cleanDomains.length.toLocaleString('vi-VN')} tên miền vào nhóm ${categoryId} (${newCount.toLocaleString('vi-VN')} mới, ${existingCount.toLocaleString('vi-VN')} đã tồn tại)`,
       reason: data.reason || 'Nhập hàng loạt IOC',
-      // This path is only ever called from a feed sync now (the manual bulk-
-      // import UI/route was removed) and can touch hundreds of thousands of
-      // domains in one call — recording a per-domain "before" snapshot here
-      // (like the other actions below do) would add real write overhead to
-      // every sync. The real, safe undo for a feed's effect already exists
-      // as its own dedicated action: "Tạm dừng nguồn" (pause) instantly
-      // unblocks every domain that source added — no generic rollback here.
+      // This path is only ever called from a feed sync now (the manual
+      // bulk-import UI/route was removed) and can touch hundreds of
+      // thousands of domains in one call — recording a per-domain "before"
+      // snapshot here (like the other actions below do) would add real
+      // write overhead to every sync. The real, safe undo for a feed's
+      // effect already exists as its own dedicated action: "Tạm dừng
+      // nguồn" (pause) instantly unblocks every domain that source added —
+      // no generic rollback here.
       canRollback: false,
       details: [
-        `Số lượng: ${upserted.length}`,
-        `Nhóm: ${data.categories.join(', ')}`,
+        `Số lượng: ${cleanDomains.length}`,
+        `Nhóm: ${categoryId}`,
         `Mới: ${newCount}`,
         `Đã tồn tại: ${existingCount}`,
         'Để hoàn tác: dùng "Tạm dừng nguồn" ở tab Nguồn cấp dữ liệu.',
       ],
     });
 
-    return { domains: upserted, insertedCount: upserted.length, newCount, existingCount };
+    return { insertedCount: cleanDomains.length, newCount, existingCount };
   } catch (error: any) {
+    failed = true;
+    await client.query('ROLLBACK').catch(() => {});
     console.error('bulkCreateDomains failed:', error);
     // See createDomain's identical check — preserve a deliberately-thrown,
-    // already-clear validation message (e.g. an invalid category id from
-    // addDomainCategoryMemberships) instead of masking it.
+    // already-clear validation message (e.g. an invalid category id above)
+    // instead of masking it.
     if (error instanceof Error && !error.cause) throw error;
     throw new Error('Failed to bulk import domains', { cause: error });
+  } finally {
+    // Passing the error tells node-postgres to discard this connection
+    // instead of returning a possibly-broken one to the pool for reuse.
+    client.release(failed);
   }
 }
 
@@ -1182,15 +1259,22 @@ const activeSyncs = new Set<string>();
 // sync at once via Promise.all — but that only awaits each HTTP call
 // returning (a few ms, once status flips to 'syncing'); the actual
 // fetch+parse+insert work for every source then runs fully concurrently in
-// this SAME Node process, all sharing one heap. With several large feeds
-// (e.g. multiple Hagezi list variants) that's what caused a real
-// "JavaScript heap out of memory" crash in production — nothing capped how
-// many memory-heavy syncs could run at once. This gate limits how many
-// actually do the heavy lifting simultaneously; the rest sit at 'syncing'
-// with an honest "queued" phase until a slot frees up, so the UI still
-// shows every source as started right away (no behavior change there) but
-// peak memory is now bounded regardless of how many sources exist.
-const MAX_CONCURRENT_SYNCS = 2;
+// this SAME Node process, all sharing one heap AND one disk. With several
+// large feeds (e.g. multiple Hagezi list variants) that's what caused a
+// real "JavaScript heap out of memory" crash in production — nothing
+// capped how many memory-heavy syncs could run at once.
+//
+// Set to 1 (was 2): real Postgres checkpoint logs from production showed
+// sustained disk write throughput of only ~1-2 MB/s during a sync — this
+// VPS' disk is the hard bottleneck (see docker-compose.yml's note on
+// max_wal_size for the earlier measurement of this same ceiling). Two
+// syncs writing concurrently doesn't parallelize past a disk that slow —
+// it just makes both compete for the same limited I/O queue, likely
+// worse than one at a time given the two writers' pages interleave
+// (more random I/O) instead of each write burst being contiguous.
+// Bump this back up only once the disk itself is confirmed fast enough
+// (e.g. after a storage upgrade) to actually benefit from parallel writes.
+const MAX_CONCURRENT_SYNCS = 1;
 let activeSyncSlots = 0;
 const syncSlotWaiters: (() => void)[] = [];
 
@@ -1393,9 +1477,8 @@ async function runFeedSourceSyncJob(id: string, actingUser?: { email?: string; r
       userEmail: actingUser?.email,
       userRole: actingUser?.role,
       feedSourceId: id,
-      onChunkProgress: async (processed, total) => {
-        const percent = 58 + (processed / total) * 42;
-        await setSyncProgress(id, percent, `Đang ghi vào CyberDNSTIP-DB (${processed.toLocaleString('vi-VN')}/${total.toLocaleString('vi-VN')})...`);
+      onPhaseProgress: async (fraction, label) => {
+        await setSyncProgress(id, 58 + fraction * 42, label);
       },
     });
 
