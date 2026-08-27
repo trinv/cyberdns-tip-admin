@@ -597,8 +597,32 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
+    // Vite content-hashes every JS/CSS bundle filename (e.g.
+    // index-jxn5V6Zz.js) — a changed file always gets a new name, so a
+    // cached copy of one can never go stale under that name. Cache these
+    // as aggressively as possible.
+    app.use(
+      '/assets',
+      express.static(path.join(distPath, 'assets'), { immutable: true, maxAge: '1y' })
+    );
+    // index: false — otherwise express.static auto-serves dist/index.html
+    // for GET / itself (with ITS OWN default "Cache-Control: public,
+    // max-age=0" header), bypassing the no-store route below entirely.
+    app.use(express.static(distPath, { index: false }));
+    // index.html is the one thing that must NEVER be cached: it's what
+    // points the browser at the CURRENT build's hashed asset filenames.
+    // Without this, express.static's default headers leave that up to the
+    // browser's own heuristics — which can and did cache index.html, so
+    // after a redeploy (which replaces dist/ wholesale, deleting the old
+    // build's hashed files) a returning visitor's F5 could serve a stale
+    // cached index.html referencing JS/CSS that no longer exists on the
+    // server. Those requests 404, the app never mounts, and the user sees
+    // a blank white page — exactly what a hard refresh (Ctrl+Shift+R, which
+    // bypasses the cache) "fixes" by accident. no-store forecloses this
+    // permanently: every load fetches a fresh index.html for whatever was
+    // last actually deployed.
     app.get('*', (req, res) => {
+      res.set('Cache-Control', 'no-store');
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
