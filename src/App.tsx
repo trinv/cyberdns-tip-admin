@@ -676,17 +676,22 @@ export default function App() {
   // Quick Plain Text (.txt) download — exports the current selection, or
   // otherwise EVERY domain matching the active filters (the whole category),
   // not just the page currently on screen.
+  // Always the FULL filtered list — never silently scoped down to
+  // whatever happens to be checkbox-selected. Neither button's label
+  // ("Xuất file .TXT/.CSV") says "selected", so quietly switching to a
+  // selected-only export the moment any row is ticked (even for an
+  // unrelated bulk action) was a real, surprising bug: the user asks for
+  // "the whole list" and silently gets a handful of rows instead. The
+  // export modal (onOpenExportModal) is where an explicit, visible choice
+  // between "toàn bộ" and "chỉ N đã chọn" belongs — a radio button the
+  // user can actually see, not an inferred guess here.
   const handleQuickExportTxt = async () => {
     let targetList: DomainItem[];
-    if (selectedDomainIds.size > 0) {
-      targetList = domains.filter((d) => selectedDomainIds.has(d.id));
-    } else {
-      try {
-        targetList = await fetchAllFilteredDomains();
-      } catch (err) {
-        showToast('Không thể tải toàn bộ danh sách để xuất — vui lòng thử lại.', 'warning');
-        return;
-      }
+    try {
+      targetList = await fetchAllFilteredDomains();
+    } catch (err) {
+      showToast('Không thể tải toàn bộ danh sách để xuất — vui lòng thử lại.', 'warning');
+      return;
     }
 
     const content = targetList.map(d => d.domain).join('\n');
@@ -702,18 +707,15 @@ export default function App() {
     showToast(`Đã xuất ${targetList.length} tên miền sang định dạng .TXT thành công!`, 'success');
   };
 
-  // Quick CSV download — same "selection, or the whole filtered category" scope as above.
+  // Quick CSV download — same "always the full filtered list" reasoning as
+  // handleQuickExportTxt above.
   const handleQuickExportCsv = async () => {
     let targetList: DomainItem[];
-    if (selectedDomainIds.size > 0) {
-      targetList = domains.filter((d) => selectedDomainIds.has(d.id));
-    } else {
-      try {
-        targetList = await fetchAllFilteredDomains();
-      } catch (err) {
-        showToast('Không thể tải toàn bộ danh sách để xuất — vui lòng thử lại.', 'warning');
-        return;
-      }
+    try {
+      targetList = await fetchAllFilteredDomains();
+    } catch (err) {
+      showToast('Không thể tải toàn bộ danh sách để xuất — vui lòng thử lại.', 'warning');
+      return;
     }
 
     const headers = ['domain', 'primaryCategory', 'categories', 'status', 'source', 'firstSeen'];

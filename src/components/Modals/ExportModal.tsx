@@ -42,8 +42,15 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
   useEffect(() => {
     if (!isOpen) {
+      // Reset on close, not just the fetched data — "scope" defaulting
+      // back to "Toàn bộ" every time the modal is freshly opened means a
+      // "Chỉ N đã chọn" choice from a PREVIOUS export session can never
+      // silently carry over and combine with whatever happens to be
+      // selected this time (an unrelated bulk-action selection, say) into
+      // an export the user never consciously asked for.
       setAllFilteredDomains(null);
       setLoadError(null);
+      setScope('filtered');
       return;
     }
     if (scope !== 'filtered' || allFilteredDomains !== null || isLoadingAll) return;
@@ -201,7 +208,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                   <FileSpreadsheet className="w-4 h-4 text-teal-600 dark:text-teal-400" />
                 </div>
                 <span className="text-xs text-slate-500 dark:text-slate-400 font-sans">
-                  Đầy đủ các cột ASN, Threat Score và mốc thời gian
+                  Đầy đủ các cột nhóm, trạng thái và mốc thời gian
                 </span>
               </button>
 

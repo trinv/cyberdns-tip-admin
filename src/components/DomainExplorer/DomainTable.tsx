@@ -360,7 +360,7 @@ export const DomainTable: React.FC<DomainTableProps> = ({
                 <FileSpreadsheet className="w-4 h-4 text-teal-600 dark:text-teal-400" />
                 <div>
                   <div className="font-bold">Xuất file .CSV (Đầy đủ thuộc tính)</div>
-                  <div className="text-xs text-slate-400 dark:text-slate-500">Bao gồm ASN, Threat Score và mốc thời gian</div>
+                  <div className="text-xs text-slate-400 dark:text-slate-500">Bao gồm nhóm, trạng thái, nguồn và mốc thời gian</div>
                 </div>
               </button>
 
