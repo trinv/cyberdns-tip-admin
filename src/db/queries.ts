@@ -798,16 +798,16 @@ export async function bulkCreateDomains(data: {
       )
     );
 
-    // Re-select so the returned rows reflect the trigger-updated cache
-    // (categories/primaryCategory), not their pre-membership state. Chunked
-    // for the same bound-parameter reason as the inserts above.
-    const finalIds = upserted.map((d) => d.id);
-    const inserted: (typeof domains.$inferSelect)[] = [];
-    for (let i = 0; i < finalIds.length; i += EXISTENCE_CHUNK_SIZE) {
-      const idChunk = finalIds.slice(i, i + EXISTENCE_CHUNK_SIZE);
-      inserted.push(...(await db.select().from(domains).where(inArray(domains.id, idChunk))));
-    }
-
+    // No re-select of the full final rows here (there used to be one,
+    // chunked the same way as the existence check above) — it re-fetched
+    // every column, including the `timeline` JSONB array, for every single
+    // domain in the batch, just to discard it: the only caller (feed sync,
+    // see runFeedSourceSyncJob) only ever reads newCount/existingCount. For
+    // a several-hundred-thousand-domain feed like Hagezi's, holding that
+    // many full row objects in memory at once was the actual cause of a
+    // real "JavaScript heap out of memory" crash observed in production —
+    // `upserted` (already built above) already has everything a caller
+    // could need (id + domain), at a fraction of the memory.
     await db.insert(auditLogs).values({
       // data.userEmail is the person who clicked "Đồng bộ" — threaded in via
       // startFeedSourceSync/runFeedSourceSyncJob. The fallback only fires if
@@ -815,8 +815,8 @@ export async function bulkCreateDomains(data: {
       user: data.userEmail || 'Feed Sync (không rõ người khởi chạy)',
       role: data.userRole || 'SecOps',
       action: 'add',
-      targetCount: inserted.length,
-      summary: `Nhập hàng loạt ${inserted.length} tên miền vào nhóm ${data.categories.join(', ')} (${newCount.toLocaleString('vi-VN')} mới, ${existingCount.toLocaleString('vi-VN')} đã tồn tại)`,
+      targetCount: upserted.length,
+      summary: `Nhập hàng loạt ${upserted.length} tên miền vào nhóm ${data.categories.join(', ')} (${newCount.toLocaleString('vi-VN')} mới, ${existingCount.toLocaleString('vi-VN')} đã tồn tại)`,
       reason: data.reason || 'Nhập hàng loạt IOC',
       // This path is only ever called from a feed sync now (the manual bulk-
       // import UI/route was removed) and can touch hundreds of thousands of
@@ -827,7 +827,7 @@ export async function bulkCreateDomains(data: {
       // unblocks every domain that source added — no generic rollback here.
       canRollback: false,
       details: [
-        `Số lượng: ${inserted.length}`,
+        `Số lượng: ${upserted.length}`,
         `Nhóm: ${data.categories.join(', ')}`,
         `Mới: ${newCount}`,
         `Đã tồn tại: ${existingCount}`,
@@ -835,7 +835,7 @@ export async function bulkCreateDomains(data: {
       ],
     });
 
-    return { domains: inserted, insertedCount: inserted.length, newCount, existingCount };
+    return { domains: upserted, insertedCount: upserted.length, newCount, existingCount };
   } catch (error: any) {
     console.error('bulkCreateDomains failed:', error);
     // See createDomain's identical check — preserve a deliberately-thrown,
@@ -1303,6 +1303,11 @@ async function runFeedSourceSyncJob(id: string, actingUser?: { email?: string; r
 
     // --- Phase 2: parse + dedupe locally (52-58%) ---
     const { domains: parsedDomains } = parseFeedText(feedText);
+    // The raw feed body (can be several MB for a large list like Hagezi's)
+    // is never needed again after parsing — drop the reference now instead
+    // of letting it sit alive in this function's scope for the entire
+    // insert phase below, which is exactly when memory pressure peaks.
+    feedText = '';
 
     if (parsedDomains.length === 0) {
       await db
