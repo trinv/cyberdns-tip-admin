@@ -1172,6 +1172,41 @@ export async function migrateAwayFromGracePeriod() {
 // tab switch: there is no client-side "isSyncing" state to lose.
 const activeSyncs = new Set<string>();
 
+// "Đồng bộ tất cả" (see App.tsx's onSyncAll) starts EVERY unpaused source's
+// sync at once via Promise.all — but that only awaits each HTTP call
+// returning (a few ms, once status flips to 'syncing'); the actual
+// fetch+parse+insert work for every source then runs fully concurrently in
+// this SAME Node process, all sharing one heap. With several large feeds
+// (e.g. multiple Hagezi list variants) that's what caused a real
+// "JavaScript heap out of memory" crash in production — nothing capped how
+// many memory-heavy syncs could run at once. This gate limits how many
+// actually do the heavy lifting simultaneously; the rest sit at 'syncing'
+// with an honest "queued" phase until a slot frees up, so the UI still
+// shows every source as started right away (no behavior change there) but
+// peak memory is now bounded regardless of how many sources exist.
+const MAX_CONCURRENT_SYNCS = 2;
+let activeSyncSlots = 0;
+const syncSlotWaiters: (() => void)[] = [];
+
+function acquireSyncSlot(): Promise<void> {
+  if (activeSyncSlots < MAX_CONCURRENT_SYNCS) {
+    activeSyncSlots++;
+    return Promise.resolve();
+  }
+  return new Promise<void>((resolve) => {
+    syncSlotWaiters.push(() => {
+      activeSyncSlots++;
+      resolve();
+    });
+  });
+}
+
+function releaseSyncSlot() {
+  activeSyncSlots--;
+  const next = syncSlotWaiters.shift();
+  if (next) next();
+}
+
 export async function startFeedSourceSync(id: string, actingUser?: { email?: string; role?: string }) {
   const existing = await db.select().from(feedSources).where(eq(feedSources.id, id)).limit(1);
   const source = existing[0];
@@ -1235,10 +1270,22 @@ async function runFeedSourceSyncJob(id: string, actingUser?: { email?: string; r
       .where(eq(feedSources.id, id));
   };
 
+  let slotAcquired = false;
   try {
     const existing = await db.select().from(feedSources).where(eq(feedSources.id, id)).limit(1);
     const source = existing[0];
     if (!source) return;
+
+    // Wait for a concurrency slot (see MAX_CONCURRENT_SYNCS above) before
+    // doing any of the actual memory-heavy work — status stays 'syncing'
+    // the whole time (started() already set that), so the UI still shows
+    // this source as started immediately; only the phase label reveals
+    // it's queued rather than actively running.
+    if (activeSyncSlots >= MAX_CONCURRENT_SYNCS) {
+      await setSyncProgress(id, 0, 'Đang chờ lượt đồng bộ (nguồn khác đang xử lý)...');
+    }
+    await acquireSyncSlot();
+    slotAcquired = true;
 
     // --- Phase 1: download the full feed to local memory (0-50%) ---
     let feedText: string;
@@ -1362,6 +1409,8 @@ async function runFeedSourceSyncJob(id: string, actingUser?: { email?: string; r
   } catch (error: any) {
     console.error(`runFeedSourceSyncJob failed for source ${id}:`, error);
     await fail(`Đồng bộ thất bại: ${error?.message || String(error)}`);
+  } finally {
+    if (slotAcquired) releaseSyncSlot();
   }
 }
 
