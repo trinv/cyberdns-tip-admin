@@ -1045,7 +1045,13 @@ export async function deleteCategory(id: string) {
 // 5. Feed Sources Queries & Mutations
 export async function getFeedSources() {
   try {
-    return await db.select().from(feedSources).orderBy(desc(feedSources.domainCount));
+    // Ordered by creation time (stable) — NOT domainCount. Sorting by
+    // domainCount meant every source's card could silently swap position
+    // the moment ITS OWN sync (or any other source's) changed the count,
+    // including mid-sync as it climbs — a real risk of clicking "Tạm dừng"/
+    // "Xoá" on the wrong card right after the list reshuffled underneath.
+    // Creation order never changes on its own.
+    return await db.select().from(feedSources).orderBy(asc(feedSources.createdAt));
   } catch (error) {
     console.error('getFeedSources failed:', error);
     throw new Error('Failed to retrieve feed sources', { cause: error });
