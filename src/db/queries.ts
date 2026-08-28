@@ -12,7 +12,7 @@ import {
   auditLogs,
   savedFilters,
 } from './schema.ts';
-import { eq, desc, asc, sql, ilike, and, inArray } from 'drizzle-orm';
+import { eq, ne, desc, asc, sql, ilike, and, or, isNull, inArray } from 'drizzle-orm';
 import { parseFeedText } from './feedParser.ts';
 import { hashPassword, verifyPassword, generateSessionToken, generateTempPassword } from '../lib/password.ts';
 import { sendNewIpLoginAlert } from '../lib/mailer.ts';
@@ -777,6 +777,12 @@ const UPSERT_DOMAINS_SQL = `
   ) t
   ON CONFLICT (domain) DO UPDATE SET
       status = 'active',
+      -- An explicit (re-)block always clears the "auto-unblocked by a
+      -- paused source" marker, matching createDomain's single-add path —
+      -- without this, a domain reactivated here by a DIFFERENT feed while
+      -- its original pausing source is still paused would stay flagged as
+      -- if it were still riding on that stale pause.
+      unblocked_by_source_pause = false,
       updated_at = now();
 `;
 
@@ -1538,8 +1544,8 @@ async function runFeedSourceSyncJob(id: string, actingUser?: { email?: string; r
 
 // Domains this source currently owns — via domain_categories.feedSourceId,
 // the authoritative provenance link (set by addDomainCategoryMemberships on
-// every insert/move, including ones that came through an approved review
-// item — see resolveReviewItem). Shared by pause/resume/delete below.
+// every insert, including ones that came through an approved review item —
+// see resolveReviewItem). Shared by pause/resume/delete below.
 async function getDomainIdsForFeedSource(feedSourceId: string): Promise<number[]> {
   const rows = await db
     .select({ domainId: domainCategories.domainId })
@@ -1548,10 +1554,46 @@ async function getDomainIdsForFeedSource(feedSourceId: string): Promise<number[]
   return rows.map((r) => r.domainId);
 }
 
+// Of the domains this source owns, which ones should ACTUALLY move to
+// 'unblocked' if this source's membership goes away (pause or delete) — a
+// domain can now belong to several categories at once (see schema.ts's note
+// on domain_categories' composite unique constraint), so a domain this
+// source reported under category A but ANOTHER still-active source (or a
+// manual entry) also put under category B must stay blocked: it's still
+// legitimately backed, just not by this source anymore. Only domains with
+// NO other active backing — no manual membership, and no membership from a
+// source that isn't itself currently paused — are real candidates to unblock.
+//
+// This is what pauseFeedSource/deleteFeedSource use instead of the plain
+// domain-id list above; resumeFeedSource doesn't need this distinction — it
+// only ever re-activates domains its OWN pause actually set unblocked (see
+// its WHERE clause), which this function already guarantees is the correct set.
+async function getDomainIdsToUnblockForFeedSource(feedSourceId: string): Promise<number[]> {
+  const allLinked = await getDomainIdsForFeedSource(feedSourceId);
+  if (allLinked.length === 0) return [];
+
+  const stillBackedRows = await db
+    .select({ domainId: domainCategories.domainId })
+    .from(domainCategories)
+    .leftJoin(feedSources, eq(feedSources.id, domainCategories.feedSourceId))
+    .where(
+      and(
+        inArray(domainCategories.domainId, allLinked),
+        or(
+          isNull(domainCategories.feedSourceId),
+          and(ne(domainCategories.feedSourceId, feedSourceId), eq(feedSources.isPaused, false))
+        )
+      )
+    );
+  const stillBacked = new Set(stillBackedRows.map((r) => r.domainId));
+  return allLinked.filter((id) => !stillBacked.has(id));
+}
+
 // Pauses a feed source: excludes it from future syncs (see
 // startFeedSourceSync's isPaused guard and "Đồng bộ tất cả" in the
 // frontend, which should skip paused sources) AND moves every domain it
-// currently owns from active to 'unblocked' — marked
+// currently owns — that has no OTHER active backing, see
+// getDomainIdsToUnblockForFeedSource — from active to 'unblocked', marked
 // unblockedBySourcePause so resumeFeedSource can undo exactly this, and
 // only this, later. Domains a human separately moved to allowlist/protected
 // are left untouched (those are deliberate overrides, not "just being
@@ -1563,7 +1605,10 @@ export async function pauseFeedSource(id: string, userEmail: string) {
     if (!source) throw new Error(`Feed source ${id} not found`);
     if (source.isPaused) return { source, affectedCount: 0 };
 
-    const domainIds = await getDomainIdsForFeedSource(id);
+    // Only domains with no OTHER active backing (see the function's own
+    // note) — a domain this source shares with a still-active source, or
+    // one a human manually also categorized, stays 'active' untouched.
+    const domainIds = await getDomainIdsToUnblockForFeedSource(id);
     let affectedCount = 0;
     if (domainIds.length > 0) {
       const CHUNK = 5000;
@@ -1655,7 +1700,10 @@ export async function resumeFeedSource(id: string, userEmail: string) {
 // Deletes a feed source permanently. Unlike a pause, there's no "resume"
 // coming back for these domains, so they're moved to 'unblocked' WITHOUT
 // the unblockedBySourcePause marker (nothing will ever auto-re-activate
-// them again — a human has to deliberately re-block if that's wanted).
+// them again — a human has to deliberately re-block if that's wanted). Only
+// domains with no other active backing (see getDomainIdsToUnblockForFeedSource)
+// are touched — one still validly categorized/sourced elsewhere stays
+// blocked even though this specific source's membership is going away.
 // domain_categories.feedSourceId/reviewQueue.feedSourceId both reference
 // this row ON DELETE SET NULL, so those rows survive with the link cleared
 // rather than being cascade-deleted.
@@ -1665,7 +1713,7 @@ export async function deleteFeedSource(id: string, userEmail: string) {
     const source = existing[0];
     if (!source) throw new Error(`Feed source ${id} not found`);
 
-    const domainIds = await getDomainIdsForFeedSource(id);
+    const domainIds = await getDomainIdsToUnblockForFeedSource(id);
     let affectedCount = 0;
     if (domainIds.length > 0) {
       const CHUNK = 5000;
