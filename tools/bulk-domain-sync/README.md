@@ -9,12 +9,13 @@ not a simplified stand-in table.
 
 The real `domains` table is denormalized: `domains.categories` (a jsonb
 array) and `domains.primary_category` are a **read-path cache**, not the
-source of truth. The real relation is `domain_categories` — one row per
-domain (`domain_id` is uniquely constrained: a domain belongs to exactly
-one category at a time). A Postgres trigger
-(`sync_domain_category_cache`, copied verbatim into `schema.sql` from
-`src/db/triggers.ts`) keeps that cache — and `categories.count` — in sync
-automatically on every insert/update/delete against `domain_categories`.
+source of truth. The real relation is `domain_categories` — a domain can
+belong to **several** categories at once (e.g. reported as both "malware"
+and "phishing" by two different feeds); the unique constraint is on the
+`(domain_id, category_id)` **pair**, not `domain_id` alone. A Postgres
+trigger (`sync_domain_category_cache`, copied verbatim into `schema.sql`
+from `src/db/triggers.ts`) keeps that cache — and `categories.count` — in
+sync automatically on every insert/update/delete against `domain_categories`.
 
 `sync_domains.py` therefore **never writes `domains.categories` or
 `primary_category` directly** — exactly like the real app's own
@@ -28,10 +29,12 @@ automatically on every insert/update/delete against `domain_categories`.
    overriding e.g. a stale `'unblocked'`) — matching
    `bulkCreateDomains`'s own `onConflictDoUpdate` exactly.
 2. **`domain_categories`** — one `INSERT ... SELECT ... ON CONFLICT
-   (domain_id) DO UPDATE`, joining the staging table to `domains` on
-   domain name to get the id (no id bookkeeping needed in Python). Moves
-   a domain to a different category on conflict rather than erroring —
-   matching `addDomainCategoryMemberships`'s `onConflictDoUpdate` exactly.
+   (domain_id, category_id) DO UPDATE`, joining the staging table to
+   `domains` on domain name to get the id (no id bookkeeping needed in
+   Python). A domain already in this category is a no-op/refresh; already
+   in a different category, it keeps that one and gains this one too (a
+   different pair, so a fresh row, not a conflict) — matching
+   `addDomainCategoryMemberships`'s `onConflictDoUpdate` exactly.
 
 The trigger then derives `domains.categories`/`primary_category` and
 `categories.count` from that — this script touches neither.
@@ -115,10 +118,11 @@ in an isolated schema (never against a live app's actual data):
 - 20,000 mixed-format domains synced in ~2.7s.
 - Re-run: fully idempotent — same row counts, `categories.count` did not
   double.
-- Re-synced under a **different** `--category`: the domain moved
-  correctly (old category's count dropped to 0, new category's count
-  rose to match, `domains.categories`/`primary_category` cache updated by
-  the trigger, not by this script).
+- Synced under a **different** `--category` on a later run: the domain
+  gained the second category *in addition to* the first (`domains.categories`
+  ended up `["malware", "phishing"]`, both categories' counts incremented
+  independently) — additive, never a move, matching the main app's own
+  "Thêm vào nhóm" behavior.
 - Unknown `--category`: fails fast with a clear message and the list of
   valid ids, before touching `domains` at all.
 

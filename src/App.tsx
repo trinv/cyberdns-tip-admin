@@ -615,7 +615,7 @@ export default function App() {
       await Promise.all([refreshDomains(), refreshAllData()]);
       const n = result.updatedCount;
       showToast(
-        action === 'add_group' ? `Đã chuyển nhóm cho ${n} tên miền!` :
+        action === 'add_group' ? `Đã thêm ${n} tên miền vào nhóm!` :
         action === 'allowlist' ? `Đã chuyển ${n} tên miền vào Allowlist!` :
         `Đã gỡ chặn hoàn toàn cho ${n} tên miền!`,
         action === 'allowlist' ? 'warning' : 'success'

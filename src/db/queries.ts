@@ -289,13 +289,15 @@ export async function ensureSuperAdmin() {
 // These are the ONLY places that should touch domain_categories — everything
 // else derives from it via the sync trigger (src/db/triggers.ts).
 
-// A domain belongs to exactly one category at a time (domainId is uniquely
-// constrained in domain_categories — see schema.ts). Re-adding a domain that
-// is already in this exact category is a no-op change (same row, same
-// values); re-adding it under a DIFFERENT category MOVES it there — the old
-// membership is overwritten, not left alongside a second row. The sync
-// trigger reacts to that UPDATE and keeps domains.categories/primaryCategory
-// and both categories' live counts accurate automatically.
+// A domain can belong to MULTIPLE categories (domain_categories' unique
+// constraint is on the (domainId, categoryId) PAIR — see schema.ts).
+// Re-adding a domain to a category it's already in is a no-op/refresh (a
+// real duplicate, same pair); adding it to a NEW category is a genuine
+// additional row, not a conflict — this is what makes the bulk toolbar's
+// "Thêm vào nhóm" additive and lets two different feeds legitimately both
+// claim the same domain under their own categories. The sync trigger reacts
+// to the insert/update and keeps domains.categories/primaryCategory and
+// every touched category's live count accurate automatically.
 async function addDomainCategoryMemberships(
   rows: { domainId: number; categoryId: string; sourceLabel?: string | null; feedSourceId?: string | null }[]
 ) {
@@ -307,18 +309,18 @@ async function addDomainCategoryMemberships(
   const CHUNK_SIZE = 5000;
   for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
     const chunk = rows.slice(i, i + CHUNK_SIZE);
-    // A single INSERT statement can't target the same conflict key (domainId)
-    // twice, and "the same domain into two categories in one call" has no
-    // valid meaning under the one-category-per-domain rule anyway — de-dupe
-    // by domainId within this chunk first (last entry wins).
-    const byDomainId = new Map<number, (typeof chunk)[number]>();
-    for (const r of chunk) byDomainId.set(r.domainId, r);
+    // A single INSERT statement can't target the same conflict key twice —
+    // de-dupe by the (domainId, categoryId) PAIR within this chunk first
+    // (last entry wins). Two DIFFERENT categories for the same domainId are
+    // no longer a conflict at all now, so both rows go through untouched.
+    const byPair = new Map<string, (typeof chunk)[number]>();
+    for (const r of chunk) byPair.set(`${r.domainId}:${r.categoryId}`, r);
 
     try {
       await db
         .insert(domainCategories)
         .values(
-          Array.from(byDomainId.values()).map((r) => ({
+          Array.from(byPair.values()).map((r) => ({
             domainId: r.domainId,
             categoryId: r.categoryId,
             sourceLabel: r.sourceLabel || null,
@@ -326,9 +328,11 @@ async function addDomainCategoryMemberships(
           }))
         )
         .onConflictDoUpdate({
-          target: domainCategories.domainId,
+          target: [domainCategories.domainId, domainCategories.categoryId],
+          // categoryId isn't in SET — it's part of the conflict key now, so
+          // a conflict here always means "same domain, same category
+          // already"; only its provenance can meaningfully be refreshed.
           set: {
-            categoryId: sql`excluded.category_id`,
             sourceLabel: sql`excluded.source_label`,
             feedSourceId: sql`excluded.feed_source_id`,
           },
@@ -345,7 +349,7 @@ async function addDomainCategoryMemberships(
       if (code === '23503') {
         const realCategories = await db.select({ id: categories.id }).from(categories);
         const validIds = new Set(realCategories.map((c) => c.id));
-        const badIds = Array.from(new Set(Array.from(byDomainId.values()).map((r) => r.categoryId))).filter(
+        const badIds = Array.from(new Set(Array.from(byPair.values()).map((r) => r.categoryId))).filter(
           (id) => !validIds.has(id)
         );
         throw new Error(
@@ -377,16 +381,24 @@ export async function getDashboardStats() {
   try {
     const activeFilter = eq(domains.status, 'active');
 
-    const [totalActiveRows, totalAllRows, categoryRows, tldRows, statusRows, recentActive] = await Promise.all([
+    const [totalActiveRows, totalAllRows, categoryResult, tldRows, statusRows, recentActive] = await Promise.all([
       db.select({ count: sql<number>`count(*)` }).from(domains).where(activeFilter),
       db.select({ count: sql<number>`count(*)` }).from(domains),
-      db
-        .select({ category: domains.primaryCategory, count: sql<number>`count(*)` })
-        .from(domains)
-        .where(activeFilter)
-        .groupBy(domains.primaryCategory)
-        .orderBy(desc(sql`count(*)`))
-        .limit(8),
+      // Unnests the jsonb `categories` array rather than grouping by
+      // primaryCategory — a domain can now belong to several categories at
+      // once (see schema.ts's note on domain_categories' composite unique
+      // constraint), so a domain tagged both 'malware' and 'phishing' must
+      // count toward BOTH breakdowns here, not just whichever it was added
+      // to first. jsonb_array_elements_text needs raw SQL — not expressible
+      // via the query builder.
+      db.execute<{ category: string; count: number }>(sql`
+        SELECT cat AS category, count(*)::int AS count
+        FROM domains, jsonb_array_elements_text(categories) AS cat
+        WHERE status = 'active'
+        GROUP BY cat
+        ORDER BY count(*) DESC
+        LIMIT 8
+      `),
       db
         .select({ tld: domains.tld, count: sql<number>`count(*)` })
         .from(domains)
@@ -419,7 +431,7 @@ export async function getDashboardStats() {
     return {
       totalActive,
       totalAll,
-      categoryBreakdown: categoryRows.map((c) => ({
+      categoryBreakdown: categoryResult.rows.map((c) => ({
         category: c.category,
         count: Number(c.count),
         percent: totalActive > 0 ? (Number(c.count) / totalActive) * 100 : 0,
@@ -476,16 +488,17 @@ export async function getDomains(params: {
       conditions.push(ilike(domains.domain, `%${search.trim()}%`));
     }
     if (category && category !== 'all') {
-      // primaryCategory, not the jsonb `categories` array — a domain belongs
-      // to exactly ONE category (domain_categories.domainId is uniquely
-      // constrained, see schema.ts), so the trigger-maintained primaryCategory
-      // always equals categories[0] anyway. Filtering on it directly uses
-      // domains_primary_category_idx (a plain btree index); the equivalent
-      // `categories @> '[...]'::jsonb` containment check has no matching
-      // index at all, forcing a full sequential scan on every single
-      // category-filtered Domain Explorer load — the single most common
-      // query this table sees.
-      conditions.push(eq(domains.primaryCategory, category));
+      // The jsonb `categories` array, not primaryCategory — a domain can now
+      // belong to several categories at once (see schema.ts's note on
+      // domain_categories' composite unique constraint), so filtering by
+      // primaryCategory alone would silently hide a domain from every
+      // category view except the one it happened to be added to FIRST.
+      // Backed by domains_categories_gin_idx (see ensureSearchIndexes in
+      // triggers.ts) so this containment check stays index-backed instead
+      // of falling back to a full sequential scan on every category-filtered
+      // Domain Explorer load — still the single most common query this
+      // table sees.
+      conditions.push(sql`${domains.categories} @> ${JSON.stringify([category])}::jsonb`);
     }
     if (status && status.trim() !== '') {
       const statusList = status.split(',').map((s) => s.trim()).filter(Boolean);
@@ -769,29 +782,31 @@ const UPSERT_DOMAINS_SQL = `
 
 // Joins staging -> domains on domain NAME for the id — no id bookkeeping in
 // JS between phases. ON CONFLICT (domain_id) DO UPDATE mirrors
-// addDomainCategoryMemberships' own onConflictDoUpdate exactly: since
-// domain_id is uniquely constrained (a domain belongs to exactly ONE
-// category at a time), re-syncing an already-categorized domain MOVES it
-// rather than erroring. is_primary is left at its column default (false) —
-// the sync_domain_category_cache trigger (src/db/triggers.ts) promotes it
-// once this statement commits, same as every other write path.
+// addDomainCategoryMemberships' own onConflictDoUpdate exactly: domain_id +
+// category_id is the unique pair now (a domain can be in several
+// categories), so re-syncing an already-categorized domain under the SAME
+// category is a no-op/provenance-refresh; under a DIFFERENT category it's a
+// genuine additional row (no conflict at all — different key), not a move.
+// is_primary is left at its column default (false) — the
+// sync_domain_category_cache trigger (src/db/triggers.ts) promotes it once
+// this statement commits, same as every other write path.
 const UPSERT_MEMBERSHIPS_SQL = `
   INSERT INTO domain_categories (domain_id, category_id, feed_source_id, source_label)
   SELECT d.id, $1, $2, $3
   FROM tmp_sync_domains t
   JOIN domains d ON d.domain = t.domain
-  ON CONFLICT (domain_id) DO UPDATE SET
-      category_id = EXCLUDED.category_id,
+  ON CONFLICT (domain_id, category_id) DO UPDATE SET
       feed_source_id = EXCLUDED.feed_source_id,
       source_label = EXCLUDED.source_label;
 `;
 
 export async function bulkCreateDomains(data: {
   domains: string[];
-  // A domain belongs to exactly one category (domain_categories.domainId is
-  // uniquely constrained) — only categories[0] is ever actually used. Kept
-  // as an array for backward compatibility with existing call sites, all of
-  // which already only ever pass a single-element array (see
+  // A domain can belong to multiple categories now, but a single
+  // bulkCreateDomains batch (one feed sync) still only ever tags its
+  // domains with ONE category — only categories[0] is ever actually used.
+  // Kept as an array for backward compatibility with existing call sites,
+  // all of which already only ever pass a single-element array (see
   // runFeedSourceSyncJob: `categories: [source.category]`).
   categories: string[];
   source?: string;
@@ -841,12 +856,20 @@ export async function bulkCreateDomains(data: {
     );
     await data.onPhaseProgress?.(0.4, `Đã tải ${cleanDomains.length.toLocaleString('vi-VN')} domain vào bảng tạm — đang ghi vào bảng domains...`);
 
-    // One query against the just-staged data gives the new-vs-existing
-    // split directly — no separate chunked existence pre-check needed
-    // (the old design's real cost: N/10,000 extra round-trips before any
-    // writing even started).
+    // "Existing" now means "already in THIS category" — not just "the
+    // domain row already exists". A domain that exists but is new to this
+    // category is a genuine new membership, not a duplicate (see the
+    // schema.ts note on domain_categories' composite unique constraint):
+    // e.g. a domain already tagged 'malware' by one feed, now also reported
+    // by a 'phishing' feed, counts as new here, not existing.
     const existingResult = await client.query<{ count: string }>(
-      'SELECT count(*) FROM tmp_sync_domains t WHERE EXISTS (SELECT 1 FROM domains d WHERE d.domain = t.domain);'
+      `SELECT count(*) FROM tmp_sync_domains t
+       WHERE EXISTS (
+         SELECT 1 FROM domains d
+         JOIN domain_categories dc ON dc.domain_id = d.id
+         WHERE d.domain = t.domain AND dc.category_id = $1
+       );`,
+      [categoryId]
     );
     const existingCount = Number(existingResult.rows[0].count);
     const newCount = cleanDomains.length - existingCount;
@@ -924,11 +947,12 @@ export async function bulkCreateDomains(data: {
 }
 
 export async function bulkUpdateDomains(params: {
-  // 'remove_group' removed per explicit request — every domain always
-  // belongs to exactly one category (domain_categories.domainId is
-  // uniquely constrained), so "remove from group with no replacement"
-  // never had a coherent end state; 'add_group' (a move, since it
-  // replaces the existing membership) is the only group-changing action now.
+  // 'remove_group' removed per earlier explicit request when a domain could
+  // only ever be in one category — moot now that a domain can be in several
+  // (see schema.ts's note on domain_categories' composite unique
+  // constraint), but the bulk toolbar still only exposes an additive
+  // "Thêm vào nhóm", not a "remove"; that'd be a separate feature to add if
+  // wanted, now that it has a coherent meaning again.
   action: 'add_group' | 'allowlist' | 'unblock';
   domainIds?: number[];
   category?: string;
@@ -941,12 +965,15 @@ export async function bulkUpdateDomains(params: {
 
     if (domainIds.length === 0) return { updatedCount: 0 };
 
-    // Snapshot each domain's pre-change status/category BEFORE mutating —
-    // bounded by whatever the admin checked in the UI (never feed-sync
-    // scale), so this is cheap and lets rollbackAuditLog actually restore
-    // it later instead of just describing what happened.
+    // Snapshot each domain's pre-change status, and (for add_group) whether
+    // it ALREADY had the target category — bounded by whatever the admin
+    // checked in the UI (never feed-sync scale), so this is cheap and lets
+    // rollbackAuditLog actually restore it later instead of just describing
+    // what happened. hadCategoryBefore matters because add_group is
+    // additive now: rollback must remove only the category THIS action
+    // actually added, never stripping one a domain already had.
     const beforeRows = await db
-      .select({ id: domains.id, status: domains.status, primaryCategory: domains.primaryCategory })
+      .select({ id: domains.id, status: domains.status, categories: domains.categories })
       .from(domains)
       .where(inArray(domains.id, domainIds));
 
@@ -971,11 +998,10 @@ export async function bulkUpdateDomains(params: {
         })
         .where(inArray(domains.id, domainIds));
     } else if (action === 'add_group' && category) {
-      // Idempotent: domains already in this category are silently skipped
-      // (DB-enforced unique membership), not duplicated. For a domain
-      // already in a DIFFERENT category, this MOVES it (addDomainCategoryMemberships
-      // upserts on domainId) — there's no separate "remove from group"
-      // action; a domain always belongs to exactly one category.
+      // Additive: a domain already in this category is silently
+      // skipped/refreshed (DB-enforced unique on the (domainId, categoryId)
+      // pair), and a domain already in OTHER categories keeps them — this
+      // is now genuinely "thêm vào nhóm", not a move.
       await addDomainCategoryMemberships(
         domainIds.map((domainId) => ({ domainId, categoryId: category, sourceLabel: reason || 'Bulk action' }))
       );
@@ -994,7 +1020,14 @@ export async function bulkUpdateDomains(params: {
       rollbackData: {
         type: 'bulk_action',
         action,
-        items: beforeRows.map((r) => ({ domainId: r.id, status: r.status, primaryCategory: r.primaryCategory })),
+        // Only meaningful for add_group — the one category this whole
+        // batch actually added (see rollbackAuditLog).
+        category: action === 'add_group' ? category : undefined,
+        items: beforeRows.map((r) => ({
+          domainId: r.id,
+          status: r.status,
+          hadCategoryBefore: category ? (r.categories || []).includes(category) : undefined,
+        })),
       },
       details: [`Hành động: ${action}`, `Số lượng: ${domainIds.length}`, `Lý do: ${reason}`],
     });
@@ -1956,15 +1989,20 @@ export async function rollbackAuditLog(logId: number, userEmail: string, reason?
 
       summary = `Hoàn tác thêm tên miền: ${target[0].domain}`;
     } else if (data.type === 'bulk_action') {
-      const items = (data.items || []) as { domainId: number; status: string; primaryCategory: string | null }[];
+      const items = (data.items || []) as { domainId: number; status: string; hadCategoryBefore?: boolean }[];
       for (const item of items) {
         await db.update(domains).set({ status: item.status, updatedAt: new Date() }).where(eq(domains.id, item.domainId));
-        // Only "add_group" ever changed category membership — restore it,
-        // best-effort (skip silently if the original category no longer exists).
-        if (data.action === 'add_group' && item.primaryCategory) {
-          await addDomainCategoryMemberships([
-            { domainId: item.domainId, categoryId: item.primaryCategory, sourceLabel: 'Hoàn tác (Rollback)' },
-          ]).catch(() => {});
+      }
+      // add_group is additive now (a domain can be in several categories —
+      // see schema.ts's note on domain_categories' composite unique
+      // constraint), so undoing it means removing exactly the category THIS
+      // action added — never touching a domain that already had it before
+      // (hadCategoryBefore), and never touching any other category the
+      // domain has, since add_group never removed anything to begin with.
+      if (data.action === 'add_group' && data.category) {
+        const newlyAddedIds = items.filter((i) => !i.hadCategoryBefore).map((i) => i.domainId);
+        if (newlyAddedIds.length > 0) {
+          await removeDomainCategoryMemberships(newlyAddedIds, data.category).catch(() => {});
         }
       }
       summary = `Hoàn tác thao tác hàng loạt trên ${items.length} tên miền`;

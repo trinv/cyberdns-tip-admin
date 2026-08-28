@@ -420,7 +420,7 @@ export const DomainTable: React.FC<DomainTableProps> = ({
               onClick={() => onOpenBulkModal('add_group')}
               className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all shadow-xs cursor-pointer active-press"
             >
-              Chuyển nhóm...
+              Thêm vào nhóm...
             </button>
             <button
               onClick={() => onOpenBulkModal('allowlist')}

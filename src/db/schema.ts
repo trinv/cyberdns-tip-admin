@@ -211,26 +211,28 @@ export const feedSources = pgTable(
 
 // 4b. Domain ↔ Category Membership (the authoritative relation)
 //
-// A domain belongs to EXACTLY ONE category at a time: the UNIQUE index on
-// domainId alone below enforces that at the database level — atomically,
-// even under concurrent feed syncs — by making a second membership row for
-// the same domain impossible; re-adding a domain under a different category
-// therefore has to be an UPDATE (a move), not an INSERT (see
-// addDomainCategoryMemberships' onConflictDoUpdate in queries.ts). This is
-// what guarantees "1 tên miền chỉ tồn tại duy nhất trong 1 danh mục".
+// A domain can belong to MULTIPLE categories at once (e.g. reported as
+// both "malware" and "phishing" by two different feeds) — changed from the
+// earlier "exactly one category" design per explicit request. The UNIQUE
+// constraint is now on the (domainId, categoryId) PAIR, not domainId alone:
+// re-adding a domain already in category X under category X again is a
+// no-op/refresh (a real duplicate); adding it to a NEW category Y is a
+// genuine additional row, not a conflict — see addDomainCategoryMemberships'
+// onConflictDoUpdate in queries.ts, which now targets that composite pair.
+// domainId keeps its own plain index (below) since it's no longer backed by
+// a single-column unique index's implicit one.
 //
-// `isPrimary` is always true for the (at most one) row a domain has — kept
-// as a column rather than removed so the existing sync trigger's promotion
-// logic (src/db/triggers.ts) and domains.primaryCategory derivation don't
-// need special-casing for "no primary yet" during the brief window between
-// insert and the trigger's promote step.
+// `isPrimary` marks the one row (per domain) considered "the" category for
+// contexts that need a single value — display sort order, the CSV export's
+// primary_category column, domains.primaryCategory's denormalized value —
+// always the OLDEST membership by addedAt (see the sync trigger's promotion
+// logic in src/db/triggers.ts), not a ranking of importance.
 export const domainCategories = pgTable(
   'domain_categories',
   {
     id: serial('id').primaryKey(),
     domainId: integer('domain_id')
       .notNull()
-      .unique()
       .references(() => domains.id, { onDelete: 'cascade' }),
     categoryId: varchar('category_id', { length: 100 })
       .notNull()
@@ -251,6 +253,8 @@ export const domainCategories = pgTable(
     addedAt: timestamp('added_at').defaultNow().notNull(),
   },
   (table) => [
+    uniqueIndex('domain_categories_domain_category_uidx').on(table.domainId, table.categoryId),
+    index('domain_categories_domain_idx').on(table.domainId),
     index('domain_categories_category_idx').on(table.categoryId),
     index('domain_categories_feed_source_idx').on(table.feedSourceId),
   ]

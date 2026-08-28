@@ -208,6 +208,18 @@ export async function ensureSearchIndexes() {
       CREATE INDEX IF NOT EXISTS domains_domain_trgm_idx
       ON domains USING gin (domain gin_trgm_ops);
     `);
+    // domains_categories_gin_idx: a domain can belong to several categories
+    // (see schema.ts's note on domain_categories' composite unique
+    // constraint), so getDomains' category filter checks jsonb containment
+    // (`categories @> '["id"]'`) against the whole array instead of equality
+    // against primaryCategory. jsonb's default GIN opclass already supports
+    // `@>` directly — no non-default opclass needed here, unlike the trigram
+    // index above — but it's still not expressible via schema.ts's DSL, so
+    // it's applied idempotently here the same way.
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS domains_categories_gin_idx
+      ON domains USING gin (categories);
+    `);
     // Cleanup: an earlier version of this function created a partial index
     // sorted by threat_score, which no longer exists as a column (removed —
     // it was never backed by a real scoring pipeline, see schema.ts).

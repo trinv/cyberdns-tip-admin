@@ -49,7 +49,7 @@ export const DomainBulkModal: React.FC<DomainBulkModalProps> = ({
   const getActionTitle = () => {
     switch (actionType) {
       case 'add_group':
-        return `Chuyển ${count.toLocaleString('vi-VN')} domain vào nhóm ${selectedCat}`;
+        return `Thêm ${count.toLocaleString('vi-VN')} domain vào nhóm ${selectedCat}`;
       case 'allowlist':
         return `Chuyển ${count.toLocaleString('vi-VN')} domain sang Allowlist (Miễn trừ)`;
       case 'unblock':
@@ -103,7 +103,7 @@ export const DomainBulkModal: React.FC<DomainBulkModalProps> = ({
                 ))}
               </select>
               <p className="text-xs text-slate-400 dark:text-slate-500">
-                Mỗi tên miền chỉ thuộc 1 nhóm — domain đang ở nhóm khác sẽ được CHUYỂN sang nhóm này, không giữ đồng thời cả hai.
+                Một tên miền có thể thuộc nhiều nhóm cùng lúc — thao tác này CHỈ THÊM nhóm này, không gỡ bỏ nhóm hiện có của domain.
               </p>
             </div>
           )}

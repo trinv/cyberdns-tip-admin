@@ -94,16 +94,22 @@ CREATE INDEX IF NOT EXISTS domains_status_idx ON domains (status);
 CREATE INDEX IF NOT EXISTS domains_primary_category_idx ON domains (primary_category);
 CREATE INDEX IF NOT EXISTS domains_tld_idx ON domains (tld);
 CREATE INDEX IF NOT EXISTS domains_last_seen_idx ON domains (last_seen);
+-- Backs jsonb containment lookups (`categories @> '["id"]'`) against the
+-- multi-category array below — the default GIN opclass already supports
+-- `@>` directly, no extension needed (unlike a trigram index).
+CREATE INDEX IF NOT EXISTS domains_categories_gin_idx ON domains USING gin (categories);
 
 -- 4. Domain <-> Category membership — the AUTHORITATIVE relation.
--- domain_id is uniquely constrained: a domain belongs to exactly ONE
--- category at a time, atomically, even under concurrent syncs — re-adding
--- a domain under a different category is an UPDATE (a move), never a
--- second row. This is what upsert_memberships()'s
--- "ON CONFLICT (domain_id) DO UPDATE" in sync_domains.py relies on.
+-- A domain can belong to MULTIPLE categories at once (e.g. reported as both
+-- "malware" and "phishing" by two different feeds) — the unique constraint
+-- is on the (domain_id, category_id) PAIR, not domain_id alone. Re-adding a
+-- domain already in category X under category X again is a no-op/refresh;
+-- adding it to a NEW category Y is a genuine additional row, not a
+-- conflict. This is what upsert_memberships()'s
+-- "ON CONFLICT (domain_id, category_id) DO UPDATE" in sync_domains.py relies on.
 CREATE TABLE IF NOT EXISTS domain_categories (
     id             SERIAL PRIMARY KEY,
-    domain_id      INTEGER NOT NULL UNIQUE
+    domain_id      INTEGER NOT NULL
                        REFERENCES domains (id) ON DELETE CASCADE,
     category_id    VARCHAR(100) NOT NULL
                        REFERENCES categories (id) ON DELETE RESTRICT,
@@ -111,8 +117,10 @@ CREATE TABLE IF NOT EXISTS domain_categories (
                        REFERENCES feed_sources (id) ON DELETE SET NULL,
     source_label   TEXT,
     is_primary     BOOLEAN NOT NULL DEFAULT false,
-    added_at       TIMESTAMP NOT NULL DEFAULT now()
+    added_at       TIMESTAMP NOT NULL DEFAULT now(),
+    UNIQUE (domain_id, category_id)
 );
+CREATE INDEX IF NOT EXISTS domain_categories_domain_idx ON domain_categories (domain_id);
 CREATE INDEX IF NOT EXISTS domain_categories_category_idx ON domain_categories (category_id);
 CREATE INDEX IF NOT EXISTS domain_categories_feed_source_idx ON domain_categories (feed_source_id);
 

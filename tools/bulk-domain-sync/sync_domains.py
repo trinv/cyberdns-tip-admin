@@ -7,14 +7,16 @@ the full walkthrough of how this maps onto that schema.
 
 The production `domains` table is denormalized: `domains.categories`
 (jsonb array) and `domains.primary_category` are a READ-PATH CACHE derived
-from the real source of truth, `domain_categories` (one row per domain,
-its `domain_id` uniquely constrained — a domain belongs to exactly one
-category at a time). A Postgres trigger on `domain_categories`
-(sync_domain_category_cache, see src/db/triggers.ts) keeps that cache and
-`categories.count` in sync automatically on every insert/update/delete —
-this script must NEVER write domains.categories/primary_category directly,
-only domain_categories, exactly like the real app's own
-createDomain/bulkCreateDomains + addDomainCategoryMemberships do.
+from the real source of truth, `domain_categories` — a domain can belong to
+SEVERAL categories at once (e.g. reported as both "malware" and "phishing"
+by two different feeds); the unique constraint is on the (domain_id,
+category_id) PAIR, not domain_id alone. A Postgres trigger on
+`domain_categories` (sync_domain_category_cache, see src/db/triggers.ts)
+keeps that cache and `categories.count` in sync automatically on every
+insert/update/delete — this script must NEVER write
+domains.categories/primary_category directly, only domain_categories,
+exactly like the real app's own createDomain/bulkCreateDomains +
+addDomainCategoryMemberships do.
 
 Pipeline:
 
@@ -37,11 +39,13 @@ Pipeline:
      column defaults).
   5. Phase B — upsert into `domain_categories`, joining the staging table
      to `domains` on domain name for the id (no Python-side id bookkeeping
-     needed): one INSERT ... SELECT ... ON CONFLICT (domain_id) DO UPDATE,
-     matching addDomainCategoryMemberships' onConflictDoUpdate exactly
-     (moves an existing domain to this category rather than erroring).
-     The trigger then derives domains.categories/primary_category and
-     categories.count from this — this script touches neither directly.
+     needed): one INSERT ... SELECT ... ON CONFLICT (domain_id, category_id)
+     DO UPDATE, matching addDomainCategoryMemberships' onConflictDoUpdate
+     exactly — a domain already in this category is a no-op/refresh; a
+     domain already in a DIFFERENT category keeps it and gains this one too
+     (no conflict at all — different key). The trigger then derives
+     domains.categories/primary_category and categories.count from this —
+     this script touches neither directly.
   6. TRUNCATE the staging table so the next run starts from empty.
 
 Both phases run in ONE transaction — if Phase B fails, Phase A's writes
@@ -204,22 +208,21 @@ ON CONFLICT (domain) DO UPDATE SET
 
 # Joins staging -> domains on the domain NAME to get domain_id — no Python-
 # side id bookkeeping between phases needed, this is one set-based
-# statement regardless of batch size. ON CONFLICT (domain_id) DO UPDATE
-# mirrors addDomainCategoryMemberships' onConflictDoUpdate exactly: since
-# domain_id is uniquely constrained (a domain belongs to exactly ONE
-# category at a time), re-syncing a domain already in a DIFFERENT category
-# MOVES it here rather than erroring — there is no separate "remove from
-# category" operation, by the same production invariant. is_primary is
-# deliberately left to its column default (false); the sync_domain_category_
-# cache trigger (src/db/triggers.ts) promotes it to true itself once this
-# statement commits, same as the real app's writes.
+# statement regardless of batch size. ON CONFLICT (domain_id, category_id)
+# DO UPDATE mirrors addDomainCategoryMemberships' onConflictDoUpdate
+# exactly: a domain already in THIS category is a no-op/refresh; a domain
+# already in a DIFFERENT category keeps it and gains this one too — that's
+# a different (domain_id, category_id) pair, so it's a fresh INSERT, not a
+# conflict at all. is_primary is deliberately left to its column default
+# (false); the sync_domain_category_cache trigger (src/db/triggers.ts)
+# promotes it to true itself once this statement commits, same as the real
+# app's writes.
 UPSERT_MEMBERSHIPS_SQL = """
 INSERT INTO domain_categories (domain_id, category_id, feed_source_id, source_label)
 SELECT d.id, %(category_id)s, %(feed_source_id)s, %(source_label)s
 FROM tmp_domains t
 JOIN domains d ON d.domain = t.domain
-ON CONFLICT (domain_id) DO UPDATE SET
-    category_id = EXCLUDED.category_id,
+ON CONFLICT (domain_id, category_id) DO UPDATE SET
     feed_source_id = EXCLUDED.feed_source_id,
     source_label = EXCLUDED.source_label;
 """
