@@ -489,16 +489,12 @@ export default function App() {
         }
         setSources(fresh);
         if (anyCompleted) {
-          await Promise.all([
-            fetchCategories().then(setCategories).catch(() => {}),
-            fetchDashboardStats().then(setDashboardStats).catch(() => {}),
-            // Feed syncs always write straight to domains now (see
-            // runFeedSourceSyncJob), never to review_queue — this refetch is
-            // just a harmless defensive no-op kept in case anything else
-            // changed review_queue counts while this sync was running.
-            fetchReviewQueue().then(setReviewItems).catch(() => {}),
-            refreshDomains(),
-          ]);
+          // refreshAllData covers categories/dashboardStats/auditLogs/
+          // reviewQueue/releases in one batch — a completed sync writes an
+          // audit log entry too (see bulkCreateDomains), which the old,
+          // hand-picked fetch list here didn't include, so a finished
+          // sync's own log entry only showed up after a manual F5.
+          await Promise.all([refreshAllData(), refreshDomains()]);
         }
       } catch (err) {
         console.warn('Poll feed sources failed:', err);
@@ -509,7 +505,7 @@ export default function App() {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [sources, refreshDomains]);
+  }, [sources, refreshDomains, refreshAllData]);
 
   // Any actual filter change (not just paging/sorting) invalidates the
   // current page/selection — jumping back to page 1 and clearing a
@@ -613,7 +609,10 @@ export default function App() {
         reason,
       });
       setSelectedDomainIds(new Set());
-      await Promise.all([refreshDomains(), fetchAuditLogs().then(setAuditLogs).catch(() => {}), fetchCategories().then(setCategories).catch(() => {})]);
+      // refreshAllData also covers dashboardStats — bulk allowlist/unblock/
+      // move-group changes the exact counts Dashboard's KPI cards show,
+      // which the old hand-picked fetch list here didn't refresh.
+      await Promise.all([refreshDomains(), refreshAllData()]);
       const n = result.updatedCount;
       showToast(
         action === 'add_group' ? `Đã chuyển nhóm cho ${n} tên miền!` :
@@ -636,7 +635,9 @@ export default function App() {
         if (Number.isNaN(numericId)) throw new Error('Invalid domain id');
         await updateDomainApi(numericId, domainData, reason);
         showToast(`Đã cập nhật và lưu cấu hình cho ${domainData.domain} vào CyberDNSTIP-DB`, 'success');
-        await Promise.all([refreshDomains(), fetchCategories().then(setCategories).catch(() => {})]);
+        // updateDomain writes an audit log entry and can change status
+        // (affecting Dashboard's counts) — refreshAllData covers both.
+        await Promise.all([refreshDomains(), refreshAllData()]);
       } catch (err) {
         console.warn('Backend update domain notice:', err);
         showToast(`Không thể lưu thay đổi cho ${domainData.domain} — vui lòng thử lại.`, 'warning');
@@ -658,7 +659,10 @@ export default function App() {
         } else {
           showToast(`${domainValue} đã tồn tại hoặc đang chờ duyệt`, 'info');
         }
-        await fetchReviewQueue().then(setReviewItems).catch(() => {});
+        // proposeDomain writes an audit log entry and changes the review
+        // queue count Dashboard's SOC queue widget shows — refreshAllData
+        // covers reviewQueue/dashboardStats/auditLogs in one batch.
+        await refreshAllData();
       } catch (err) {
         console.warn('Backend propose domain notice:', err);
         showToast(`Không thể gửi tên miền mới vào Hàng đợi duyệt — vui lòng thử lại.`, 'warning');
@@ -676,22 +680,21 @@ export default function App() {
   // Quick Plain Text (.txt) download — exports the current selection, or
   // otherwise EVERY domain matching the active filters (the whole category),
   // not just the page currently on screen.
-  // Always the FULL filtered list — never silently scoped down to
-  // whatever happens to be checkbox-selected. Neither button's label
-  // ("Xuất file .TXT/.CSV") says "selected", so quietly switching to a
-  // selected-only export the moment any row is ticked (even for an
-  // unrelated bulk action) was a real, surprising bug: the user asks for
-  // "the whole list" and silently gets a handful of rows instead. The
-  // export modal (onOpenExportModal) is where an explicit, visible choice
-  // between "toàn bộ" and "chỉ N đã chọn" belongs — a radio button the
-  // user can actually see, not an inferred guess here.
+  // Explicit two-case behavior, by design (confirmed with the user after an
+  // earlier revision briefly made this always export everything): nothing
+  // ticked -> export the full filtered list; anything ticked -> export
+  // exactly that selection. No hidden guessing beyond this one rule.
   const handleQuickExportTxt = async () => {
     let targetList: DomainItem[];
-    try {
-      targetList = await fetchAllFilteredDomains();
-    } catch (err) {
-      showToast('Không thể tải toàn bộ danh sách để xuất — vui lòng thử lại.', 'warning');
-      return;
+    if (selectedDomainIds.size > 0) {
+      targetList = domains.filter((d) => selectedDomainIds.has(d.id));
+    } else {
+      try {
+        targetList = await fetchAllFilteredDomains();
+      } catch (err) {
+        showToast('Không thể tải toàn bộ danh sách để xuất — vui lòng thử lại.', 'warning');
+        return;
+      }
     }
 
     const content = targetList.map(d => d.domain).join('\n');
@@ -707,15 +710,18 @@ export default function App() {
     showToast(`Đã xuất ${targetList.length} tên miền sang định dạng .TXT thành công!`, 'success');
   };
 
-  // Quick CSV download — same "always the full filtered list" reasoning as
-  // handleQuickExportTxt above.
+  // Quick CSV download — same explicit two-case rule as handleQuickExportTxt above.
   const handleQuickExportCsv = async () => {
     let targetList: DomainItem[];
-    try {
-      targetList = await fetchAllFilteredDomains();
-    } catch (err) {
-      showToast('Không thể tải toàn bộ danh sách để xuất — vui lòng thử lại.', 'warning');
-      return;
+    if (selectedDomainIds.size > 0) {
+      targetList = domains.filter((d) => selectedDomainIds.has(d.id));
+    } else {
+      try {
+        targetList = await fetchAllFilteredDomains();
+      } catch (err) {
+        showToast('Không thể tải toàn bộ danh sách để xuất — vui lòng thử lại.', 'warning');
+        return;
+      }
     }
 
     const headers = ['domain', 'primaryCategory', 'categories', 'status', 'source', 'firstSeen'];
@@ -752,7 +758,8 @@ export default function App() {
         reason,
       });
       showToast(`Đã gửi ${result.insertedCount} tên miền vào Hàng đợi duyệt — chờ xác nhận trước khi chặn (${result.skippedCount} đã bỏ qua vì trùng/đang chờ duyệt)`, 'success');
-      await fetchReviewQueue().then(setReviewItems).catch(() => {});
+      // Same reasoning as handleSaveDomain's propose branch above.
+      await refreshAllData();
     } catch (err) {
       console.warn('Backend bulk propose notice:', err);
       showToast(`Nhập thất bại — chưa có tên miền nào được gửi duyệt. Vui lòng thử lại.`, 'warning');
@@ -770,7 +777,9 @@ export default function App() {
       await resolveReviewItemApi(id, 'approved', customCategory);
       setReviewItems((prev) => prev.filter((r) => r.id !== id));
       showToast(`Đã duyệt chặn tên miền ${item.domain} vào nhóm ${customCategory || item.proposedCategory}`, 'success');
-      await Promise.all([refreshDomains(), fetchCategories().then(setCategories).catch(() => {})]);
+      // Approval creates a real domain (writes an audit log entry) and
+      // changes the SOC queue/blocked counts Dashboard shows.
+      await Promise.all([refreshDomains(), refreshAllData()]);
     } catch (err) {
       console.warn('Backend resolve review notice:', err);
       showToast(`Duyệt thất bại cho ${item.domain} — vui lòng thử lại.`, 'warning');
@@ -787,6 +796,8 @@ export default function App() {
       await resolveReviewItemApi(id, 'rejected');
       setReviewItems((prev) => prev.filter((r) => r.id !== id));
       showToast(`Đã từ chối tên miền ${item?.domain || ''}`, 'info');
+      // Changes the SOC queue count Dashboard's KPI card shows.
+      await fetchDashboardStats().then(setDashboardStats).catch(() => {});
     } catch (err) {
       console.warn('Backend reject review notice:', err);
       showToast(`Từ chối thất bại cho ${item?.domain || ''} — vui lòng thử lại.`, 'warning');
@@ -802,7 +813,8 @@ export default function App() {
     // resolved — the simplest way to stay correct if some calls failed.
     const freshQueue = await fetchReviewQueue().catch(() => null);
     if (freshQueue) setReviewItems(freshQueue);
-    await Promise.all([refreshDomains(), fetchCategories().then(setCategories).catch(() => {})]);
+    // Every approval creates a real domain + audit log entry.
+    await Promise.all([refreshDomains(), refreshAllData()]);
     showToast(
       failed > 0
         ? `Đã duyệt ${succeeded}/${items.length} tên miền — ${failed} thất bại, vui lòng thử lại.`
@@ -849,6 +861,12 @@ export default function App() {
       const updated = await deployReleaseApi(release.version);
       applyReleaseUpdate(updated);
       showToast(`Bản phát hành đã được triển khai hoàn tất 100% đến các node Edge Anycast!`, 'success');
+      // deployRemainingRelease writes an audit log entry — not
+      // refreshAllData() here since that would also reset `release` to
+      // releasesList[0], overriding whichever release is actually being
+      // viewed (applyReleaseUpdate above already merges the real update
+      // into it correctly).
+      fetchAuditLogs().then(setAuditLogs).catch(() => {});
     } catch (err: any) {
       console.warn('Backend deploy release notice:', err);
       showToast(err?.message || 'Triển khai thất bại — vui lòng thử lại.', 'warning');
@@ -865,6 +883,7 @@ export default function App() {
       const updated = await overrideReleaseApi(release.version, 'Admin ghi đè cổng an toàn từ giao diện Phát hành');
       applyReleaseUpdate(updated);
       showToast(`Admin đã ghi đè thành công cổng an toàn! Bắt đầu cuốn chiếu toàn bộ cụm.`, 'success');
+      fetchAuditLogs().then(setAuditLogs).catch(() => {});
     } catch (err: any) {
       console.warn('Backend override release notice:', err);
       showToast(err?.message || 'Ghi đè thất bại — vui lòng thử lại.', 'warning');
@@ -876,6 +895,7 @@ export default function App() {
       const updated = await rollbackReleaseApi(version, 'Khôi phục thủ công từ giao diện Phát hành');
       applyReleaseUpdate(updated);
       showToast(`Đã hoàn tác và khôi phục về bản phát hành ${version}`, 'success');
+      fetchAuditLogs().then(setAuditLogs).catch(() => {});
     } catch (err: any) {
       console.warn('Backend rollback release notice:', err);
       showToast(err?.message || 'Hoàn tác thất bại — vui lòng thử lại.', 'warning');

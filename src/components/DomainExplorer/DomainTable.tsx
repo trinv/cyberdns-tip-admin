@@ -336,6 +336,22 @@ export const DomainTable: React.FC<DomainTableProps> = ({
               <div className="px-3.5 py-1 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                 TÙY CHỌN XUẤT NHANH
               </div>
+              {/* Which scope "Xuất nhanh" below will actually use — nothing
+                  ticked exports the whole filtered list; anything ticked
+                  exports exactly that selection (see handleQuickExportTxt/
+                  Csv in App.tsx). Spelled out here so it's never a silent
+                  surprise which one you're about to get. */}
+              <div
+                className={`mx-3.5 mb-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold ${
+                  selectedDomainIds.size > 0
+                    ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300'
+                    : 'bg-slate-50 dark:bg-slate-700/60 text-slate-500 dark:text-slate-400'
+                }`}
+              >
+                {selectedDomainIds.size > 0
+                  ? `Sẽ xuất ${selectedDomainIds.size} tên miền đã chọn`
+                  : 'Sẽ xuất toàn bộ danh sách đang lọc'}
+              </div>
               <button
                 onClick={() => {
                   onQuickExportTxt();
