@@ -328,7 +328,7 @@ export default function App() {
   // Modals States
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState<boolean>(false);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState<boolean>(false);
-  const [bulkActionType, setBulkActionType] = useState<'add_group' | 'allowlist' | 'unblock'>('add_group');
+  const [bulkActionType, setBulkActionType] = useState<'add_group' | 'allowlist' | 'unblock' | 'block'>('add_group');
   const [isAddDomainModalOpen, setIsAddDomainModalOpen] = useState<boolean>(false);
   const [domainToEdit, setDomainToEdit] = useState<DomainItem | null>(null);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState<boolean>(false);
@@ -596,7 +596,7 @@ export default function App() {
   // DomainBulkModal.tsx's onConfirm type) and this trusts the real server
   // response instead of hand-simulating the result locally.
   const handleConfirmBulkAction = async (
-    action: 'add_group' | 'allowlist' | 'unblock',
+    action: 'add_group' | 'allowlist' | 'unblock' | 'block',
     targetCategories: string[],
     reason: string
   ) => {
@@ -610,13 +610,14 @@ export default function App() {
       });
       setSelectedDomainIds(new Set());
       // refreshAllData also covers dashboardStats — bulk allowlist/unblock/
-      // move-group changes the exact counts Dashboard's KPI cards show,
-      // which the old hand-picked fetch list here didn't refresh.
+      // block/move-group changes the exact counts Dashboard's KPI cards
+      // show, which the old hand-picked fetch list here didn't refresh.
       await Promise.all([refreshDomains(), refreshAllData()]);
       const n = result.updatedCount;
       showToast(
         action === 'add_group' ? `Đã thêm ${n} tên miền vào nhóm!` :
         action === 'allowlist' ? `Đã chuyển ${n} tên miền vào Allowlist!` :
+        action === 'block' ? `Đã chặn lại ${n} tên miền vào Blocklist!` :
         `Đã gỡ chặn hoàn toàn cho ${n} tên miền!`,
         action === 'allowlist' ? 'warning' : 'success'
       );
@@ -1056,6 +1057,7 @@ export default function App() {
                 setSelectedTld={setSelectedTld}
                 selectedSource={selectedSource}
                 setSelectedSource={setSelectedSource}
+                selectedStatus={selectedStatus}
                 onOpenBulkModal={(actionType) => {
                   setBulkActionType(actionType);
                   setIsBulkModalOpen(true);

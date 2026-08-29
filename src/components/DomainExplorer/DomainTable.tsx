@@ -38,7 +38,13 @@ interface DomainTableProps {
   setSelectedTld: (tld: string) => void;
   selectedSource: string;
   setSelectedSource: (source: string) => void;
-  onOpenBulkModal: (actionType: 'add_group' | 'allowlist' | 'unblock') => void;
+  // Drives the bulk-action toolbar's 3rd button: while viewing the "Đã thôi
+  // chặn" list specifically, offering "Thôi chặn..." again on domains
+  // already unblocked doesn't make sense — swapped for "Chặn..." (re-block)
+  // instead. Any other status filter (including 'all', where the page can
+  // mix statuses) keeps the original "Thôi chặn...".
+  selectedStatus: DomainStatus | 'all';
+  onOpenBulkModal: (actionType: 'add_group' | 'allowlist' | 'unblock' | 'block') => void;
   onOpenExportModal: () => void;
   onQuickExportTxt: () => void;
   onQuickExportCsv: () => void;
@@ -72,6 +78,7 @@ export const DomainTable: React.FC<DomainTableProps> = ({
   setSelectedTld,
   selectedSource,
   setSelectedSource,
+  selectedStatus,
   onOpenBulkModal,
   onOpenExportModal,
   onQuickExportTxt,
@@ -428,12 +435,21 @@ export const DomainTable: React.FC<DomainTableProps> = ({
             >
               Allowlist...
             </button>
-            <button
-              onClick={() => onOpenBulkModal('unblock')}
-              className="px-3 py-1.5 bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800 font-bold rounded-xl transition-colors cursor-pointer shadow-xs active-press"
-            >
-              Thôi chặn...
-            </button>
+            {selectedStatus === 'unblocked' ? (
+              <button
+                onClick={() => onOpenBulkModal('block')}
+                className="px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-bold rounded-xl transition-colors cursor-pointer shadow-xs active-press"
+              >
+                Chặn...
+              </button>
+            ) : (
+              <button
+                onClick={() => onOpenBulkModal('unblock')}
+                className="px-3 py-1.5 bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800 font-bold rounded-xl transition-colors cursor-pointer shadow-xs active-press"
+              >
+                Thôi chặn...
+              </button>
+            )}
           </div>
         </div>
       )}

@@ -978,7 +978,7 @@ export async function bulkUpdateDomains(params: {
   // constraint), but the bulk toolbar still only exposes an additive
   // "Thêm vào nhóm", not a "remove"; that'd be a separate feature to add if
   // wanted, now that it has a coherent meaning again.
-  action: 'add_group' | 'allowlist' | 'unblock';
+  action: 'add_group' | 'allowlist' | 'unblock' | 'block';
   domainIds?: number[];
   category?: string;
   reason: string;
@@ -1018,6 +1018,24 @@ export async function bulkUpdateDomains(params: {
         .update(domains)
         .set({
           status: 'unblocked',
+          unblockedBySourcePause: false,
+          updatedAt: new Date(),
+        })
+        .where(inArray(domains.id, domainIds));
+    } else if (action === 'block') {
+      // Reverse of 'unblock' — a human deliberately re-blocking a domain
+      // that's currently in 'unblocked' (e.g. one a paused/deleted feed
+      // source dropped, or one an analyst manually thôi-chặn'd earlier).
+      // Its domain_categories rows were never touched by unblock/pause/
+      // delete-source in the first place (see pauseFeedSource/
+      // deleteFeedSource's own notes), so this is purely a status flip —
+      // no membership to restore. unblockedBySourcePause is cleared same
+      // as allowlist/unblock: an explicit human action from here on, not
+      // an artifact of whatever a source's pause once did.
+      await db
+        .update(domains)
+        .set({
+          status: 'active',
           unblockedBySourcePause: false,
           updatedAt: new Date(),
         })

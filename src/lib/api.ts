@@ -254,7 +254,7 @@ export async function proposeBulkDomainsApi(data: {
 }
 
 export async function bulkActionDomainsApi(data: {
-  action: 'add_group' | 'allowlist' | 'unblock';
+  action: 'add_group' | 'allowlist' | 'unblock' | 'block';
   domainIds: (string | number)[];
   category?: string;
   reason: string;
