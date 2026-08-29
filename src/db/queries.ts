@@ -12,7 +12,7 @@ import {
   auditLogs,
   savedFilters,
 } from './schema.ts';
-import { eq, ne, desc, asc, sql, ilike, and, or, isNull, inArray } from 'drizzle-orm';
+import { eq, desc, asc, sql, ilike, and, inArray } from 'drizzle-orm';
 import { parseFeedText } from './feedParser.ts';
 import { hashPassword, verifyPassword, generateSessionToken, generateTempPassword } from '../lib/password.ts';
 import { sendNewIpLoginAlert } from '../lib/mailer.ts';
@@ -310,17 +310,20 @@ async function addDomainCategoryMemberships(
   for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
     const chunk = rows.slice(i, i + CHUNK_SIZE);
     // A single INSERT statement can't target the same conflict key twice —
-    // de-dupe by the (domainId, categoryId) PAIR within this chunk first
-    // (last entry wins). Two DIFFERENT categories for the same domainId are
-    // no longer a conflict at all now, so both rows go through untouched.
-    const byPair = new Map<string, (typeof chunk)[number]>();
-    for (const r of chunk) byPair.set(`${r.domainId}:${r.categoryId}`, r);
+    // de-dupe by the (domainId, categoryId, feedSourceId) TRIPLE within this
+    // chunk first (last entry wins). Two DIFFERENT categories, OR the same
+    // category from two DIFFERENT sources, are no longer a conflict at all
+    // now — both rows go through untouched (see schema.ts's note on
+    // domain_categories for why: each source gets its own row per category,
+    // so pausing one source never loses/confuses another's attribution).
+    const byTriple = new Map<string, (typeof chunk)[number]>();
+    for (const r of chunk) byTriple.set(`${r.domainId}:${r.categoryId}:${r.feedSourceId || ''}`, r);
 
     try {
       await db
         .insert(domainCategories)
         .values(
-          Array.from(byPair.values()).map((r) => ({
+          Array.from(byTriple.values()).map((r) => ({
             domainId: r.domainId,
             categoryId: r.categoryId,
             sourceLabel: r.sourceLabel || null,
@@ -328,13 +331,13 @@ async function addDomainCategoryMemberships(
           }))
         )
         .onConflictDoUpdate({
-          target: [domainCategories.domainId, domainCategories.categoryId],
-          // categoryId isn't in SET — it's part of the conflict key now, so
-          // a conflict here always means "same domain, same category
-          // already"; only its provenance can meaningfully be refreshed.
+          target: [domainCategories.domainId, domainCategories.categoryId, domainCategories.feedSourceId],
+          // categoryId/feedSourceId aren't in SET — both are part of the
+          // conflict key now, so a conflict here always means "same domain,
+          // same category, same source already"; only sourceLabel can
+          // meaningfully be refreshed.
           set: {
             sourceLabel: sql`excluded.source_label`,
-            feedSourceId: sql`excluded.feed_source_id`,
           },
         });
     } catch (error: any) {
@@ -349,7 +352,7 @@ async function addDomainCategoryMemberships(
       if (code === '23503') {
         const realCategories = await db.select({ id: categories.id }).from(categories);
         const validIds = new Set(realCategories.map((c) => c.id));
-        const badIds = Array.from(new Set(Array.from(byPair.values()).map((r) => r.categoryId))).filter(
+        const badIds = Array.from(new Set(Array.from(byTriple.values()).map((r) => r.categoryId))).filter(
           (id) => !validIds.has(id)
         );
         throw new Error(
@@ -363,11 +366,24 @@ async function addDomainCategoryMemberships(
   }
 }
 
-async function removeDomainCategoryMemberships(domainIds: number[], categoryId: string) {
+// feedSourceId is optional: omitted (the default, e.g. updateDomain's own
+// reconciliation), this removes the category ENTIRELY — every source's row
+// for it — matching "a human explicitly took this domain out of this
+// category" intent. Passed explicitly (e.g. rollbackAuditLog undoing a
+// specific bulk add_group, always attributed feedSourceId=null), it scopes
+// the delete to just that one attribution, so undoing a manual bulk action
+// can never accidentally also strip a real feed source's own, independent
+// membership in the same category (see schema.ts's note on
+// domain_categories: the same category can be backed by several sources at once).
+async function removeDomainCategoryMemberships(domainIds: number[], categoryId: string, feedSourceId?: string | null) {
   if (domainIds.length === 0) return;
-  await db
-    .delete(domainCategories)
-    .where(and(inArray(domainCategories.domainId, domainIds), eq(domainCategories.categoryId, categoryId)));
+  const conditions = [inArray(domainCategories.domainId, domainIds), eq(domainCategories.categoryId, categoryId)];
+  if (feedSourceId !== undefined) {
+    conditions.push(
+      feedSourceId === null ? sql`${domainCategories.feedSourceId} IS NULL` : eq(domainCategories.feedSourceId, feedSourceId)
+    );
+  }
+  await db.delete(domainCategories).where(and(...conditions));
 }
 
 // 3. Dashboard aggregate stats — computed live from the domains table.
@@ -787,22 +803,24 @@ const UPSERT_DOMAINS_SQL = `
 `;
 
 // Joins staging -> domains on domain NAME for the id — no id bookkeeping in
-// JS between phases. ON CONFLICT (domain_id) DO UPDATE mirrors
-// addDomainCategoryMemberships' own onConflictDoUpdate exactly: domain_id +
-// category_id is the unique pair now (a domain can be in several
-// categories), so re-syncing an already-categorized domain under the SAME
-// category is a no-op/provenance-refresh; under a DIFFERENT category it's a
-// genuine additional row (no conflict at all — different key), not a move.
-// is_primary is left at its column default (false) — the
-// sync_domain_category_cache trigger (src/db/triggers.ts) promotes it once
-// this statement commits, same as every other write path.
+// JS between phases. ON CONFLICT (domain_id, category_id, feed_source_id)
+// DO UPDATE mirrors addDomainCategoryMemberships' own onConflictDoUpdate
+// exactly: that TRIPLE is the unique key now (see schema.ts's note on
+// domain_categories — a domain can be in several categories, AND the same
+// category can independently be backed by several different sources), so
+// re-syncing a domain THIS source already put in THIS category is a no-op/
+// label-refresh; a different category, or the same category from a
+// DIFFERENT source, is a genuine additional row (no conflict — different
+// key), never overwriting another source's own attribution. is_primary is
+// left at its column default (false) — the sync_domain_category_cache
+// trigger (src/db/triggers.ts) promotes it once this statement commits,
+// same as every other write path.
 const UPSERT_MEMBERSHIPS_SQL = `
   INSERT INTO domain_categories (domain_id, category_id, feed_source_id, source_label)
   SELECT d.id, $1, $2, $3
   FROM tmp_sync_domains t
   JOIN domains d ON d.domain = t.domain
-  ON CONFLICT (domain_id, category_id) DO UPDATE SET
-      feed_source_id = EXCLUDED.feed_source_id,
+  ON CONFLICT (domain_id, category_id, feed_source_id) DO UPDATE SET
       source_label = EXCLUDED.source_label;
 `;
 
@@ -862,20 +880,21 @@ export async function bulkCreateDomains(data: {
     );
     await data.onPhaseProgress?.(0.4, `Đã tải ${cleanDomains.length.toLocaleString('vi-VN')} domain vào bảng tạm — đang ghi vào bảng domains...`);
 
-    // "Existing" now means "already in THIS category" — not just "the
-    // domain row already exists". A domain that exists but is new to this
-    // category is a genuine new membership, not a duplicate (see the
-    // schema.ts note on domain_categories' composite unique constraint):
-    // e.g. a domain already tagged 'malware' by one feed, now also reported
-    // by a 'phishing' feed, counts as new here, not existing.
+    // "Existing" now means "already in THIS category, FROM THIS SOURCE" —
+    // not just "the domain row already exists" or even "already in this
+    // category at all" (see schema.ts's note on domain_categories: the same
+    // category can independently be backed by several different sources).
+    // A domain already tagged 'malware' by a DIFFERENT feed counts as new
+    // here — this sync's own attribution for it doesn't exist yet, even
+    // though the domain+category combo itself isn't new.
     const existingResult = await client.query<{ count: string }>(
       `SELECT count(*) FROM tmp_sync_domains t
        WHERE EXISTS (
          SELECT 1 FROM domains d
          JOIN domain_categories dc ON dc.domain_id = d.id
-         WHERE d.domain = t.domain AND dc.category_id = $1
+         WHERE d.domain = t.domain AND dc.category_id = $1 AND dc.feed_source_id IS NOT DISTINCT FROM $2
        );`,
-      [categoryId]
+      [categoryId, data.feedSourceId || null]
     );
     const existingCount = Number(existingResult.rows[0].count);
     const newCount = cleanDomains.length - existingCount;
@@ -1568,25 +1587,35 @@ async function getDomainIdsForFeedSource(feedSourceId: string): Promise<number[]
 // domain-id list above; resumeFeedSource doesn't need this distinction — it
 // only ever re-activates domains its OWN pause actually set unblocked (see
 // its WHERE clause), which this function already guarantees is the correct set.
-async function getDomainIdsToUnblockForFeedSource(feedSourceId: string): Promise<number[]> {
-  const allLinked = await getDomainIdsForFeedSource(feedSourceId);
-  if (allLinked.length === 0) return [];
+//
+// A single set-based query with the source id as its only bound parameter —
+// NOT `inArray(domainId, allLinkedIds)`, which for a source managing
+// hundreds of thousands of domains (a real Hagezi-scale feed) risks
+// exceeding Postgres' ~65,535 bound-parameter limit outright. totalLinked
+// is returned alongside so callers can report how many were evaluated vs.
+// actually unblocked — real blocklists commonly overlap heavily across
+// categories/sources, so "only a few unblocked out of many linked" is
+// often the CORRECT outcome (those domains are still legitimately backed
+// elsewhere), not a bug — worth being able to show that reasoning rather
+// than just a bare count.
+async function getDomainIdsToUnblockForFeedSource(
+  feedSourceId: string
+): Promise<{ toUnblock: number[]; totalLinked: number }> {
+  const totalLinked = await getDomainIdsForFeedSource(feedSourceId);
+  if (totalLinked.length === 0) return { toUnblock: [], totalLinked: 0 };
 
-  const stillBackedRows = await db
-    .select({ domainId: domainCategories.domainId })
-    .from(domainCategories)
-    .leftJoin(feedSources, eq(feedSources.id, domainCategories.feedSourceId))
-    .where(
-      and(
-        inArray(domainCategories.domainId, allLinked),
-        or(
-          isNull(domainCategories.feedSourceId),
-          and(ne(domainCategories.feedSourceId, feedSourceId), eq(feedSources.isPaused, false))
-        )
+  const result = await db.execute<{ domain_id: number }>(sql`
+    SELECT dc.domain_id
+    FROM domain_categories dc
+    WHERE dc.feed_source_id = ${feedSourceId}
+      AND NOT EXISTS (
+        SELECT 1 FROM domain_categories dc2
+        LEFT JOIN feed_sources fs2 ON fs2.id = dc2.feed_source_id
+        WHERE dc2.domain_id = dc.domain_id
+          AND (dc2.feed_source_id IS NULL OR (dc2.feed_source_id != ${feedSourceId} AND fs2.is_paused = false))
       )
-    );
-  const stillBacked = new Set(stillBackedRows.map((r) => r.domainId));
-  return allLinked.filter((id) => !stillBacked.has(id));
+  `);
+  return { toUnblock: result.rows.map((r) => r.domain_id), totalLinked: totalLinked.length };
 }
 
 // Pauses a feed source: excludes it from future syncs (see
@@ -1608,7 +1637,7 @@ export async function pauseFeedSource(id: string, userEmail: string) {
     // Only domains with no OTHER active backing (see the function's own
     // note) — a domain this source shares with a still-active source, or
     // one a human manually also categorized, stays 'active' untouched.
-    const domainIds = await getDomainIdsToUnblockForFeedSource(id);
+    const { toUnblock: domainIds, totalLinked } = await getDomainIdsToUnblockForFeedSource(id);
     let affectedCount = 0;
     if (domainIds.length > 0) {
       const CHUNK = 5000;
@@ -1622,6 +1651,7 @@ export async function pauseFeedSource(id: string, userEmail: string) {
         affectedCount += updated.length;
       }
     }
+    const keptBlockedCount = totalLinked - domainIds.length;
 
     const updatedSource = await db
       .update(feedSources)
@@ -1637,7 +1667,16 @@ export async function pauseFeedSource(id: string, userEmail: string) {
       summary: `Tạm dừng nguồn feed "${source.name}" — ${affectedCount.toLocaleString('vi-VN')} tên miền chuyển sang Thôi chặn`,
       reason: 'Tạm dừng đồng bộ nguồn feed',
       canRollback: false,
-      details: [`Nguồn: ${source.name} (${id})`, `Số tên miền: ${affectedCount}`],
+      details: [
+        `Nguồn: ${source.name} (${id})`,
+        `Tổng tên miền thuộc nguồn: ${totalLinked.toLocaleString('vi-VN')}`,
+        `Chuyển thôi chặn: ${affectedCount.toLocaleString('vi-VN')}`,
+        // Real, common case at scale: a domain this source manages can
+        // still be legitimately blocked via ANOTHER category/source that
+        // isn't paused, so it correctly stays active — not a bug when this
+        // number is large.
+        `Giữ nguyên chặn (còn thuộc nhóm/nguồn khác đang hoạt động): ${keptBlockedCount.toLocaleString('vi-VN')}`,
+      ],
     });
 
     return { source: updatedSource[0], affectedCount };
@@ -1713,7 +1752,7 @@ export async function deleteFeedSource(id: string, userEmail: string) {
     const source = existing[0];
     if (!source) throw new Error(`Feed source ${id} not found`);
 
-    const domainIds = await getDomainIdsToUnblockForFeedSource(id);
+    const { toUnblock: domainIds, totalLinked } = await getDomainIdsToUnblockForFeedSource(id);
     let affectedCount = 0;
     if (domainIds.length > 0) {
       const CHUNK = 5000;
@@ -1727,6 +1766,7 @@ export async function deleteFeedSource(id: string, userEmail: string) {
         affectedCount += updated.length;
       }
     }
+    const keptBlockedCount = totalLinked - domainIds.length;
 
     await db.delete(feedSources).where(eq(feedSources.id, id));
 
@@ -1738,7 +1778,12 @@ export async function deleteFeedSource(id: string, userEmail: string) {
       summary: `Đã xoá nguồn feed "${source.name}" — ${affectedCount.toLocaleString('vi-VN')} tên miền chuyển sang Thôi chặn`,
       reason: 'Xoá nguồn feed',
       canRollback: false,
-      details: [`Nguồn: ${source.name} (${id})`, `Số tên miền: ${affectedCount}`],
+      details: [
+        `Nguồn: ${source.name} (${id})`,
+        `Tổng tên miền thuộc nguồn: ${totalLinked.toLocaleString('vi-VN')}`,
+        `Chuyển thôi chặn: ${affectedCount.toLocaleString('vi-VN')}`,
+        `Giữ nguyên chặn (còn thuộc nhóm/nguồn khác đang hoạt động): ${keptBlockedCount.toLocaleString('vi-VN')}`,
+      ],
     });
 
     return { affectedCount };
@@ -2050,7 +2095,10 @@ export async function rollbackAuditLog(logId: number, userEmail: string, reason?
       if (data.action === 'add_group' && data.category) {
         const newlyAddedIds = items.filter((i) => !i.hadCategoryBefore).map((i) => i.domainId);
         if (newlyAddedIds.length > 0) {
-          await removeDomainCategoryMemberships(newlyAddedIds, data.category).catch(() => {});
+          // Scoped to feedSourceId=null — the bulk toolbar's own
+          // attribution (see bulkUpdateDomains) — never touches a real feed
+          // source's own, independent row for the same category.
+          await removeDomainCategoryMemberships(newlyAddedIds, data.category, null).catch(() => {});
         }
       }
       summary = `Hoàn tác thao tác hàng loạt trên ${items.length} tên miền`;

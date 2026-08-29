@@ -10,7 +10,6 @@ import {
   jsonb,
   varchar,
   index,
-  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 
 // 1. Users Table — self-hosted email/password accounts (no external IdP).
@@ -211,22 +210,41 @@ export const feedSources = pgTable(
 
 // 4b. Domain ↔ Category Membership (the authoritative relation)
 //
-// A domain can belong to MULTIPLE categories at once (e.g. reported as
-// both "malware" and "phishing" by two different feeds) — changed from the
-// earlier "exactly one category" design per explicit request. The UNIQUE
-// constraint is now on the (domainId, categoryId) PAIR, not domainId alone:
-// re-adding a domain already in category X under category X again is a
-// no-op/refresh (a real duplicate); adding it to a NEW category Y is a
-// genuine additional row, not a conflict — see addDomainCategoryMemberships'
-// onConflictDoUpdate in queries.ts, which now targets that composite pair.
-// domainId keeps its own plain index (below) since it's no longer backed by
-// a single-column unique index's implicit one.
+// A domain can belong to MULTIPLE categories at once, AND the same
+// (domain, category) pair can be independently backed by MULTIPLE sources
+// at once — e.g. both a Hagezi feed AND an OISD feed pointed at the same
+// "Malware" category, both legitimately reporting the same domain. The
+// real uniqueness is therefore the (domainId, categoryId, feedSourceId)
+// TRIPLE, enforced via a raw-SQL "NULLS NOT DISTINCT" unique index applied
+// in ensureDomainCategoryTriggers (src/db/triggers.ts) — not expressible
+// through this schema DSL, and NULLS NOT DISTINCT matters here specifically
+// so multiple manual entries (feedSourceId null) for the same domain+
+// category still collapse into one row instead of accumulating duplicates.
+// Without per-source rows, pausing source A when source B ALSO backs the
+// same domain+category would silently overwrite/lose A's own attribution
+// the moment B re-synced (last writer wins) — this is what tracking each
+// source's own row prevents: pausing/deleting A only ever touches A's row,
+// never B's, regardless of sync order.
 //
-// `isPrimary` marks the one row (per domain) considered "the" category for
-// contexts that need a single value — display sort order, the CSV export's
-// primary_category column, domains.primaryCategory's denormalized value —
-// always the OLDEST membership by addedAt (see the sync trigger's promotion
-// logic in src/db/triggers.ts), not a ranking of importance.
+// feedSourceId is ON DELETE CASCADE (not SET NULL): with feedSourceId part
+// of the unique key, nulling it out on the source's deletion could collide
+// with an already-existing manual (null-source) row for the same domain+
+// category, violating the constraint mid-delete. Deleting this source's OWN
+// row instead is both safe and more honest — if another source (or a
+// manual entry) still backs this domain+category, that row is untouched
+// and nothing is lost; if this was the only backing, the row disappearing
+// matches deleteFeedSource() already having unblocked the domain for
+// exactly that reason.
+//
+// `isPrimary` marks the one row (per domain, not per category — a domain
+// can have several rows sharing the same category_id now) considered "the"
+// category for contexts that need a single value — display sort order, the
+// CSV export's primary_category column, domains.primaryCategory's
+// denormalized value — always the domain's OLDEST membership by addedAt
+// (see the sync trigger's promotion logic in src/db/triggers.ts), not a
+// ranking of importance. Which specific row (of possibly several sharing
+// that category) holds the flag doesn't matter — the derived category_id
+// value is the same either way.
 export const domainCategories = pgTable(
   'domain_categories',
   {
@@ -241,9 +259,10 @@ export const domainCategories = pgTable(
       // silently orphaning those domains from all categorization.
       .references(() => categories.id, { onDelete: 'restrict' }),
     // Which feed run added this specific membership, when known — nullable
-    // because manual entries and legacy/unattributed data have none.
+    // because manual entries have none. See the file-level note above for
+    // why this is ON DELETE CASCADE, not SET NULL.
     feedSourceId: varchar('feed_source_id', { length: 100 }).references(() => feedSources.id, {
-      onDelete: 'set null',
+      onDelete: 'cascade',
     }),
     // Human-readable provenance for this one membership (e.g. 'hagezi/gambling'
     // or 'Thủ công (SOC Analyst)') — distinct from feedSourceId because not
@@ -253,7 +272,10 @@ export const domainCategories = pgTable(
     addedAt: timestamp('added_at').defaultNow().notNull(),
   },
   (table) => [
-    uniqueIndex('domain_categories_domain_category_uidx').on(table.domainId, table.categoryId),
+    // The real (domainId, categoryId, feedSourceId) uniqueness lives in
+    // triggers.ts as a raw "NULLS NOT DISTINCT" index — see the file-level
+    // note above for why. domainId/categoryId here are for lookups only,
+    // not a substitute for that constraint.
     index('domain_categories_domain_idx').on(table.domainId),
     index('domain_categories_category_idx').on(table.categoryId),
     index('domain_categories_feed_source_idx').on(table.feedSourceId),

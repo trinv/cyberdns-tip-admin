@@ -11,11 +11,23 @@ The real `domains` table is denormalized: `domains.categories` (a jsonb
 array) and `domains.primary_category` are a **read-path cache**, not the
 source of truth. The real relation is `domain_categories` — a domain can
 belong to **several** categories at once (e.g. reported as both "malware"
-and "phishing" by two different feeds); the unique constraint is on the
-`(domain_id, category_id)` **pair**, not `domain_id` alone. A Postgres
-trigger (`sync_domain_category_cache`, copied verbatim into `schema.sql`
-from `src/db/triggers.ts`) keeps that cache — and `categories.count` — in
-sync automatically on every insert/update/delete against `domain_categories`.
+and "phishing" by two different feeds), AND the same `(domain, category)`
+pair can independently be backed by **several sources** at once (e.g. both
+a Hagezi-Malware feed and an OISD-Malware feed each reporting the same
+domain into "malware"). The unique constraint is therefore on the
+`(domain_id, category_id, feed_source_id)` **triple**, not the
+`(domain_id, category_id)` pair alone — every source keeps its own
+independent attribution row for a domain+category it reports, rather than
+a second source's sync silently overwriting the first source's row
+(last-writer-wins). That per-source row is exactly what lets "stop
+sync"/"delete source" unblock only the domains genuinely backed solely by
+*that* source, leaving domains any other active source/category still
+vouches for untouched. A Postgres trigger (`sync_domain_category_cache`,
+copied verbatim into `schema.sql` from `src/db/triggers.ts`) keeps the
+`domains.categories`/`primary_category` cache — and `categories.count` — in
+sync automatically on every insert/update/delete against
+`domain_categories`, correctly deduping across multiple source-rows that
+share a category so neither the cache array nor the count double-counts.
 
 `sync_domains.py` therefore **never writes `domains.categories` or
 `primary_category` directly** — exactly like the real app's own
@@ -29,12 +41,17 @@ sync automatically on every insert/update/delete against `domain_categories`.
    overriding e.g. a stale `'unblocked'`) — matching
    `bulkCreateDomains`'s own `onConflictDoUpdate` exactly.
 2. **`domain_categories`** — one `INSERT ... SELECT ... ON CONFLICT
-   (domain_id, category_id) DO UPDATE`, joining the staging table to
-   `domains` on domain name to get the id (no id bookkeeping needed in
-   Python). A domain already in this category is a no-op/refresh; already
-   in a different category, it keeps that one and gains this one too (a
-   different pair, so a fresh row, not a conflict) — matching
-   `addDomainCategoryMemberships`'s `onConflictDoUpdate` exactly.
+   (domain_id, category_id, feed_source_id) DO UPDATE`, joining the staging
+   table to `domains` on domain name to get the id (no id bookkeeping
+   needed in Python). A domain already tagged by *this* source in this
+   category is a no-op/refresh (only `source_label` can change); tagged by
+   a *different* source, it's a distinct row that survives independently —
+   not a conflict; already in a different category, it keeps that one and
+   gains this one too (a different pair, so a fresh row) — matching
+   `addDomainCategoryMemberships`'s `onConflictDoUpdate` exactly. The
+   underlying unique index uses `NULLS NOT DISTINCT` so this also collapses
+   correctly when `feed_source_id` is `NULL` (a manual/no-source
+   membership), not just for real source ids.
 
 The trigger then derives `domains.categories`/`primary_category` and
 `categories.count` from that — this script touches neither.
@@ -123,6 +140,16 @@ in an isolated schema (never against a live app's actual data):
   ended up `["malware", "phishing"]`, both categories' counts incremented
   independently) — additive, never a move, matching the main app's own
   "Thêm vào nhóm" behavior.
+- **Two different `--feed-source-id` values synced into the SAME
+  `--category`, with overlapping domains** (the scenario the
+  `(domain_id, category_id, feed_source_id)` triple key exists for): 5
+  domains via `src-hagezi`, then 5 domains via `src-oisd` with 3 domains in
+  common. Result — the 3 overlap domains ended up with **two independent
+  `domain_categories` rows**, one per source (`['src-hagezi', 'src-oisd']`),
+  neither overwriting the other; `categories.count` correctly settled at
+  **7** (the distinct-domain count, not 10 the row count); and every
+  domain's `domains.categories` cache array held `["malware"]` exactly
+  once — no duplicate entries from the two source-rows sharing a category.
 - Unknown `--category`: fails fast with a clear message and the list of
   valid ids, before touching `domains` at all.
 

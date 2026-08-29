@@ -100,13 +100,25 @@ CREATE INDEX IF NOT EXISTS domains_last_seen_idx ON domains (last_seen);
 CREATE INDEX IF NOT EXISTS domains_categories_gin_idx ON domains USING gin (categories);
 
 -- 4. Domain <-> Category membership — the AUTHORITATIVE relation.
--- A domain can belong to MULTIPLE categories at once (e.g. reported as both
--- "malware" and "phishing" by two different feeds) — the unique constraint
--- is on the (domain_id, category_id) PAIR, not domain_id alone. Re-adding a
--- domain already in category X under category X again is a no-op/refresh;
--- adding it to a NEW category Y is a genuine additional row, not a
--- conflict. This is what upsert_memberships()'s
--- "ON CONFLICT (domain_id, category_id) DO UPDATE" in sync_domains.py relies on.
+-- A domain can belong to MULTIPLE categories at once, AND the same
+-- (domain, category) pair can independently be backed by MULTIPLE sources
+-- at once (e.g. both a Hagezi feed and an OISD feed pointed at the same
+-- "Malware" category, both legitimately reporting the same domain). The
+-- real uniqueness is the (domain_id, category_id, feed_source_id) TRIPLE —
+-- see the NULLS NOT DISTINCT index below, not a plain UNIQUE column list,
+-- so multiple manual (feed_source_id null) entries for the same domain+
+-- category still collapse into one row instead of accumulating duplicates.
+-- Without per-source rows, pausing source A when source B ALSO backs the
+-- same domain+category would silently lose A's own attribution the moment
+-- B re-synced (last writer wins) — tracking each source's own row is what
+-- prevents that: pausing/deleting A only ever touches A's row, never B's.
+--
+-- feed_source_id is ON DELETE CASCADE, not SET NULL: with feed_source_id
+-- part of the unique key, nulling it out on the source's deletion could
+-- collide with an already-existing manual (null-source) row for the same
+-- domain+category. Deleting this source's OWN row instead is safe — if
+-- another source or a manual entry still backs this domain+category, that
+-- row is untouched.
 CREATE TABLE IF NOT EXISTS domain_categories (
     id             SERIAL PRIMARY KEY,
     domain_id      INTEGER NOT NULL
@@ -114,12 +126,13 @@ CREATE TABLE IF NOT EXISTS domain_categories (
     category_id    VARCHAR(100) NOT NULL
                        REFERENCES categories (id) ON DELETE RESTRICT,
     feed_source_id VARCHAR(100)
-                       REFERENCES feed_sources (id) ON DELETE SET NULL,
+                       REFERENCES feed_sources (id) ON DELETE CASCADE,
     source_label   TEXT,
     is_primary     BOOLEAN NOT NULL DEFAULT false,
-    added_at       TIMESTAMP NOT NULL DEFAULT now(),
-    UNIQUE (domain_id, category_id)
+    added_at       TIMESTAMP NOT NULL DEFAULT now()
 );
+CREATE UNIQUE INDEX IF NOT EXISTS domain_categories_domain_category_source_uidx
+ON domain_categories (domain_id, category_id, feed_source_id) NULLS NOT DISTINCT;
 CREATE INDEX IF NOT EXISTS domain_categories_domain_idx ON domain_categories (domain_id);
 CREATE INDEX IF NOT EXISTS domain_categories_category_idx ON domain_categories (category_id);
 CREATE INDEX IF NOT EXISTS domain_categories_feed_source_idx ON domain_categories (feed_source_id);
@@ -143,33 +156,61 @@ CREATE INDEX IF NOT EXISTS domain_categories_feed_source_idx ON domain_categorie
 CREATE OR REPLACE FUNCTION sync_domain_category_cache() RETURNS trigger AS $fn$
 DECLARE
     affected_domain_ids integer[];
-    affected_category_ids varchar(100)[];
 BEGIN
     IF TG_OP = 'INSERT' THEN
-        SELECT array_agg(DISTINCT domain_id), array_agg(DISTINCT category_id)
-        INTO affected_domain_ids, affected_category_ids
-        FROM new_table;
+        SELECT array_agg(DISTINCT domain_id) INTO affected_domain_ids FROM new_table;
 
+        -- A category's count only grows when a domain becomes NEWLY
+        -- represented in it — not once per row, since a second source
+        -- adding a domain the category ALREADY has (via a different
+        -- source's earlier row) must not double-count it. Bounded by this
+        -- statement's size (an indexed point-lookup per distinct pair via
+        -- domain_categories_domain_category_source_uidx), not the
+        -- category's total size.
         UPDATE categories c
         SET count = count + nc.c
-        FROM (SELECT category_id, count(*) AS c FROM new_table GROUP BY category_id) nc
+        FROM (
+            SELECT nt.category_id, count(*) AS c
+            FROM (SELECT DISTINCT domain_id, category_id FROM new_table) nt
+            WHERE NOT EXISTS (
+                SELECT 1 FROM domain_categories dc
+                WHERE dc.domain_id = nt.domain_id
+                  AND dc.category_id = nt.category_id
+                  AND NOT EXISTS (SELECT 1 FROM new_table nt2 WHERE nt2.id = dc.id)
+            )
+            GROUP BY nt.category_id
+        ) nc
         WHERE c.id = nc.category_id;
     ELSIF TG_OP = 'DELETE' THEN
-        SELECT array_agg(DISTINCT domain_id), array_agg(DISTINCT category_id)
-        INTO affected_domain_ids, affected_category_ids
-        FROM old_table;
+        SELECT array_agg(DISTINCT domain_id) INTO affected_domain_ids FROM old_table;
 
+        -- Mirror of the INSERT branch: a category's count only drops when a
+        -- domain has NO remaining row left in it. old_table's rows are
+        -- already gone from the real table by the time an AFTER DELETE
+        -- trigger runs, so this is a direct existence check.
         UPDATE categories c
         SET count = count - oc.c
-        FROM (SELECT category_id, count(*) AS c FROM old_table GROUP BY category_id) oc
+        FROM (
+            SELECT ot.category_id, count(*) AS c
+            FROM (SELECT DISTINCT domain_id, category_id FROM old_table) ot
+            WHERE NOT EXISTS (
+                SELECT 1 FROM domain_categories dc
+                WHERE dc.domain_id = ot.domain_id AND dc.category_id = ot.category_id
+            )
+            GROUP BY ot.category_id
+        ) oc
         WHERE c.id = oc.category_id;
     ELSIF TG_OP = 'UPDATE' THEN
-        SELECT array_agg(DISTINCT domain_id), array_agg(DISTINCT category_id)
-        INTO affected_domain_ids, affected_category_ids
+        -- category_id is part of the unique key now, so it never actually
+        -- changes value in an UPDATE anymore — only source_label/
+        -- feed_source_id can. This branch's delta always nets to zero;
+        -- kept only as a defensive no-op.
+        SELECT array_agg(DISTINCT domain_id)
+        INTO affected_domain_ids
         FROM (
-            SELECT domain_id, category_id FROM new_table
+            SELECT domain_id FROM new_table
             UNION
-            SELECT domain_id, category_id FROM old_table
+            SELECT domain_id FROM old_table
         ) both_tables;
 
         UPDATE categories c
@@ -206,22 +247,36 @@ BEGIN
       );
 
     -- 2. Recompute the denormalized cache on domains for every affected
-    --    domain in ONE statement.
-    WITH agg AS (
-        SELECT dc.domain_id,
-               jsonb_agg(dc.category_id ORDER BY dc.added_at ASC) AS cats,
-               (array_agg(dc.category_id) FILTER (WHERE dc.is_primary))[1] AS primary_cat
-        FROM domain_categories dc
-        WHERE dc.domain_id = ANY(affected_domain_ids)
-        GROUP BY dc.domain_id
+    --    domain in ONE statement. cats_agg/primary_agg are built SEPARATELY
+    --    (not one CTE joining domain_categories back in) — joining the
+    --    already-deduped per-(domain,category) set back onto the raw table
+    --    to pick up is_primary would fan back out to however many
+    --    source-rows share that category, duplicating the category_id in
+    --    the cache array once per source instead of once per domain.
+    WITH cat_first_seen AS (
+        SELECT domain_id, category_id, min(added_at) AS first_added
+        FROM domain_categories
+        WHERE domain_id = ANY(affected_domain_ids)
+        GROUP BY domain_id, category_id
+    ),
+    cats_agg AS (
+        SELECT domain_id, jsonb_agg(category_id ORDER BY first_added ASC) AS cats
+        FROM cat_first_seen
+        GROUP BY domain_id
+    ),
+    primary_agg AS (
+        SELECT domain_id, category_id AS primary_cat
+        FROM domain_categories
+        WHERE domain_id = ANY(affected_domain_ids) AND is_primary = true
     )
     UPDATE domains d
     SET
-        categories = COALESCE(agg.cats, '[]'::jsonb),
-        primary_category = agg.primary_cat,
+        categories = COALESCE(cats_agg.cats, '[]'::jsonb),
+        primary_category = primary_agg.primary_cat,
         updated_at = now()
     FROM (SELECT unnest(affected_domain_ids) AS id) ids
-    LEFT JOIN agg ON agg.domain_id = ids.id
+    LEFT JOIN cats_agg ON cats_agg.domain_id = ids.id
+    LEFT JOIN primary_agg ON primary_agg.domain_id = ids.id
     WHERE d.id = ids.id;
 
     -- 3. categories.count is maintained incrementally above (inside each

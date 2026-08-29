@@ -39,10 +39,14 @@ Pipeline:
      column defaults).
   5. Phase B — upsert into `domain_categories`, joining the staging table
      to `domains` on domain name for the id (no Python-side id bookkeeping
-     needed): one INSERT ... SELECT ... ON CONFLICT (domain_id, category_id)
-     DO UPDATE, matching addDomainCategoryMemberships' onConflictDoUpdate
-     exactly — a domain already in this category is a no-op/refresh; a
-     domain already in a DIFFERENT category keeps it and gains this one too
+     needed): one INSERT ... SELECT ... ON CONFLICT
+     (domain_id, category_id, feed_source_id) DO UPDATE, matching
+     addDomainCategoryMemberships' onConflictDoUpdate exactly — a domain
+     already tagged by THIS source in this category is a no-op/refresh
+     (only source_label can change); the same domain+category tagged by a
+     DIFFERENT source is a distinct row, not a conflict, so both sources'
+     attribution survive independently — and a domain already in a
+     DIFFERENT category keeps it and gains this one too
      (no conflict at all — different key). The trigger then derives
      domains.categories/primary_category and categories.count from this —
      this script touches neither directly.
@@ -208,22 +212,38 @@ ON CONFLICT (domain) DO UPDATE SET
 
 # Joins staging -> domains on the domain NAME to get domain_id — no Python-
 # side id bookkeeping between phases needed, this is one set-based
-# statement regardless of batch size. ON CONFLICT (domain_id, category_id)
-# DO UPDATE mirrors addDomainCategoryMemberships' onConflictDoUpdate
-# exactly: a domain already in THIS category is a no-op/refresh; a domain
-# already in a DIFFERENT category keeps it and gains this one too — that's
-# a different (domain_id, category_id) pair, so it's a fresh INSERT, not a
-# conflict at all. is_primary is deliberately left to its column default
-# (false); the sync_domain_category_cache trigger (src/db/triggers.ts)
-# promotes it to true itself once this statement commits, same as the real
-# app's writes.
+# statement regardless of batch size. The real uniqueness is the TRIPLE
+# (domain_id, category_id, feed_source_id) — a domain+category pair can be
+# independently backed by MULTIPLE sources at once (e.g. both a
+# Hagezi-Malware and an OISD-Malware feed reporting the same domain into
+# "malware"); collapsing on (domain_id, category_id) alone would let a
+# second source's sync silently steal/overwrite the first source's own
+# attribution row (last-writer-wins), breaking that first source's own
+# pause/delete-driven unblock logic. ON CONFLICT
+# (domain_id, category_id, feed_source_id) DO UPDATE mirrors
+# addDomainCategoryMemberships' onConflictDoUpdate exactly: a domain
+# already tagged by THIS source in this category only refreshes
+# source_label (category_id and feed_source_id are both part of the
+# conflict key, so they never change via the SET clause); tagged by a
+# DIFFERENT source, it's a distinct row — a fresh INSERT, not a conflict —
+# so both sources' attribution survive side by side; and a domain already
+# in a DIFFERENT category keeps it and gains this one too — that's a
+# different pair entirely. is_primary is deliberately left to its column
+# default (false); the sync_domain_category_cache trigger
+# (src/db/triggers.ts) promotes it to true itself once this statement
+# commits, same as the real app's writes. NULLS NOT DISTINCT on the
+# underlying unique index (domain_categories_domain_category_source_uidx,
+# see schema.sql) means this ON CONFLICT target also collapses correctly
+# when feed_source_id is NULL (a manual/no-source membership), not just
+# when it's a real source id — Postgres' default NULL-handling would
+# otherwise treat every NULL as distinct and let duplicate NULL-source rows
+# through.
 UPSERT_MEMBERSHIPS_SQL = """
 INSERT INTO domain_categories (domain_id, category_id, feed_source_id, source_label)
 SELECT d.id, %(category_id)s, %(feed_source_id)s, %(source_label)s
 FROM tmp_domains t
 JOIN domains d ON d.domain = t.domain
-ON CONFLICT (domain_id, category_id) DO UPDATE SET
-    feed_source_id = EXCLUDED.feed_source_id,
+ON CONFLICT (domain_id, category_id, feed_source_id) DO UPDATE SET
     source_label = EXCLUDED.source_label;
 """
 
