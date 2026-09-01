@@ -10,7 +10,6 @@ import {
   releases,
   reviewQueue,
   auditLogs,
-  savedFilters,
 } from './schema.ts';
 import { eq, desc, asc, sql, ilike, and, inArray } from 'drizzle-orm';
 import { parseFeedText } from './feedParser.ts';
@@ -24,6 +23,16 @@ import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
 const SESSION_TTL_MS = 30 * 24 * 3600 * 1000; // 30 days
+
+// `db` and `tx` (the callback param `db.transaction` hands its caller) share
+// the same query-building surface (select/insert/update/delete/execute) —
+// this alias lets every write-path helper below accept either one. A caller
+// running standalone passes `db` (its own real transaction, opened inside
+// the helper); a caller that's already inside a transaction passes its own
+// `tx` so the helper's writes join that SAME transaction instead of opening
+// a second, independent one on a different pooled connection (which would
+// defeat atomicity — see e.g. resolveReviewItem calling createDomain).
+type Executor = Parameters<Parameters<typeof db.transaction>[0]>[0] | typeof db;
 
 // Never let a passwordHash leak out of this module into an API response.
 function toSafeUser(u: typeof users.$inferSelect) {
@@ -52,18 +61,33 @@ export async function authenticateUser(email: string, password: string) {
 // authenticateUser() reveals to the actual login response (which must stay
 // a generic "email or password incorrect" either way).
 export async function findUserIdByEmail(email: string): Promise<number | null> {
-  const rows = await db.select({ id: users.id }).from(users).where(eq(users.email, email.toLowerCase().trim())).limit(1);
-  return rows[0]?.id ?? null;
+  try {
+    const rows = await db.select({ id: users.id }).from(users).where(eq(users.email, email.toLowerCase().trim())).limit(1);
+    return rows[0]?.id ?? null;
+  } catch (error) {
+    console.error('findUserIdByEmail failed:', error);
+    throw new Error('Failed to look up user by email', { cause: error });
+  }
 }
 
 export async function createSession(userId: number): Promise<string> {
-  const token = generateSessionToken();
-  await db.insert(sessions).values({ token, userId, expiresAt: new Date(Date.now() + SESSION_TTL_MS) });
-  return token;
+  try {
+    const token = generateSessionToken();
+    await db.insert(sessions).values({ token, userId, expiresAt: new Date(Date.now() + SESSION_TTL_MS) });
+    return token;
+  } catch (error) {
+    console.error('createSession failed:', error);
+    throw new Error('Failed to create session', { cause: error });
+  }
 }
 
 export async function deleteSession(token: string) {
-  await db.delete(sessions).where(eq(sessions.token, token));
+  try {
+    await db.delete(sessions).where(eq(sessions.token, token));
+  } catch (error) {
+    console.error('deleteSession failed:', error);
+    throw new Error('Failed to delete session', { cause: error });
+  }
 }
 
 // 1d. Login logging + new-IP detection. Records EVERY attempt (success and
@@ -205,11 +229,21 @@ export async function createUserAccount(data: { email: string; password: string;
 // Refuses to demote/deactivate the last remaining active Admin — without
 // this, an operator could accidentally lock every admin-only action
 // (including undoing the change itself) out of the system.
-async function assertNotLastActiveAdmin(excludingUserId: number) {
-  const admins = await db
+//
+// Takes `tx` (never the module-level `db`) and locks every candidate row
+// with FOR UPDATE before counting: a plain SELECT-then-UPDATE here is a
+// classic TOCTOU race — with exactly 2 active Admins A and B, a concurrent
+// deactivate(A) and deactivate(B) could each read "the other one is still
+// active" from its own snapshot and both pass, leaving zero active Admins.
+// Locking the candidate rows first forces the second call to wait for the
+// first transaction to commit, at which point it correctly sees the
+// now-reduced set and throws.
+async function assertNotLastActiveAdmin(tx: Executor, excludingUserId: number) {
+  const admins = await tx
     .select({ id: users.id })
     .from(users)
-    .where(and(eq(users.role, 'Admin'), eq(users.isActive, true)));
+    .where(and(eq(users.role, 'Admin'), eq(users.isActive, true)))
+    .for('update');
   if (!admins.some((a) => a.id !== excludingUserId)) {
     throw new Error('Không thể thực hiện: đây là tài khoản Admin đang hoạt động cuối cùng trong hệ thống.');
   }
@@ -220,29 +254,31 @@ export async function updateUserAccount(
   patch: { role?: string; isActive?: boolean; displayName?: string; password?: string }
 ) {
   try {
-    if (patch.role !== undefined && patch.role !== 'Admin') {
-      await assertNotLastActiveAdmin(id);
-    }
-    if (patch.isActive === false) {
-      await assertNotLastActiveAdmin(id);
-    }
+    return await db.transaction(async (tx) => {
+      if (patch.role !== undefined && patch.role !== 'Admin') {
+        await assertNotLastActiveAdmin(tx, id);
+      }
+      if (patch.isActive === false) {
+        await assertNotLastActiveAdmin(tx, id);
+      }
 
-    const setValues: Record<string, any> = { updatedAt: new Date() };
-    if (patch.role !== undefined) setValues.role = patch.role;
-    if (patch.isActive !== undefined) setValues.isActive = patch.isActive;
-    if (patch.displayName !== undefined) setValues.displayName = patch.displayName;
-    if (patch.password) setValues.passwordHash = await hashPassword(patch.password);
+      const setValues: Record<string, any> = { updatedAt: new Date() };
+      if (patch.role !== undefined) setValues.role = patch.role;
+      if (patch.isActive !== undefined) setValues.isActive = patch.isActive;
+      if (patch.displayName !== undefined) setValues.displayName = patch.displayName;
+      if (patch.password) setValues.passwordHash = await hashPassword(patch.password);
 
-    const updated = await db.update(users).set(setValues).where(eq(users.id, id)).returning();
-    if (!updated[0]) throw new Error(`User id ${id} not found`);
+      const updated = await tx.update(users).set(setValues).where(eq(users.id, id)).returning();
+      if (!updated[0]) throw new Error(`User id ${id} not found`);
 
-    // Revoking access kills existing sessions immediately instead of
-    // waiting for them to naturally expire over the next 30 days.
-    if (patch.isActive === false) {
-      await db.delete(sessions).where(eq(sessions.userId, id));
-    }
+      // Revoking access kills existing sessions immediately instead of
+      // waiting for them to naturally expire over the next 30 days.
+      if (patch.isActive === false) {
+        await tx.delete(sessions).where(eq(sessions.userId, id));
+      }
 
-    return toSafeUser(updated[0]);
+      return toSafeUser(updated[0]);
+    });
   } catch (error) {
     console.error('updateUserAccount failed:', error);
     throw error instanceof Error ? error : new Error('Failed to update user account', { cause: error });
@@ -299,6 +335,7 @@ export async function ensureSuperAdmin() {
 // to the insert/update and keeps domains.categories/primaryCategory and
 // every touched category's live count accurate automatically.
 async function addDomainCategoryMemberships(
+  executor: Executor,
   rows: { domainId: number; categoryId: string; sourceLabel?: string | null; feedSourceId?: string | null }[]
 ) {
   if (rows.length === 0) return;
@@ -320,7 +357,7 @@ async function addDomainCategoryMemberships(
     for (const r of chunk) byTriple.set(`${r.domainId}:${r.categoryId}:${r.feedSourceId || ''}`, r);
 
     try {
-      await db
+      await executor
         .insert(domainCategories)
         .values(
           Array.from(byTriple.values()).map((r) => ({
@@ -375,7 +412,12 @@ async function addDomainCategoryMemberships(
 // can never accidentally also strip a real feed source's own, independent
 // membership in the same category (see schema.ts's note on
 // domain_categories: the same category can be backed by several sources at once).
-async function removeDomainCategoryMemberships(domainIds: number[], categoryId: string, feedSourceId?: string | null) {
+async function removeDomainCategoryMemberships(
+  executor: Executor,
+  domainIds: number[],
+  categoryId: string,
+  feedSourceId?: string | null
+) {
   if (domainIds.length === 0) return;
   const conditions = [inArray(domainCategories.domainId, domainIds), eq(domainCategories.categoryId, categoryId)];
   if (feedSourceId !== undefined) {
@@ -383,7 +425,7 @@ async function removeDomainCategoryMemberships(domainIds: number[], categoryId: 
       feedSourceId === null ? sql`${domainCategories.feedSourceId} IS NULL` : eq(domainCategories.feedSourceId, feedSourceId)
     );
   }
-  await db.delete(domainCategories).where(and(...conditions));
+  await executor.delete(domainCategories).where(and(...conditions));
 }
 
 // 3. Dashboard aggregate stats — computed live from the domains table.
@@ -563,73 +605,87 @@ export async function updateDomain(
   meta: { userEmail?: string; userRole?: string; reason?: string } = {}
 ) {
   try {
-    // Snapshot the pre-change row so the audit log entry can carry enough
-    // structured state to actually reverse this specific edit later (see
-    // rollbackAuditLog) — not just describe it in prose.
-    const beforeRows = await db.select().from(domains).where(eq(domains.id, id)).limit(1);
-    if (!beforeRows[0]) throw new Error(`Domain id ${id} not found`);
-    const before = beforeRows[0];
+    // Whole edit — status/tag/etc. update, category reconciliation, and the
+    // audit-log entry describing it — runs as ONE real transaction now: if
+    // any step fails partway (e.g. an invalid category in patch.categories),
+    // everything rolls back together instead of leaving the domain's status
+    // changed with no audit trail of it (see the DB audit's own finding).
+    return await db.transaction(async (tx) => {
+      // Snapshot the pre-change row so the audit log entry can carry enough
+      // structured state to actually reverse this specific edit later (see
+      // rollbackAuditLog) — not just describe it in prose.
+      const beforeRows = await tx.select().from(domains).where(eq(domains.id, id)).limit(1);
+      if (!beforeRows[0]) throw new Error(`Domain id ${id} not found`);
+      const before = beforeRows[0];
 
-    const setValues: Record<string, any> = { updatedAt: new Date() };
-    // Any explicit status change here is a human decision — clear the
-    // "auto-unblocked by a paused source" marker regardless of which status
-    // it's changing to, so a later resumeFeedSource never second-guesses it.
-    if (patch.status !== undefined) { setValues.status = patch.status; setValues.unblockedBySourcePause = false; }
-    if (patch.sourceDetail !== undefined) setValues.sourceDetail = patch.sourceDetail;
-    if (patch.tags !== undefined) setValues.tags = patch.tags;
-    if (patch.isProtected !== undefined) setValues.isProtected = patch.isProtected;
+      const setValues: Record<string, any> = { updatedAt: new Date() };
+      // Any explicit status change here is a human decision — clear the
+      // "auto-unblocked by a paused source" marker regardless of which status
+      // it's changing to, so a later resumeFeedSource never second-guesses it.
+      if (patch.status !== undefined) { setValues.status = patch.status; setValues.unblockedBySourcePause = false; }
+      if (patch.sourceDetail !== undefined) setValues.sourceDetail = patch.sourceDetail;
+      if (patch.tags !== undefined) setValues.tags = patch.tags;
+      if (patch.isProtected !== undefined) setValues.isProtected = patch.isProtected;
 
-    let updated = await db.update(domains).set(setValues).where(eq(domains.id, id)).returning();
-    if (!updated[0]) throw new Error(`Domain id ${id} not found`);
+      let updated = await tx.update(domains).set(setValues).where(eq(domains.id, id)).returning();
+      if (!updated[0]) throw new Error(`Domain id ${id} not found`);
 
-    // Reconcile category membership to the desired full set instead of
-    // writing categories/primaryCategory directly (see schema.ts note):
-    // add what's missing, remove what's no longer wanted, leave any
-    // untouched membership's original addedAt/sourceLabel intact.
-    if (patch.categories !== undefined) {
-      const desired = new Set(patch.categories);
-      const current = new Set(updated[0].categories || []);
+      // Reconcile category membership to the desired full set instead of
+      // writing categories/primaryCategory directly (see schema.ts note):
+      // add what's missing, remove what's no longer wanted, leave any
+      // untouched membership's original addedAt/sourceLabel intact.
+      if (patch.categories !== undefined) {
+        const desired = new Set(patch.categories);
+        const current = new Set(updated[0].categories || []);
 
-      const toAdd = [...desired].filter((c) => !current.has(c));
-      const toRemove = [...current].filter((c) => !desired.has(c));
+        const toAdd = [...desired].filter((c) => !current.has(c));
+        const toRemove = [...current].filter((c) => !desired.has(c));
 
-      if (toAdd.length > 0) {
-        await addDomainCategoryMemberships(
-          toAdd.map((categoryId) => ({ domainId: id, categoryId, sourceLabel: meta.reason || 'Manual edit' }))
-        );
+        if (toAdd.length > 0) {
+          await addDomainCategoryMemberships(
+            tx,
+            toAdd.map((categoryId) => ({ domainId: id, categoryId, sourceLabel: meta.reason || 'Manual edit' }))
+          );
+        }
+        for (const categoryId of toRemove) {
+          await removeDomainCategoryMemberships(tx, [id], categoryId);
+        }
+
+        // Re-select: the sync trigger has now updated categories/primaryCategory.
+        updated = await tx.select().from(domains).where(eq(domains.id, id));
       }
-      for (const categoryId of toRemove) {
-        await removeDomainCategoryMemberships([id], categoryId);
-      }
 
-      // Re-select: the sync trigger has now updated categories/primaryCategory.
-      updated = await db.select().from(domains).where(eq(domains.id, id));
-    }
-
-    await db.insert(auditLogs).values({
-      user: meta.userEmail || 'Analyst (Manual)',
-      role: meta.userRole || 'SecOps',
-      action: 'edit_group',
-      targetCount: 1,
-      summary: `Cập nhật cấu hình tên miền: ${updated[0].domain}`,
-      reason: meta.reason || 'Cập nhật phân loại theo bằng chứng mới',
-      canRollback: true,
-      rollbackExpiresAt: new Date(Date.now() + 48 * 3600 * 1000),
-      rollbackData: {
-        type: 'edit_group',
-        domainId: id,
-        before: {
-          status: before.status,
-          categories: before.categories,
-          sourceDetail: before.sourceDetail,
-          tags: before.tags,
-          isProtected: before.isProtected,
+      await tx.insert(auditLogs).values({
+        user: meta.userEmail || 'Analyst (Manual)',
+        role: meta.userRole || 'SecOps',
+        action: 'edit_group',
+        targetCount: 1,
+        summary: `Cập nhật cấu hình tên miền: ${updated[0].domain}`,
+        reason: meta.reason || 'Cập nhật phân loại theo bằng chứng mới',
+        canRollback: true,
+        rollbackExpiresAt: new Date(Date.now() + 48 * 3600 * 1000),
+        rollbackData: {
+          type: 'edit_group',
+          domainId: id,
+          before: {
+            status: before.status,
+            categories: before.categories,
+            sourceDetail: before.sourceDetail,
+            tags: before.tags,
+            isProtected: before.isProtected,
+            // Snapshotted so rollbackAuditLog can restore it too — without
+            // this, rolling back an explicit edit that happened to a domain
+            // still marked unblockedBySourcePause=true (before this edit)
+            // would leave that flag permanently cleared, and resumeFeedSource
+            // could never auto-reactivate it again (see the DB audit finding).
+            unblockedBySourcePause: before.unblockedBySourcePause,
+          },
         },
-      },
-      details: [`Tên miền: ${updated[0].domain}`, `Trạng thái: ${updated[0].status}`],
-    });
+        details: [`Tên miền: ${updated[0].domain}`, `Trạng thái: ${updated[0].status}`],
+      });
 
-    return updated[0];
+      return updated[0];
+    });
   } catch (error) {
     console.error('updateDomain failed:', error);
     throw new Error('Failed to update domain record', { cause: error });
@@ -648,7 +704,15 @@ export async function createDomain(data: {
   // resolveReviewItem) so the resulting domain_categories row stays
   // traceable to its source, same as a directly-auto-blocked domain.
   feedSourceId?: string;
-}) {
+},
+  // Optional: pass a caller's own `tx` (e.g. resolveReviewItem, which needs
+  // its own reviewQueue.status update and this call to succeed/fail as one
+  // atomic unit) so this function's writes join that SAME transaction —
+  // opened as a SAVEPOINT via `executor.transaction` below, not a second,
+  // independent transaction on a different pooled connection. Defaults to
+  // the shared `db` for every other, standalone caller.
+  executor: Executor = db
+) {
   try {
     const cleanDomain = data.domain.toLowerCase().trim();
     const parts = cleanDomain.split('.');
@@ -656,77 +720,86 @@ export async function createDomain(data: {
     const etld1 = parts.length > 2 ? `${parts[parts.length - 2]}.${tld}` : cleanDomain;
     const sourceLabel = data.source || 'Thủ công (SOC Analyst)';
 
-    // Snapshot whether this domain already existed (and its prior status)
-    // BEFORE the upsert below, so the audit log entry can carry enough
-    // structured state for rollbackAuditLog to actually reverse an "add"
-    // later — restore the previous status if it existed, or soft-revert a
-    // brand-new row to "unblocked" (never a hard delete — see rollbackAuditLog).
-    const beforeRows = await db
-      .select({ status: domains.status })
-      .from(domains)
-      .where(eq(domains.domain, cleanDomain))
-      .limit(1);
-    const existedBefore = beforeRows.length > 0;
-    const previousStatus = existedBefore ? beforeRows[0].status : null;
+    // The domain upsert, category-membership insert, re-select and audit-log
+    // entry all run as ONE transaction (a real one when executor===db, a
+    // nested SAVEPOINT when executor is already a tx) — an invalid category
+    // id now rolls back the domain upsert too, instead of leaving an orphan
+    // active domain with an empty categories array and no audit log entry
+    // (see the DB audit's own finding on this).
+    return await executor.transaction(async (tx) => {
+      // Snapshot whether this domain already existed (and its prior status)
+      // BEFORE the upsert below, so the audit log entry can carry enough
+      // structured state for rollbackAuditLog to actually reverse an "add"
+      // later — restore the previous status if it existed, or soft-revert a
+      // brand-new row to "unblocked" (never a hard delete — see rollbackAuditLog).
+      const beforeRows = await tx
+        .select({ status: domains.status })
+        .from(domains)
+        .where(eq(domains.domain, cleanDomain))
+        .limit(1);
+      const existedBefore = beforeRows.length > 0;
+      const previousStatus = existedBefore ? beforeRows[0].status : null;
 
-    // Upsert the domain identity row itself (categories are NOT set here —
-    // see addDomainCategoryMemberships below and the note on schema.ts).
-    const upserted = await db
-      .insert(domains)
-      .values({
-        domain: cleanDomain,
-        etld1,
-        tld,
-        source: sourceLabel,
-        sourceDetail: `Thêm bởi ${data.userEmail || 'Analyst'} - Lý do: ${data.reason || 'Bổ sung IOC thủ công'}`,
-        status: 'active',
-        timeline: [
-          {
-            time: new Date().toISOString(),
-            description: `Thêm vào danh sách chặn (${data.categories.join(', ')})`,
-            source: data.userEmail || 'SOC Analyst',
-            type: 'manual',
-          },
-        ],
-      })
-      .onConflictDoUpdate({
-        target: domains.domain,
-        set: {
+      // Upsert the domain identity row itself (categories are NOT set here —
+      // see addDomainCategoryMemberships below and the note on schema.ts).
+      const upserted = await tx
+        .insert(domains)
+        .values({
+          domain: cleanDomain,
+          etld1,
+          tld,
+          source: sourceLabel,
+          sourceDetail: `Thêm bởi ${data.userEmail || 'Analyst'} - Lý do: ${data.reason || 'Bổ sung IOC thủ công'}`,
           status: 'active',
-          // An explicit (re-)block always clears the "auto-unblocked by a
-          // paused source" marker, whatever it was before.
-          unblockedBySourcePause: false,
-          updatedAt: new Date(),
-        },
-      })
-      .returning({ id: domains.id });
+          timeline: [
+            {
+              time: new Date().toISOString(),
+              description: `Thêm vào danh sách chặn (${data.categories.join(', ')})`,
+              source: data.userEmail || 'SOC Analyst',
+              type: 'manual',
+            },
+          ],
+        })
+        .onConflictDoUpdate({
+          target: domains.domain,
+          set: {
+            status: 'active',
+            // An explicit (re-)block always clears the "auto-unblocked by a
+            // paused source" marker, whatever it was before.
+            unblockedBySourcePause: false,
+            updatedAt: new Date(),
+          },
+        })
+        .returning({ id: domains.id });
 
-    const domainId = upserted[0].id;
+      const domainId = upserted[0].id;
 
-    // Idempotent: re-adding a domain to a category it's already in is a
-    // silent no-op (DB-enforced), never a duplicate membership row.
-    await addDomainCategoryMemberships(
-      data.categories.map((categoryId) => ({ domainId, categoryId, sourceLabel, feedSourceId: data.feedSourceId }))
-    );
+      // Idempotent: re-adding a domain to a category it's already in is a
+      // silent no-op (DB-enforced), never a duplicate membership row.
+      await addDomainCategoryMemberships(
+        tx,
+        data.categories.map((categoryId) => ({ domainId, categoryId, sourceLabel, feedSourceId: data.feedSourceId }))
+      );
 
-    // Re-select so the caller gets the trigger-updated categories/primaryCategory.
-    const finalRows = await db.select().from(domains).where(eq(domains.id, domainId)).limit(1);
+      // Re-select so the caller gets the trigger-updated categories/primaryCategory.
+      const finalRows = await tx.select().from(domains).where(eq(domains.id, domainId)).limit(1);
 
-    // Log to audit log
-    await db.insert(auditLogs).values({
-      user: data.userEmail || 'Analyst (Manual)',
-      role: data.userRole || 'SecOps',
-      action: 'add',
-      targetCount: 1,
-      summary: `Thêm thủ công tên miền: ${cleanDomain}`,
-      reason: data.reason || 'Bổ sung IOC thủ công',
-      canRollback: true,
-      rollbackExpiresAt: new Date(Date.now() + 48 * 3600 * 1000),
-      rollbackData: { type: 'add', domainId, existedBefore, previousStatus },
-      details: [`Tên miền: ${cleanDomain}`, `Nhóm: ${data.categories.join(', ')}`],
+      // Log to audit log
+      await tx.insert(auditLogs).values({
+        user: data.userEmail || 'Analyst (Manual)',
+        role: data.userRole || 'SecOps',
+        action: 'add',
+        targetCount: 1,
+        summary: `Thêm thủ công tên miền: ${cleanDomain}`,
+        reason: data.reason || 'Bổ sung IOC thủ công',
+        canRollback: true,
+        rollbackExpiresAt: new Date(Date.now() + 48 * 3600 * 1000),
+        rollbackData: { type: 'add', domainId, existedBefore, previousStatus },
+        details: [`Tên miền: ${cleanDomain}`, `Nhóm: ${data.categories.join(', ')}`],
+      });
+
+      return finalRows[0];
     });
-
-    return finalRows[0];
   } catch (error: any) {
     console.error('createDomain failed:', error);
     // A validation error thrown deliberately above (e.g. an invalid
@@ -990,94 +1063,132 @@ export async function bulkUpdateDomains(params: {
 
     if (domainIds.length === 0) return { updatedCount: 0 };
 
-    // Snapshot each domain's pre-change status, and (for add_group) whether
-    // it ALREADY had the target category — bounded by whatever the admin
-    // checked in the UI (never feed-sync scale), so this is cheap and lets
-    // rollbackAuditLog actually restore it later instead of just describing
-    // what happened. hadCategoryBefore matters because add_group is
-    // additive now: rollback must remove only the category THIS action
-    // actually added, never stripping one a domain already had.
-    const beforeRows = await db
-      .select({ id: domains.id, status: domains.status, categories: domains.categories })
-      .from(domains)
-      .where(inArray(domains.id, domainIds));
-
-    if (action === 'allowlist') {
-      await db
-        .update(domains)
-        .set({
-          status: 'allowlist',
-          // Explicit human action — no longer just a side-effect of a
-          // paused source, whatever it was before.
-          unblockedBySourcePause: false,
-          updatedAt: new Date(),
-        })
-        .where(inArray(domains.id, domainIds));
-    } else if (action === 'unblock') {
-      await db
-        .update(domains)
-        .set({
-          status: 'unblocked',
-          unblockedBySourcePause: false,
-          updatedAt: new Date(),
-        })
-        .where(inArray(domains.id, domainIds));
-    } else if (action === 'block') {
-      // Reverse of 'unblock' — a human deliberately re-blocking a domain
-      // that's currently in 'unblocked' (e.g. one a paused/deleted feed
-      // source dropped, or one an analyst manually thôi-chặn'd earlier).
-      // Its domain_categories rows were never touched by unblock/pause/
-      // delete-source in the first place (see pauseFeedSource/
-      // deleteFeedSource's own notes), so this is purely a status flip —
-      // no membership to restore. unblockedBySourcePause is cleared same
-      // as allowlist/unblock: an explicit human action from here on, not
-      // an artifact of whatever a source's pause once did.
-      await db
-        .update(domains)
-        .set({
-          status: 'active',
-          unblockedBySourcePause: false,
-          updatedAt: new Date(),
-        })
-        .where(inArray(domains.id, domainIds));
-    } else if (action === 'add_group' && category) {
-      // Additive: a domain already in this category is silently
-      // skipped/refreshed (DB-enforced unique on the (domainId, categoryId)
-      // pair), and a domain already in OTHER categories keeps them — this
-      // is now genuinely "thêm vào nhóm", not a move.
-      await addDomainCategoryMemberships(
-        domainIds.map((domainId) => ({ domainId, categoryId: category, sourceLabel: reason || 'Bulk action' }))
-      );
+    // Fail fast on bad input instead of silently no-op'ing while still
+    // reporting success and writing a "we did this" audit log entry that
+    // doesn't correspond to any real change (see the DB audit's own
+    // finding — this used to be reachable via a typo'd/garbage `action`
+    // from the API layer, or add_group with no category selected).
+    const KNOWN_ACTIONS = ['add_group', 'allowlist', 'unblock', 'block'] as const;
+    if (!(KNOWN_ACTIONS as readonly string[]).includes(action)) {
+      throw new Error(`Hành động hàng loạt không hợp lệ: "${action}".`);
+    }
+    if (action === 'add_group' && !category) {
+      throw new Error('Thao tác "Thêm vào nhóm" yêu cầu chọn một nhóm danh mục đích.');
     }
 
-    // Insert Audit Log
-    await db.insert(auditLogs).values({
-      user: userEmail,
-      role: userRole || 'Admin',
-      action: 'bulk_action',
-      targetCount: domainIds.length,
-      summary: `Thực hiện thao tác hàng loạt [${action}] trên ${domainIds.length} tên miền`,
-      reason: reason || 'SOC Bulk Policy Update',
-      canRollback: true,
-      rollbackExpiresAt: new Date(Date.now() + 48 * 3600 * 1000),
-      rollbackData: {
-        type: 'bulk_action',
-        action,
-        // Only meaningful for add_group — the one category this whole
-        // batch actually added (see rollbackAuditLog).
-        category: action === 'add_group' ? category : undefined,
-        items: beforeRows.map((r) => ({
-          domainId: r.id,
-          status: r.status,
-          hadCategoryBefore: category ? (r.categories || []).includes(category) : undefined,
-        })),
-      },
-      details: [`Hành động: ${action}`, `Số lượng: ${domainIds.length}`, `Lý do: ${reason}`],
-    });
+    // Whole action — the domain update, category insert (for add_group),
+    // and the audit-log entry describing it — runs as ONE real transaction:
+    // if any step fails partway, everything rolls back together instead of
+    // leaving domains changed with no audit trail of it (see the DB audit's
+    // own finding on this).
+    return await db.transaction(async (tx) => {
+      // Snapshot each domain's pre-change status/unblockedBySourcePause, and
+      // (for add_group) whether it ALREADY had the target category —
+      // bounded by whatever the admin checked in the UI (never feed-sync
+      // scale), so this is cheap and lets rollbackAuditLog actually restore
+      // it later instead of just describing what happened. hadCategoryBefore
+      // matters because add_group is additive now: rollback must remove only
+      // the category THIS action actually added, never stripping one a
+      // domain already had.
+      const beforeRows = await tx
+        .select({
+          id: domains.id,
+          status: domains.status,
+          categories: domains.categories,
+          unblockedBySourcePause: domains.unblockedBySourcePause,
+        })
+        .from(domains)
+        .where(inArray(domains.id, domainIds));
 
-    return { success: true, updatedCount: domainIds.length };
+      if (action === 'allowlist') {
+        await tx
+          .update(domains)
+          .set({
+            status: 'allowlist',
+            // Explicit human action — no longer just a side-effect of a
+            // paused source, whatever it was before.
+            unblockedBySourcePause: false,
+            updatedAt: new Date(),
+          })
+          .where(inArray(domains.id, domainIds));
+      } else if (action === 'unblock') {
+        await tx
+          .update(domains)
+          .set({
+            status: 'unblocked',
+            unblockedBySourcePause: false,
+            updatedAt: new Date(),
+          })
+          .where(inArray(domains.id, domainIds));
+      } else if (action === 'block') {
+        // Reverse of 'unblock' — a human deliberately re-blocking a domain
+        // that's currently in 'unblocked' (e.g. one a paused/deleted feed
+        // source dropped, or one an analyst manually thôi-chặn'd earlier).
+        // Its domain_categories rows were never touched by unblock/pause/
+        // delete-source in the first place (see pauseFeedSource/
+        // deleteFeedSource's own notes), so this is purely a status flip —
+        // no membership to restore. unblockedBySourcePause is cleared same
+        // as allowlist/unblock: an explicit human action from here on, not
+        // an artifact of whatever a source's pause once did.
+        await tx
+          .update(domains)
+          .set({
+            status: 'active',
+            unblockedBySourcePause: false,
+            updatedAt: new Date(),
+          })
+          .where(inArray(domains.id, domainIds));
+      } else if (action === 'add_group' && category) {
+        // Additive: a domain already in this category is silently
+        // skipped/refreshed (DB-enforced unique on the (domainId, categoryId)
+        // pair), and a domain already in OTHER categories keeps them — this
+        // is now genuinely "thêm vào nhóm", not a move.
+        await addDomainCategoryMemberships(
+          tx,
+          domainIds.map((domainId) => ({ domainId, categoryId: category, sourceLabel: reason || 'Bulk action' }))
+        );
+      }
+
+      // Insert Audit Log
+      await tx.insert(auditLogs).values({
+        user: userEmail,
+        role: userRole || 'Admin',
+        action: 'bulk_action',
+        targetCount: domainIds.length,
+        summary: `Thực hiện thao tác hàng loạt [${action}] trên ${domainIds.length} tên miền`,
+        reason: reason || 'SOC Bulk Policy Update',
+        canRollback: true,
+        rollbackExpiresAt: new Date(Date.now() + 48 * 3600 * 1000),
+        rollbackData: {
+          type: 'bulk_action',
+          action,
+          // Only meaningful for add_group — the one category this whole
+          // batch actually added (see rollbackAuditLog).
+          category: action === 'add_group' ? category : undefined,
+          items: beforeRows.map((r) => ({
+            domainId: r.id,
+            status: r.status,
+            hadCategoryBefore: category ? (r.categories || []).includes(category) : undefined,
+            // Snapshotted so rollbackAuditLog can restore it too — without
+            // this, rolling back a bulk action on a domain that was still
+            // marked unblockedBySourcePause=true beforehand would leave that
+            // flag permanently cleared, and resumeFeedSource could never
+            // auto-reactivate it again (see the DB audit finding).
+            unblockedBySourcePause: r.unblockedBySourcePause,
+          })),
+        },
+        details: [`Hành động: ${action}`, `Số lượng: ${domainIds.length}`, `Lý do: ${reason}`],
+      });
+
+      return { success: true, updatedCount: domainIds.length };
+    });
   } catch (error) {
     console.error('bulkUpdateDomains failed:', error);
+    // A validation error thrown deliberately above (unknown action, or
+    // add_group with no category) already has a clear, actionable
+    // Vietnamese message and no `cause` — preserve it verbatim instead of
+    // burying it behind a generic message the UI would show.
+    if (error instanceof Error && !error.cause) throw error;
     throw new Error('Failed to perform bulk domain action', { cause: error });
   }
 }
@@ -1220,6 +1331,18 @@ export async function createFeedSource(data: {
   isCustom?: boolean;
 }) {
   try {
+    // feedSources.category is a plain varchar (not a real FK to categories —
+    // see schema.ts's note), so an invalid id here would otherwise pass
+    // silently at creation time and only surface as a confusing FK-violation
+    // error at the FIRST SYNC (inside bulkCreateDomains). Fail fast here
+    // instead, same pattern already used for bulkCreateDomains/
+    // addDomainCategoryMemberships (see the DB audit's own finding on this
+    // inconsistency).
+    const cat = await db.select({ id: categories.id }).from(categories).where(eq(categories.id, data.category)).limit(1);
+    if (!cat[0]) {
+      throw new Error(`Nhóm danh mục không tồn tại: ${data.category}. Vui lòng chọn lại nhóm hợp lệ.`);
+    }
+
     const slug = data.name
       .toLowerCase()
       .trim()
@@ -1249,8 +1372,11 @@ export async function createFeedSource(data: {
       .returning();
 
     return created[0];
-  } catch (error) {
+  } catch (error: any) {
     console.error('createFeedSource failed:', error);
+    // See createDomain's identical check — preserve the deliberately-thrown,
+    // already-clear validation message above instead of masking it.
+    if (error instanceof Error && !error.cause) throw error;
     throw new Error('Failed to create feed source', { cause: error });
   }
 }
@@ -1539,6 +1665,30 @@ async function runFeedSourceSyncJob(id: string, actingUser?: { email?: string; r
 
     await setSyncProgress(id, 58, `Đã phân tích ${parsedDomains.length.toLocaleString('vi-VN')} domain — đang kiểm tra trùng lặp và ghi vào CyberDNSTIP-DB...`);
 
+    // Re-check isPaused right before writing anything: phases 1-2 above
+    // (download + parse) can take up to the full 120s fetch timeout, during
+    // which an admin could have clicked "Tạm dừng" on this exact source.
+    // Without this check, bulkCreateDomains below would still write every
+    // domain as status='active' under a source the UI already shows as
+    // paused — violating pauseFeedSource's own documented invariant (every
+    // domain this source owns moves to unblocked the moment it's paused).
+    // See the DB audit's own finding on this race.
+    const pauseCheck1 = await db.select({ isPaused: feedSources.isPaused }).from(feedSources).where(eq(feedSources.id, id)).limit(1);
+    if (pauseCheck1[0]?.isPaused) {
+      await db
+        .update(feedSources)
+        .set({
+          status: 'warning',
+          errorMessage: null,
+          lastSyncMessage: 'Đồng bộ bị hủy: nguồn đã được tạm dừng trong lúc đang tải/phân tích dữ liệu.',
+          syncProgress: 0,
+          syncPhase: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(feedSources.id, id));
+      return;
+    }
+
     // --- Phase 3: write DIRECTLY to PostgreSQL/domains (58-100%) ---
     // Feed-synced domains always go straight into the blocklist — a feed
     // is an already-curated third-party source, unlike a manual add/batch
@@ -1558,6 +1708,51 @@ async function runFeedSourceSyncJob(id: string, actingUser?: { email?: string; r
       },
     });
 
+    // Live count of domains this source actually, currently owns (via
+    // domain_categories.feedSourceId) — not parsedDomains.length, which is
+    // only how many lines THIS ONE feed body had (see the DB audit's own
+    // finding: the old value drifted from reality any time a domain this
+    // source once added was later removed by something else, or when a
+    // partial run wrote fewer rows than the feed listed).
+    const liveDomainCount = await getDomainIdsForFeedSource(id);
+
+    // Re-check isPaused again: bulkCreateDomains above is one real
+    // transaction (COPY + both upserts, all-or-nothing — see its own
+    // comment), so this only needs to catch a pause that landed WHILE that
+    // one transaction was in flight and committed just after — a much
+    // smaller window than phases 1-2's, but non-zero. Retroactively applies
+    // the exact same "no other active backing" unblock logic pauseFeedSource
+    // itself uses, instead of leaving this run's freshly-written domains
+    // active under a paused source.
+    const pauseCheck2 = await db.select({ isPaused: feedSources.isPaused }).from(feedSources).where(eq(feedSources.id, id)).limit(1);
+    if (pauseCheck2[0]?.isPaused) {
+      const { toUnblock: retroDomainIds } = await getDomainIdsToUnblockForFeedSource(id);
+      if (retroDomainIds.length > 0) {
+        const CHUNK = 5000;
+        for (let i = 0; i < retroDomainIds.length; i += CHUNK) {
+          const chunk = retroDomainIds.slice(i, i + CHUNK);
+          await db
+            .update(domains)
+            .set({ status: 'unblocked', unblockedBySourcePause: true, updatedAt: new Date() })
+            .where(and(inArray(domains.id, chunk), eq(domains.status, 'active')));
+        }
+      }
+      await db
+        .update(feedSources)
+        .set({
+          lastSync: new Date(),
+          status: 'warning',
+          errorMessage: null,
+          lastSyncMessage: `Đã ghi ${parsedDomains.length.toLocaleString('vi-VN')} domain, nhưng nguồn bị tạm dừng ngay trong lúc đồng bộ — đã tự động chuyển các domain không còn được nguồn/nhóm khác hỗ trợ sang Thôi chặn.`,
+          domainCount: liveDomainCount.length,
+          syncProgress: 0,
+          syncPhase: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(feedSources.id, id));
+      return;
+    }
+
     await db
       .update(feedSources)
       .set({
@@ -1565,7 +1760,7 @@ async function runFeedSourceSyncJob(id: string, actingUser?: { email?: string; r
         status: 'healthy',
         errorMessage: null,
         lastSyncMessage: `Đã nạp ${parsedDomains.length.toLocaleString('vi-VN')} domain — ${result.newCount.toLocaleString('vi-VN')} mới, ${result.existingCount.toLocaleString('vi-VN')} đã tồn tại (trùng lặp, đã bỏ qua/cập nhật).`,
-        domainCount: parsedDomains.length,
+        domainCount: liveDomainCount.length,
         syncProgress: 100,
         syncPhase: null,
         updatedAt: new Date(),
@@ -1583,8 +1778,14 @@ async function runFeedSourceSyncJob(id: string, actingUser?: { email?: string; r
 // the authoritative provenance link (set by addDomainCategoryMemberships on
 // every insert, including ones that came through an approved review item —
 // see resolveReviewItem). Shared by pause/resume/delete below.
-async function getDomainIdsForFeedSource(feedSourceId: string): Promise<number[]> {
-  const rows = await db
+// executor defaults to the shared `db` (every standalone read-only caller,
+// e.g. runFeedSourceSyncJob's own pause re-checks); pauseFeedSource/
+// resumeFeedSource/deleteFeedSource pass their own `tx` so this read joins
+// the SAME transaction as the writes it informs, keeping "which domains to
+// touch" and "touch them" atomic with each other and with the audit-log
+// entry describing it.
+async function getDomainIdsForFeedSource(feedSourceId: string, executor: Executor = db): Promise<number[]> {
+  const rows = await executor
     .select({ domainId: domainCategories.domainId })
     .from(domainCategories)
     .where(eq(domainCategories.feedSourceId, feedSourceId));
@@ -1617,12 +1818,13 @@ async function getDomainIdsForFeedSource(feedSourceId: string): Promise<number[]
 // elsewhere), not a bug — worth being able to show that reasoning rather
 // than just a bare count.
 async function getDomainIdsToUnblockForFeedSource(
-  feedSourceId: string
+  feedSourceId: string,
+  executor: Executor = db
 ): Promise<{ toUnblock: number[]; totalLinked: number }> {
-  const totalLinked = await getDomainIdsForFeedSource(feedSourceId);
+  const totalLinked = await getDomainIdsForFeedSource(feedSourceId, executor);
   if (totalLinked.length === 0) return { toUnblock: [], totalLinked: 0 };
 
-  const result = await db.execute<{ domain_id: number }>(sql`
+  const result = await executor.execute<{ domain_id: number }>(sql`
     SELECT dc.domain_id
     FROM domain_categories dc
     WHERE dc.feed_source_id = ${feedSourceId}
@@ -1647,57 +1849,65 @@ async function getDomainIdsToUnblockForFeedSource(
 // blocked because of this feed").
 export async function pauseFeedSource(id: string, userEmail: string) {
   try {
-    const existing = await db.select().from(feedSources).where(eq(feedSources.id, id)).limit(1);
-    const source = existing[0];
-    if (!source) throw new Error(`Feed source ${id} not found`);
-    if (source.isPaused) return { source, affectedCount: 0 };
+    // The existence check, the domains-to-unblock computation, the domain
+    // updates, the feed_sources flip, and the audit-log entry all run as ONE
+    // transaction now — previously each was its own separate statement, so
+    // a failure partway (e.g. the audit-log insert) could leave domains
+    // already moved to 'unblocked' with no record of why (see the DB
+    // audit's own finding on this).
+    return await db.transaction(async (tx) => {
+      const existing = await tx.select().from(feedSources).where(eq(feedSources.id, id)).limit(1);
+      const source = existing[0];
+      if (!source) throw new Error(`Feed source ${id} not found`);
+      if (source.isPaused) return { source, affectedCount: 0 };
 
-    // Only domains with no OTHER active backing (see the function's own
-    // note) — a domain this source shares with a still-active source, or
-    // one a human manually also categorized, stays 'active' untouched.
-    const { toUnblock: domainIds, totalLinked } = await getDomainIdsToUnblockForFeedSource(id);
-    let affectedCount = 0;
-    if (domainIds.length > 0) {
-      const CHUNK = 5000;
-      for (let i = 0; i < domainIds.length; i += CHUNK) {
-        const chunk = domainIds.slice(i, i + CHUNK);
-        const updated = await db
-          .update(domains)
-          .set({ status: 'unblocked', unblockedBySourcePause: true, updatedAt: new Date() })
-          .where(and(inArray(domains.id, chunk), eq(domains.status, 'active')))
-          .returning({ id: domains.id });
-        affectedCount += updated.length;
+      // Only domains with no OTHER active backing (see the function's own
+      // note) — a domain this source shares with a still-active source, or
+      // one a human manually also categorized, stays 'active' untouched.
+      const { toUnblock: domainIds, totalLinked } = await getDomainIdsToUnblockForFeedSource(id, tx);
+      let affectedCount = 0;
+      if (domainIds.length > 0) {
+        const CHUNK = 5000;
+        for (let i = 0; i < domainIds.length; i += CHUNK) {
+          const chunk = domainIds.slice(i, i + CHUNK);
+          const updated = await tx
+            .update(domains)
+            .set({ status: 'unblocked', unblockedBySourcePause: true, updatedAt: new Date() })
+            .where(and(inArray(domains.id, chunk), eq(domains.status, 'active')))
+            .returning({ id: domains.id });
+          affectedCount += updated.length;
+        }
       }
-    }
-    const keptBlockedCount = totalLinked - domainIds.length;
+      const keptBlockedCount = totalLinked - domainIds.length;
 
-    const updatedSource = await db
-      .update(feedSources)
-      .set({ isPaused: true, updatedAt: new Date() })
-      .where(eq(feedSources.id, id))
-      .returning();
+      const updatedSource = await tx
+        .update(feedSources)
+        .set({ isPaused: true, updatedAt: new Date() })
+        .where(eq(feedSources.id, id))
+        .returning();
 
-    await db.insert(auditLogs).values({
-      user: userEmail,
-      role: 'Admin',
-      action: 'bulk_action',
-      targetCount: affectedCount,
-      summary: `Tạm dừng nguồn feed "${source.name}" — ${affectedCount.toLocaleString('vi-VN')} tên miền chuyển sang Thôi chặn`,
-      reason: 'Tạm dừng đồng bộ nguồn feed',
-      canRollback: false,
-      details: [
-        `Nguồn: ${source.name} (${id})`,
-        `Tổng tên miền thuộc nguồn: ${totalLinked.toLocaleString('vi-VN')}`,
-        `Chuyển thôi chặn: ${affectedCount.toLocaleString('vi-VN')}`,
-        // Real, common case at scale: a domain this source manages can
-        // still be legitimately blocked via ANOTHER category/source that
-        // isn't paused, so it correctly stays active — not a bug when this
-        // number is large.
-        `Giữ nguyên chặn (còn thuộc nhóm/nguồn khác đang hoạt động): ${keptBlockedCount.toLocaleString('vi-VN')}`,
-      ],
+      await tx.insert(auditLogs).values({
+        user: userEmail,
+        role: 'Admin',
+        action: 'bulk_action',
+        targetCount: affectedCount,
+        summary: `Tạm dừng nguồn feed "${source.name}" — ${affectedCount.toLocaleString('vi-VN')} tên miền chuyển sang Thôi chặn`,
+        reason: 'Tạm dừng đồng bộ nguồn feed',
+        canRollback: false,
+        details: [
+          `Nguồn: ${source.name} (${id})`,
+          `Tổng tên miền thuộc nguồn: ${totalLinked.toLocaleString('vi-VN')}`,
+          `Chuyển thôi chặn: ${affectedCount.toLocaleString('vi-VN')}`,
+          // Real, common case at scale: a domain this source manages can
+          // still be legitimately blocked via ANOTHER category/source that
+          // isn't paused, so it correctly stays active — not a bug when this
+          // number is large.
+          `Giữ nguyên chặn (còn thuộc nhóm/nguồn khác đang hoạt động): ${keptBlockedCount.toLocaleString('vi-VN')}`,
+        ],
+      });
+
+      return { source: updatedSource[0], affectedCount };
     });
-
-    return { source: updatedSource[0], affectedCount };
   } catch (error) {
     console.error('pauseFeedSource failed:', error);
     throw error instanceof Error ? error : new Error('Failed to pause feed source', { cause: error });
@@ -1710,44 +1920,47 @@ export async function pauseFeedSource(id: string, userEmail: string) {
 // bulkUpdateDomains clearing that flag on any explicit status change).
 export async function resumeFeedSource(id: string, userEmail: string) {
   try {
-    const existing = await db.select().from(feedSources).where(eq(feedSources.id, id)).limit(1);
-    const source = existing[0];
-    if (!source) throw new Error(`Feed source ${id} not found`);
-    if (!source.isPaused) return { source, affectedCount: 0 };
+    // Same atomicity fix as pauseFeedSource above — see its own comment.
+    return await db.transaction(async (tx) => {
+      const existing = await tx.select().from(feedSources).where(eq(feedSources.id, id)).limit(1);
+      const source = existing[0];
+      if (!source) throw new Error(`Feed source ${id} not found`);
+      if (!source.isPaused) return { source, affectedCount: 0 };
 
-    const domainIds = await getDomainIdsForFeedSource(id);
-    let affectedCount = 0;
-    if (domainIds.length > 0) {
-      const CHUNK = 5000;
-      for (let i = 0; i < domainIds.length; i += CHUNK) {
-        const chunk = domainIds.slice(i, i + CHUNK);
-        const updated = await db
-          .update(domains)
-          .set({ status: 'active', unblockedBySourcePause: false, updatedAt: new Date() })
-          .where(and(inArray(domains.id, chunk), eq(domains.status, 'unblocked'), eq(domains.unblockedBySourcePause, true)))
-          .returning({ id: domains.id });
-        affectedCount += updated.length;
+      const domainIds = await getDomainIdsForFeedSource(id, tx);
+      let affectedCount = 0;
+      if (domainIds.length > 0) {
+        const CHUNK = 5000;
+        for (let i = 0; i < domainIds.length; i += CHUNK) {
+          const chunk = domainIds.slice(i, i + CHUNK);
+          const updated = await tx
+            .update(domains)
+            .set({ status: 'active', unblockedBySourcePause: false, updatedAt: new Date() })
+            .where(and(inArray(domains.id, chunk), eq(domains.status, 'unblocked'), eq(domains.unblockedBySourcePause, true)))
+            .returning({ id: domains.id });
+          affectedCount += updated.length;
+        }
       }
-    }
 
-    const updatedSource = await db
-      .update(feedSources)
-      .set({ isPaused: false, updatedAt: new Date() })
-      .where(eq(feedSources.id, id))
-      .returning();
+      const updatedSource = await tx
+        .update(feedSources)
+        .set({ isPaused: false, updatedAt: new Date() })
+        .where(eq(feedSources.id, id))
+        .returning();
 
-    await db.insert(auditLogs).values({
-      user: userEmail,
-      role: 'Admin',
-      action: 'bulk_action',
-      targetCount: affectedCount,
-      summary: `Tiếp tục nguồn feed "${source.name}" — ${affectedCount.toLocaleString('vi-VN')} tên miền chuyển lại Đang chặn`,
-      reason: 'Tiếp tục đồng bộ nguồn feed',
-      canRollback: false,
-      details: [`Nguồn: ${source.name} (${id})`, `Số tên miền: ${affectedCount}`],
+      await tx.insert(auditLogs).values({
+        user: userEmail,
+        role: 'Admin',
+        action: 'bulk_action',
+        targetCount: affectedCount,
+        summary: `Tiếp tục nguồn feed "${source.name}" — ${affectedCount.toLocaleString('vi-VN')} tên miền chuyển lại Đang chặn`,
+        reason: 'Tiếp tục đồng bộ nguồn feed',
+        canRollback: false,
+        details: [`Nguồn: ${source.name} (${id})`, `Số tên miền: ${affectedCount}`],
+      });
+
+      return { source: updatedSource[0], affectedCount };
     });
-
-    return { source: updatedSource[0], affectedCount };
   } catch (error) {
     console.error('resumeFeedSource failed:', error);
     throw error instanceof Error ? error : new Error('Failed to resume feed source', { cause: error });
@@ -1766,45 +1979,48 @@ export async function resumeFeedSource(id: string, userEmail: string) {
 // rather than being cascade-deleted.
 export async function deleteFeedSource(id: string, userEmail: string) {
   try {
-    const existing = await db.select().from(feedSources).where(eq(feedSources.id, id)).limit(1);
-    const source = existing[0];
-    if (!source) throw new Error(`Feed source ${id} not found`);
+    // Same atomicity fix as pauseFeedSource above — see its own comment.
+    return await db.transaction(async (tx) => {
+      const existing = await tx.select().from(feedSources).where(eq(feedSources.id, id)).limit(1);
+      const source = existing[0];
+      if (!source) throw new Error(`Feed source ${id} not found`);
 
-    const { toUnblock: domainIds, totalLinked } = await getDomainIdsToUnblockForFeedSource(id);
-    let affectedCount = 0;
-    if (domainIds.length > 0) {
-      const CHUNK = 5000;
-      for (let i = 0; i < domainIds.length; i += CHUNK) {
-        const chunk = domainIds.slice(i, i + CHUNK);
-        const updated = await db
-          .update(domains)
-          .set({ status: 'unblocked', unblockedBySourcePause: false, updatedAt: new Date() })
-          .where(and(inArray(domains.id, chunk), eq(domains.status, 'active')))
-          .returning({ id: domains.id });
-        affectedCount += updated.length;
+      const { toUnblock: domainIds, totalLinked } = await getDomainIdsToUnblockForFeedSource(id, tx);
+      let affectedCount = 0;
+      if (domainIds.length > 0) {
+        const CHUNK = 5000;
+        for (let i = 0; i < domainIds.length; i += CHUNK) {
+          const chunk = domainIds.slice(i, i + CHUNK);
+          const updated = await tx
+            .update(domains)
+            .set({ status: 'unblocked', unblockedBySourcePause: false, updatedAt: new Date() })
+            .where(and(inArray(domains.id, chunk), eq(domains.status, 'active')))
+            .returning({ id: domains.id });
+          affectedCount += updated.length;
+        }
       }
-    }
-    const keptBlockedCount = totalLinked - domainIds.length;
+      const keptBlockedCount = totalLinked - domainIds.length;
 
-    await db.delete(feedSources).where(eq(feedSources.id, id));
+      await tx.delete(feedSources).where(eq(feedSources.id, id));
 
-    await db.insert(auditLogs).values({
-      user: userEmail,
-      role: 'Admin',
-      action: 'remove',
-      targetCount: affectedCount,
-      summary: `Đã xoá nguồn feed "${source.name}" — ${affectedCount.toLocaleString('vi-VN')} tên miền chuyển sang Thôi chặn`,
-      reason: 'Xoá nguồn feed',
-      canRollback: false,
-      details: [
-        `Nguồn: ${source.name} (${id})`,
-        `Tổng tên miền thuộc nguồn: ${totalLinked.toLocaleString('vi-VN')}`,
-        `Chuyển thôi chặn: ${affectedCount.toLocaleString('vi-VN')}`,
-        `Giữ nguyên chặn (còn thuộc nhóm/nguồn khác đang hoạt động): ${keptBlockedCount.toLocaleString('vi-VN')}`,
-      ],
+      await tx.insert(auditLogs).values({
+        user: userEmail,
+        role: 'Admin',
+        action: 'remove',
+        targetCount: affectedCount,
+        summary: `Đã xoá nguồn feed "${source.name}" — ${affectedCount.toLocaleString('vi-VN')} tên miền chuyển sang Thôi chặn`,
+        reason: 'Xoá nguồn feed',
+        canRollback: false,
+        details: [
+          `Nguồn: ${source.name} (${id})`,
+          `Tổng tên miền thuộc nguồn: ${totalLinked.toLocaleString('vi-VN')}`,
+          `Chuyển thôi chặn: ${affectedCount.toLocaleString('vi-VN')}`,
+          `Giữ nguyên chặn (còn thuộc nhóm/nguồn khác đang hoạt động): ${keptBlockedCount.toLocaleString('vi-VN')}`,
+        ],
+      });
+
+      return { affectedCount };
     });
-
-    return { affectedCount };
   } catch (error) {
     console.error('deleteFeedSource failed:', error);
     throw error instanceof Error ? error : new Error('Failed to delete feed source', { cause: error });
@@ -1971,36 +2187,50 @@ export async function resolveReviewItem(
   reviewerRole?: string
 ) {
   try {
-    const item = await db
-      .update(reviewQueue)
-      .set({
-        status: decision,
-        reviewedBy: reviewerEmail,
-        reviewedAt: new Date(),
-      })
-      .where(eq(reviewQueue.id, id))
-      .returning();
+    // Bolted together as ONE transaction: the review-queue status flip and
+    // the resulting createDomain call now succeed or fail as a single unit
+    // (createDomain opens this as a SAVEPOINT via its own executor param —
+    // see its own comment). Before this fix, the status update committed
+    // FIRST, so a decision item could end up permanently marked "approved"
+    // in the DB even though createDomain itself failed (e.g. an invalid
+    // category override) — no domain got created, no audit log either, and
+    // the item silently vanished from the pending queue with nothing to
+    // retry (see the DB audit's own finding on this).
+    return await db.transaction(async (tx) => {
+      const item = await tx
+        .update(reviewQueue)
+        .set({
+          status: decision,
+          reviewedBy: reviewerEmail,
+          reviewedAt: new Date(),
+        })
+        .where(eq(reviewQueue.id, id))
+        .returning();
 
-    if (decision === 'approved' && item[0]) {
-      // Add directly to domains — respects the reviewer's category override
-      // if they picked a different one than the AI/crawler's proposal.
-      // feedSourceId carries the original feed's provenance through to the
-      // resulting domain_categories row, when this item came from one (see
-      // bulkCreateReviewItems), so pause/delete on that source still finds
-      // this domain even though it went through review rather than being
-      // auto-blocked directly.
-      await createDomain({
-        domain: item[0].domain,
-        categories: [categoryOverride || item[0].proposedCategory],
-        source: `Báo cáo: ${item[0].reportedBy}`,
-        reason: item[0].reason,
-        userEmail: reviewerEmail,
-        userRole: reviewerRole,
-        feedSourceId: item[0].feedSourceId || undefined,
-      });
-    }
+      if (decision === 'approved' && item[0]) {
+        // Add directly to domains — respects the reviewer's category override
+        // if they picked a different one than the AI/crawler's proposal.
+        // feedSourceId carries the original feed's provenance through to the
+        // resulting domain_categories row, when this item came from one (see
+        // bulkCreateReviewItems), so pause/delete on that source still finds
+        // this domain even though it went through review rather than being
+        // auto-blocked directly.
+        await createDomain(
+          {
+            domain: item[0].domain,
+            categories: [categoryOverride || item[0].proposedCategory],
+            source: `Báo cáo: ${item[0].reportedBy}`,
+            reason: item[0].reason,
+            userEmail: reviewerEmail,
+            userRole: reviewerRole,
+            feedSourceId: item[0].feedSourceId || undefined,
+          },
+          tx
+        );
+      }
 
-    return item[0];
+      return item[0];
+    });
   } catch (error: any) {
     console.error('resolveReviewItem failed:', error);
     // See createDomain's identical check — preserve a deliberately-thrown,
@@ -2066,11 +2296,12 @@ export async function rollbackAuditLog(logId: number, userEmail: string, reason?
       const toRemove = [...current].filter((c) => !desired.has(c));
       if (toAdd.length > 0) {
         await addDomainCategoryMemberships(
+          db,
           toAdd.map((categoryId) => ({ domainId: data.domainId, categoryId, sourceLabel: 'Hoàn tác (Rollback)' }))
         );
       }
       for (const categoryId of toRemove) {
-        await removeDomainCategoryMemberships([data.domainId], categoryId);
+        await removeDomainCategoryMemberships(db, [data.domainId], categoryId);
       }
 
       await db
@@ -2080,6 +2311,12 @@ export async function rollbackAuditLog(logId: number, userEmail: string, reason?
           sourceDetail: data.before.sourceDetail,
           tags: data.before.tags,
           isProtected: data.before.isProtected,
+          // Only present on entries written after this field started being
+          // snapshotted (see updateDomain) — undefined on older ones leaves
+          // the column untouched rather than overwriting it with `undefined`.
+          ...(data.before.unblockedBySourcePause !== undefined
+            ? { unblockedBySourcePause: data.before.unblockedBySourcePause }
+            : {}),
           updatedAt: new Date(),
         })
         .where(eq(domains.id, data.domainId));
@@ -2100,9 +2337,26 @@ export async function rollbackAuditLog(logId: number, userEmail: string, reason?
 
       summary = `Hoàn tác thêm tên miền: ${target[0].domain}`;
     } else if (data.type === 'bulk_action') {
-      const items = (data.items || []) as { domainId: number; status: string; hadCategoryBefore?: boolean }[];
+      const items = (data.items || []) as {
+        domainId: number;
+        status: string;
+        hadCategoryBefore?: boolean;
+        unblockedBySourcePause?: boolean;
+      }[];
       for (const item of items) {
-        await db.update(domains).set({ status: item.status, updatedAt: new Date() }).where(eq(domains.id, item.domainId));
+        await db
+          .update(domains)
+          .set({
+            status: item.status,
+            // Only present on entries written after this field started being
+            // snapshotted (see bulkUpdateDomains) — undefined on older ones
+            // leaves the column untouched rather than overwriting it.
+            ...(item.unblockedBySourcePause !== undefined
+              ? { unblockedBySourcePause: item.unblockedBySourcePause }
+              : {}),
+            updatedAt: new Date(),
+          })
+          .where(eq(domains.id, item.domainId));
       }
       // add_group is additive now (a domain can be in several categories —
       // see schema.ts's note on domain_categories' composite unique
@@ -2116,7 +2370,7 @@ export async function rollbackAuditLog(logId: number, userEmail: string, reason?
           // Scoped to feedSourceId=null — the bulk toolbar's own
           // attribution (see bulkUpdateDomains) — never touches a real feed
           // source's own, independent row for the same category.
-          await removeDomainCategoryMemberships(newlyAddedIds, data.category, null).catch(() => {});
+          await removeDomainCategoryMemberships(db, newlyAddedIds, data.category, null).catch(() => {});
         }
       }
       summary = `Hoàn tác thao tác hàng loạt trên ${items.length} tên miền`;

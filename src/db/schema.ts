@@ -62,7 +62,15 @@ export const loginLogs = pgTable(
     id: serial('id').primaryKey(),
     // Nullable: a failed attempt against an email that doesn't exist has no
     // real user row to reference, but is still worth logging as a signal.
-    userId: integer('user_id').references(() => users.id, { onDelete: 'cascade' }),
+    // ON DELETE SET NULL, not CASCADE: this table is a security/audit
+    // record (who logged in, from where, when) — deleting a user account
+    // must not silently erase their login history, the same reasoning
+    // auditLogs.user (a plain text column, independent of the users table's
+    // lifecycle) and reviewQueue.feedSourceId (SET NULL, see its own note)
+    // already follow elsewhere in this file. email/ipAddress/userAgent are
+    // already stored independently on this same row, so nothing forensic is
+    // lost by keeping the row and just clearing the link.
+    userId: integer('user_id').references(() => users.id, { onDelete: 'set null' }),
     email: text('email').notNull(),
     ipAddress: varchar('ip_address', { length: 64 }).notNull(),
     userAgent: text('user_agent'),
@@ -156,7 +164,16 @@ export const domains = pgTable(
     // update — real write overhead on every domain in every sync, for zero
     // read benefit. (This existed as `domains_domain_idx` until this fix.)
     index('domains_status_idx').on(table.status),
-    index('domains_primary_category_idx').on(table.primaryCategory),
+    // No index on primaryCategory: it's a denormalized display convenience
+    // (see the column's own note) — every real filter/sort/join against a
+    // domain's category goes through the jsonb `categories` array instead
+    // (via domains_categories_gin_idx, see triggers.ts's ensureSearchIndexes),
+    // since primaryCategory alone would silently hide a multi-category
+    // domain from a filter. Grepped queries.ts to confirm: nothing filters,
+    // sorts, or joins on primaryCategory — only ever selects/displays it.
+    // Real write cost (every trigger-driven cache rebuild touches this
+    // column) for zero corroborated read benefit. (This existed as
+    // `domains_primary_category_idx` until this fix.)
     index('domains_tld_idx').on(table.tld),
     // Backs the Domain Explorer's default sort (getDomains defaults to
     // lastSeen desc when no sortField is requested) — without this, every
@@ -274,9 +291,14 @@ export const domainCategories = pgTable(
   (table) => [
     // The real (domainId, categoryId, feedSourceId) uniqueness lives in
     // triggers.ts as a raw "NULLS NOT DISTINCT" index — see the file-level
-    // note above for why. domainId/categoryId here are for lookups only,
-    // not a substitute for that constraint.
-    index('domain_categories_domain_idx').on(table.domainId),
+    // note above for why. No separate index('...').on(table.domainId) here:
+    // that composite unique index's LEADING column is domainId, so it
+    // already backs any `domainId = ?` lookup exactly as well as a
+    // standalone index would — a second one would be fully redundant write
+    // cost (same reasoning as the note on `domains.domain` above). Only
+    // categoryId/feedSourceId need their own index, since neither is a
+    // leading column the composite index can serve. (This existed as
+    // `domain_categories_domain_idx` until this fix.)
     index('domain_categories_category_idx').on(table.categoryId),
     index('domain_categories_feed_source_idx').on(table.feedSourceId),
   ]

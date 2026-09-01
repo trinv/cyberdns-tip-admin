@@ -36,6 +36,14 @@ CREATE TABLE IF NOT EXISTS categories (
     created_at       TIMESTAMP NOT NULL DEFAULT now(),
     updated_at       TIMESTAMP NOT NULL DEFAULT now()
 );
+-- Defense-in-depth, not the primary correctness mechanism — mirrors the
+-- identical CHECK added in src/db/triggers.ts's ensureDomainCategoryTriggers.
+-- Postgres has no ADD CONSTRAINT IF NOT EXISTS; this DO block is the
+-- standard idempotent equivalent.
+DO $do$ BEGIN
+    ALTER TABLE categories ADD CONSTRAINT categories_count_non_negative CHECK (count >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $do$;
 
 -- 2. Feed sources — domain_categories.feed_source_id optionally references
 -- this (nullable: manual entries and this tool's own runs, unless
@@ -91,13 +99,29 @@ CREATE TABLE IF NOT EXISTS domains (
 -- already backs one; a second explicit index on the same column would be
 -- pure write-overhead for zero read benefit (see schema.ts's own note).
 CREATE INDEX IF NOT EXISTS domains_status_idx ON domains (status);
-CREATE INDEX IF NOT EXISTS domains_primary_category_idx ON domains (primary_category);
+-- No index on primary_category — a denormalized display convenience only;
+-- every real filter/sort/join goes through the jsonb `categories` array
+-- instead (see the GIN index below). Real write cost for zero corroborated
+-- read benefit (see schema.ts's own note — this existed as
+-- `domains_primary_category_idx` until this fix).
 CREATE INDEX IF NOT EXISTS domains_tld_idx ON domains (tld);
 CREATE INDEX IF NOT EXISTS domains_last_seen_idx ON domains (last_seen);
 -- Backs jsonb containment lookups (`categories @> '["id"]'`) against the
 -- multi-category array below — the default GIN opclass already supports
 -- `@>` directly, no extension needed (unlike a trigram index).
 CREATE INDEX IF NOT EXISTS domains_categories_gin_idx ON domains USING gin (categories);
+-- Trigram GIN index backing getDomains' leading-wildcard search
+-- (`ilike(domains.domain, '%term%')`) — a normal btree index (like the one
+-- `domain`'s UNIQUE constraint already provides) can't use a leading
+-- wildcard at all, so without this Postgres falls back to a full scan.
+-- Mirrors ensureSearchIndexes (src/db/triggers.ts) exactly — was missing
+-- from this file until this fix (self-healed the instant the real Node app
+-- booted once against the same database, since it always runs that
+-- function at startup, but this file's own header claims a complete
+-- column-for-column mirror, so it belongs here too for the standalone
+-- case this tool is meant to also support).
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX IF NOT EXISTS domains_domain_trgm_idx ON domains USING gin (domain gin_trgm_ops);
 
 -- 4. Domain <-> Category membership — the AUTHORITATIVE relation.
 -- A domain can belong to MULTIPLE categories at once, AND the same
@@ -133,7 +157,11 @@ CREATE TABLE IF NOT EXISTS domain_categories (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS domain_categories_domain_category_source_uidx
 ON domain_categories (domain_id, category_id, feed_source_id) NULLS NOT DISTINCT;
-CREATE INDEX IF NOT EXISTS domain_categories_domain_idx ON domain_categories (domain_id);
+-- No separate index('...').on(domain_id): the composite unique index above
+-- has domain_id as its LEADING column, so it already backs any
+-- `domain_id = ?` lookup exactly as well as a standalone index would — a
+-- second one is fully redundant write cost (see schema.ts's own note; this
+-- existed as `domain_categories_domain_idx` until this fix).
 CREATE INDEX IF NOT EXISTS domain_categories_category_idx ON domain_categories (category_id);
 CREATE INDEX IF NOT EXISTS domain_categories_feed_source_idx ON domain_categories (feed_source_id);
 
@@ -228,6 +256,17 @@ BEGIN
     IF affected_domain_ids IS NULL THEN
         RETURN NULL;
     END IF;
+
+    -- Lock every affected domain row before the primary-promotion check
+    -- below — without this, two CONCURRENT transactions each inserting the
+    -- first-ever domain_categories row(s) for the same brand-new domain
+    -- could each see "no primary yet" and both promote their own row,
+    -- leaving the domain with two is_primary=true rows permanently. Locking
+    -- domains forces the second transaction to wait for the first to
+    -- commit. ORDER BY id gives a stable lock order so two overlapping
+    -- statements can never deadlock against each other. Mirrors
+    -- src/db/triggers.ts exactly.
+    PERFORM 1 FROM domains WHERE id = ANY(affected_domain_ids) ORDER BY id FOR UPDATE;
 
     -- 1. Fallback-promote a primary membership for every affected domain
     --    that currently has none — one batched UPDATE, not one per domain.

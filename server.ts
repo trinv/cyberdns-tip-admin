@@ -14,6 +14,7 @@ import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { ensureSuperAdmin, recoverInterruptedSyncs, migrateAwayFromGracePeriod } from './src/db/queries.ts';
 import { ensureDomainCategoryTriggers, ensureSearchIndexes } from './src/db/triggers.ts';
+import { pool } from './src/db/index.ts';
 import {
   getDashboardStats,
   getDomains,
@@ -347,6 +348,14 @@ async function startServer() {
   app.post('/api/domains/bulk-action', requireAuth, async (req: AuthRequest, res) => {
     try {
       const { action, domainIds, category, reason } = req.body;
+      // bulkUpdateDomains itself now also rejects an unrecognized action
+      // (defense in depth — see its own comment), but validating here first
+      // gives a proper 400 instead of a 500 for the common case of a bad
+      // request, matching the same pattern already used for /resolve's
+      // `decision` below.
+      if (!['add_group', 'allowlist', 'unblock', 'block'].includes(action)) {
+        return res.status(400).json({ error: 'Invalid action' });
+      }
       const result = await bulkUpdateDomains({
         action,
         domainIds,
@@ -680,7 +689,14 @@ async function startServer() {
   // "stale process" itself.
   const shutdown = (signal: string) => {
     console.log(`[shutdown] Received ${signal}, closing server...`);
-    httpServer.close(() => process.exit(0));
+    httpServer.close(() => {
+      // Drain the pg Pool's connections cleanly (in-flight queries finish,
+      // idle clients close) instead of just letting process.exit() below
+      // tear them down at the OS level. Best-effort: never let a pool
+      // shutdown hiccup delay the process exit itself — the 3s force-exit
+      // timeout below is still the real safety net either way.
+      pool.end().catch(() => {}).finally(() => process.exit(0));
+    });
     // Force-exit if something (e.g. an open DB connection) keeps the event
     // loop alive longer than expected.
     setTimeout(() => process.exit(0), 3000).unref();

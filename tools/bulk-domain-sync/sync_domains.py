@@ -187,9 +187,15 @@ CREATE UNLOGGED TABLE IF NOT EXISTS tmp_domains (
 # ON CONFLICT (domain) DO UPDATE mirrors bulkCreateDomains' onConflictDoUpdate
 # exactly: an existing domain is reset to status='active' (a feed re-listing
 # it always means "still blocked" — this deliberately overrides e.g. a
-# stale 'unblocked'). first_seen/timeline are NOT in the SET clause, so an
-# existing row keeps its original first_seen — they only take their column
-# DEFAULT on a true INSERT.
+# stale 'unblocked'), AND unblocked_by_source_pause is reset to false — an
+# explicit (re-)block always clears that "auto-unblocked by a paused source"
+# marker, whatever it was before (see UPSERT_DOMAINS_SQL in
+# src/db/queries.ts, and domains.unblockedBySourcePause's own note in
+# src/db/schema.ts). Without this, a domain re-synced here by a DIFFERENT
+# source while its ORIGINAL pausing source is still paused would stay
+# flagged as if it were still riding on that stale pause. first_seen/
+# timeline are NOT in the SET clause, so an existing row keeps its original
+# first_seen — they only take their column DEFAULT on a true INSERT.
 UPSERT_DOMAINS_SQL = """
 INSERT INTO domains (domain, etld1, tld, source, source_detail, status)
 SELECT
@@ -207,6 +213,7 @@ FROM (
 ) t
 ON CONFLICT (domain) DO UPDATE SET
     status = 'active',
+    unblocked_by_source_pause = false,
     updated_at = now();
 """
 

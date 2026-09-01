@@ -51,6 +51,23 @@ export async function ensureDomainCategoryTriggers() {
       ON domain_categories (domain_id, category_id, feed_source_id) NULLS NOT DISTINCT;
     `);
 
+    // Defense-in-depth, not the primary correctness mechanism: the trigger's
+    // own delta arithmetic below is what actually keeps categories.count
+    // accurate (proven correct by construction — see its own comments), and
+    // domain_categories has exactly one writer (this trigger). This CHECK
+    // just turns "count somehow went negative" from silent, confusing data
+    // (e.g. a UI showing "-3 domains") into an immediate, loud constraint
+    // violation if that single-writer assumption is ever violated by a
+    // future code path. Postgres has no `ADD CONSTRAINT IF NOT EXISTS`, so
+    // the DO block below is the standard idempotent equivalent — safe to
+    // run on every server start, same as everything else in this function.
+    await db.execute(sql`
+      DO $do$ BEGIN
+        ALTER TABLE categories ADD CONSTRAINT categories_count_non_negative CHECK (count >= 0);
+      EXCEPTION WHEN duplicate_object THEN NULL;
+      END $do$;
+    `);
+
     await db.execute(sql`
       CREATE OR REPLACE FUNCTION sync_domain_category_cache() RETURNS trigger AS $fn$
       DECLARE
@@ -138,6 +155,24 @@ export async function ensureDomainCategoryTriggers() {
         IF affected_domain_ids IS NULL THEN
           RETURN NULL;
         END IF;
+
+        -- Lock every affected domain row before the primary-promotion check
+        -- below — without this, two CONCURRENT transactions each inserting
+        -- the first-ever domain_categories row(s) for the same brand-new
+        -- domain (e.g. a running feed sync racing a concurrent manual add/
+        -- review-approval for the same domain) could each run step 1's
+        -- "NOT EXISTS a primary yet" check against a snapshot where the
+        -- OTHER transaction's insert is still invisible, and both promote
+        -- their own row — leaving the domain with two is_primary=true rows
+        -- permanently (nothing later re-checks this). Locking domains (not
+        -- domain_categories directly — domains is the one row every writer
+        -- of this trigger already implicitly serializes on via step 2's own
+        -- UPDATE below) forces the second transaction to wait for the first
+        -- to commit, so it re-reads a primary that's now actually there.
+        -- ORDER BY id: a stable lock-acquisition order so two statements
+        -- touching overlapping-but-not-identical domain sets can never
+        -- deadlock against each other.
+        PERFORM 1 FROM domains WHERE id = ANY(affected_domain_ids) ORDER BY id FOR UPDATE;
 
         -- 1. Fallback-promote a primary membership for every affected domain
         --    that currently has none — one batched UPDATE, not one per
