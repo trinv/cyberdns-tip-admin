@@ -519,6 +519,13 @@ const DOMAIN_SORT_COLUMNS = {
   lastSeen: domains.lastSeen,
 } as const;
 
+// Sentinel accepted by getDomains'/the UI's feedSourceId filter to mean
+// "domains with NO feed-sourced membership at all" (every domain_categories
+// row it has is a manual/null-source one) — not a real feedSources.id, so
+// chosen to never collide with one (createFeedSource's own generated ids
+// are always `${slug}-${Date.now().toString(36)}`, never this literal).
+export const MANUAL_SOURCE_FILTER = '__manual__';
+
 export async function getDomains(params: {
   search?: string;
   category?: string;
@@ -527,7 +534,10 @@ export async function getDomains(params: {
   // accepted here (see below) in case a future caller ever needs it.
   status?: string;
   tld?: string;
-  source?: string;
+  // The REAL per-source attribution (domain_categories.feedSourceId), not
+  // domains.source — see this param's own note further down for why the
+  // old text-column filter this replaced was actually wrong.
+  feedSourceId?: string;
   // Omit both to fetch every matching row with no LIMIT/OFFSET — used by the
   // "xuất toàn bộ danh mục" export flow. The paginated Domain Explorer view
   // always passes an explicit limit (its page size), so this never silently
@@ -538,7 +548,7 @@ export async function getDomains(params: {
   sortDirection?: 'asc' | 'desc';
 }) {
   try {
-    const { search, category, status, tld, source, limit, offset = 0, sortField, sortDirection } = params;
+    const { search, category, status, tld, feedSourceId, limit, offset = 0, sortField, sortDirection } = params;
 
     const conditions = [];
 
@@ -566,8 +576,29 @@ export async function getDomains(params: {
     if (tld) {
       conditions.push(eq(domains.tld, tld));
     }
-    if (source) {
-      conditions.push(eq(domains.source, source));
+    // Filters by the REAL, live per-source attribution
+    // (domain_categories.feedSourceId — one row per domain PER SOURCE, see
+    // schema.ts's note), not domains.source. domains.source is a
+    // human-readable label written ONCE at the domain's first insert and
+    // NEVER updated again (grepped every ON CONFLICT/patch path — none
+    // touch it after creation) — with the (domainId, categoryId,
+    // feedSourceId) triple-key model, a domain can be independently backed
+    // by SEVERAL sources at once, so that frozen first-writer label stops
+    // reflecting reality the moment a second source also starts backing the
+    // same domain (or the first source's own backing goes away while a
+    // later source's doesn't) — filtering on it would silently show/hide
+    // the wrong domains for a given source. EXISTS, not a JOIN: a domain
+    // can have multiple domain_categories rows (several categories, or the
+    // same category from several sources), so a plain join would duplicate
+    // result rows.
+    if (feedSourceId === MANUAL_SOURCE_FILTER) {
+      conditions.push(
+        sql`NOT EXISTS (SELECT 1 FROM ${domainCategories} dc WHERE dc.domain_id = ${domains.id} AND dc.feed_source_id IS NOT NULL)`
+      );
+    } else if (feedSourceId) {
+      conditions.push(
+        sql`EXISTS (SELECT 1 FROM ${domainCategories} dc WHERE dc.domain_id = ${domains.id} AND dc.feed_source_id = ${feedSourceId})`
+      );
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -1974,9 +2005,15 @@ export async function resumeFeedSource(id: string, userEmail: string) {
 // domains with no other active backing (see getDomainIdsToUnblockForFeedSource)
 // are touched — one still validly categorized/sourced elsewhere stays
 // blocked even though this specific source's membership is going away.
-// domain_categories.feedSourceId/reviewQueue.feedSourceId both reference
-// this row ON DELETE SET NULL, so those rows survive with the link cleared
-// rather than being cascade-deleted.
+// reviewQueue.feedSourceId references this row ON DELETE SET NULL, so a
+// review item survives with its link cleared. domain_categories.feedSourceId
+// is ON DELETE CASCADE instead (see schema.ts's file-level note on
+// domain_categories for why) — this source's own membership rows are
+// deleted along with it, which is fine: the domains UPDATE above (using
+// domainIds computed BEFORE this delete) has already moved every domain
+// that needs it to 'unblocked' first, and the sync trigger (triggers.ts)
+// recomputes domains.categories/primaryCategory and categories.count from
+// whatever domain_categories rows remain once the cascade fires.
 export async function deleteFeedSource(id: string, userEmail: string) {
   try {
     // Same atomicity fix as pauseFeedSource above — see its own comment.

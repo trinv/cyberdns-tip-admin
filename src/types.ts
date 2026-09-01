@@ -13,6 +13,14 @@ export type DomainCategory =
 // backend path — see queries.ts).
 export type DomainStatus = 'active' | 'unblocked' | 'allowlist' | 'protected';
 
+// Sentinel value the "Nguồn Feed" filter (DomainTable.tsx) sends as
+// feedSourceId to mean "domains with no feed-sourced membership at all"
+// (every domain_categories row it has is manual/null-source) — mirrors
+// MANUAL_SOURCE_FILTER in src/db/queries.ts exactly. Duplicated (not
+// imported) because queries.ts pulls in server-only deps (pg, drizzle) that
+// must never end up in the browser bundle.
+export const MANUAL_SOURCE_FILTER = '__manual__';
+
 export interface CategoryInfo {
   id: string;
   name: string;

@@ -258,13 +258,13 @@ async function startServer() {
   // Domains Explorer API
   app.get('/api/domains', async (req, res) => {
     try {
-      const { search, category, status, tld, source, limit, offset, sortField, sortDirection } = req.query;
+      const { search, category, status, tld, feedSourceId, limit, offset, sortField, sortDirection } = req.query;
       const data = await getDomains({
         search: search as string,
         category: category as string,
         status: status as string,
         tld: tld as string,
-        source: source as string,
+        feedSourceId: feedSourceId as string,
         // No limit param at all => no LIMIT clause (used by the "export
         // entire category" flow); the paginated Domain Explorer view always
         // sends an explicit limit for its page size.

@@ -16,6 +16,10 @@ interface SourcesViewProps {
   onPauseSource: (id: string) => Promise<void> | void;
   onResumeSource: (id: string) => Promise<void> | void;
   onDeleteSource: (id: string) => Promise<void> | void;
+  // Jumps to Domain Explorer filtered to exactly the domains this source
+  // currently backs (via domain_categories.feedSourceId) — mirrors
+  // ReleasesView's onViewDomainsList (category-scoped) in App.tsx.
+  onViewDomainsList: (feedSourceId: string) => void;
 }
 
 export const SourcesView: React.FC<SourcesViewProps> = ({
@@ -27,6 +31,7 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
   onPauseSource,
   onResumeSource,
   onDeleteSource,
+  onViewDomainsList,
 }) => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newSourceName, setNewSourceName] = useState('');
@@ -193,6 +198,7 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
           onResumeSource={onResumeSource}
           onPause={(src) => setConfirmAction({ source: src, kind: 'pause' })}
           onDelete={(src) => setConfirmAction({ source: src, kind: 'delete' })}
+          onViewDomainsList={onViewDomainsList}
         />
       ) : (
       /* Sources Grid */
@@ -257,9 +263,13 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
                 <div className="grid grid-cols-2 gap-2 text-xs font-mono">
                   <div>
                     <span className="text-slate-400 dark:text-slate-500 block text-xs uppercase font-sans font-bold mb-0.5">SỐ LƯỢNG TÊN MIỀN</span>
-                    <span className="font-bold text-emerald-600 dark:text-emerald-400 text-sm font-mono">
+                    <button
+                      onClick={() => onViewDomainsList(src.id)}
+                      title={`Xem danh sách tên miền đang thuộc nguồn "${src.name}"`}
+                      className="font-bold text-emerald-600 dark:text-emerald-400 text-sm font-mono hover:underline cursor-pointer"
+                    >
                       {src.domainCount.toLocaleString('vi-VN')}
-                    </span>
+                    </button>
                   </div>
                   <div>
                     <span className="text-slate-400 dark:text-slate-500 block text-xs uppercase font-sans font-bold mb-0.5">CHU KỲ</span>
@@ -478,7 +488,8 @@ const SourcesCompactList: React.FC<{
   onResumeSource: (id: string) => Promise<void> | void;
   onPause: (src: FeedSource) => void;
   onDelete: (src: FeedSource) => void;
-}> = ({ sources, getCategoryInfo, onSyncSingle, onResumeSource, onPause, onDelete }) => {
+  onViewDomainsList: (feedSourceId: string) => void;
+}> = ({ sources, getCategoryInfo, onSyncSingle, onResumeSource, onPause, onDelete, onViewDomainsList }) => {
   const statusBadgeClass = (src: FeedSource) => {
     if (src.isPaused) return 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600';
     switch (src.status) {
@@ -534,7 +545,13 @@ const SourcesCompactList: React.FC<{
                     )}
                   </td>
                   <td className="px-4 py-3 text-right font-bold text-emerald-600 dark:text-emerald-400 font-mono">
-                    {src.domainCount.toLocaleString('vi-VN')}
+                    <button
+                      onClick={() => onViewDomainsList(src.id)}
+                      title={`Xem danh sách tên miền đang thuộc nguồn "${src.name}"`}
+                      className="hover:underline cursor-pointer"
+                    >
+                      {src.domainCount.toLocaleString('vi-VN')}
+                    </button>
                   </td>
                   <td className="px-4 py-3 text-slate-600 dark:text-slate-400 font-sans whitespace-nowrap">{src.syncInterval}</td>
                   <td className="px-4 py-3">

@@ -185,7 +185,11 @@ export async function fetchDomains(params: {
   // accepted server-side, see getDomains() in queries.ts.
   status?: string;
   tld?: string;
-  source?: string;
+  // The real feed_sources.id (or the MANUAL_SOURCE_FILTER sentinel — see
+  // src/db/queries.ts), not domains.source's free-text label — see
+  // getDomains' own note on why that label can't reliably answer "which
+  // domains does source X currently back."
+  feedSourceId?: string;
   limit?: number;
   offset?: number;
   sortField?: 'domain' | 'firstSeen' | 'lastSeen';
@@ -196,7 +200,7 @@ export async function fetchDomains(params: {
   if (params.category && params.category !== 'all') query.set('category', params.category);
   if (params.status) query.set('status', params.status);
   if (params.tld) query.set('tld', params.tld);
-  if (params.source) query.set('source', params.source);
+  if (params.feedSourceId) query.set('feedSourceId', params.feedSourceId);
   if (params.limit) query.set('limit', String(params.limit));
   if (params.offset) query.set('offset', String(params.offset));
   if (params.sortField) query.set('sortField', params.sortField);

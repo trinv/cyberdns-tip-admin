@@ -296,6 +296,10 @@ export default function App() {
   // Filter States
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedTld, setSelectedTld] = useState<string>('');
+  // A real feed_sources.id (or MANUAL_SOURCE_FILTER — see types.ts), not a
+  // domains.source text label — see getDomains' own note in queries.ts for
+  // why filtering by that label would be unreliable now that a domain can
+  // be independently backed by several sources at once.
   const [selectedSource, setSelectedSource] = useState<string>('');
   // Single-select (was a multi-checkbox Record<DomainStatus, boolean>) — a
   // dropdown of "Tất cả" + the 4 real statuses matches how this was already
@@ -380,7 +384,7 @@ export default function App() {
         category: selectedCategory !== 'all' ? selectedCategory : undefined,
         status: selectedStatus !== 'all' ? selectedStatus : undefined,
         tld: selectedTld || undefined,
-        source: selectedSource || undefined,
+        feedSourceId: selectedSource || undefined,
         search: debouncedSearchQuery || undefined,
         limit: domainsPageSize,
         offset: (domainsPage - 1) * domainsPageSize,
@@ -421,7 +425,7 @@ export default function App() {
       category: selectedCategory !== 'all' ? selectedCategory : undefined,
       status: selectedStatus !== 'all' ? selectedStatus : undefined,
       tld: selectedTld || undefined,
-      source: selectedSource || undefined,
+      feedSourceId: selectedSource || undefined,
       search: debouncedSearchQuery || undefined,
       sortField,
       sortDirection,
@@ -1057,6 +1061,7 @@ export default function App() {
                 setSelectedTld={setSelectedTld}
                 selectedSource={selectedSource}
                 setSelectedSource={setSelectedSource}
+                feedSources={sources}
                 selectedStatus={selectedStatus}
                 onOpenBulkModal={(actionType) => {
                   setBulkActionType(actionType);
@@ -1245,6 +1250,10 @@ export default function App() {
                   console.warn('Backend delete source notice:', err);
                   showToast(err?.message || 'Không thể xoá nguồn — vui lòng thử lại.', 'warning');
                 }
+              }}
+              onViewDomainsList={(feedSourceId) => {
+                setSelectedSource(feedSourceId);
+                setCurrentTab('domain');
               }}
             />
           )}

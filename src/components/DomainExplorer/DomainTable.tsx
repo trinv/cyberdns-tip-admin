@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { DomainItem, CategoryInfo, DomainStatus } from '../../types';
+import { DomainItem, CategoryInfo, DomainStatus, FeedSource, MANUAL_SOURCE_FILTER } from '../../types';
 import { useClickOutside } from '../../hooks/useClickOutside';
 import {
   Search, X, Plus, Download, ShieldAlert,
@@ -36,8 +36,15 @@ interface DomainTableProps {
   onClearCategoryFilter: () => void;
   selectedTld: string;
   setSelectedTld: (tld: string) => void;
+  // Real feed_sources.id (or MANUAL_SOURCE_FILTER) — see types.ts's own note.
   selectedSource: string;
   setSelectedSource: (source: string) => void;
+  // The full, real list of feed sources (id + name) — NOT derived from the
+  // current page's domains — backing the "Nguồn Feed" filter dropdown/pill
+  // below, so it lists every actual source and filters by the authoritative
+  // domain_categories.feedSourceId, not the stale domains.source label a
+  // domain was first created with (see getDomains' own note in queries.ts).
+  feedSources: FeedSource[];
   // Drives the bulk-action toolbar's 3rd button: while viewing the "Đã thôi
   // chặn" list specifically, offering "Thôi chặn..." again on domains
   // already unblocked doesn't make sense — swapped for "Chặn..." (re-block)
@@ -78,6 +85,7 @@ export const DomainTable: React.FC<DomainTableProps> = ({
   setSelectedTld,
   selectedSource,
   setSelectedSource,
+  feedSources,
   selectedStatus,
   onOpenBulkModal,
   onOpenExportModal,
@@ -107,11 +115,13 @@ export const DomainTable: React.FC<DomainTableProps> = ({
     return Array.from(set).sort();
   }, [domains]);
 
-  const availableSources = useMemo(() => {
-    const set = new Set<string>();
-    domains.forEach((d) => set.add(d.source));
-    return Array.from(set).sort();
-  }, [domains]);
+  // Real name for the currently-selected feedSourceId (or the manual-filter
+  // sentinel) — used by the pill below. Falls back to the raw id if a
+  // source was deleted after being selected (rare, harmless).
+  const selectedSourceLabel = useMemo(() => {
+    if (selectedSource === MANUAL_SOURCE_FILTER) return 'Thủ công (không qua Feed)';
+    return feedSources.find((s) => s.id === selectedSource)?.name || selectedSource;
+  }, [selectedSource, feedSources]);
 
   const totalPages = Math.ceil(totalCount / pageSize) || 1;
 
@@ -272,10 +282,14 @@ export const DomainTable: React.FC<DomainTableProps> = ({
             </div>
           )}
 
-          {/* Source Filter Dropdown / Pill */}
+          {/* Source Filter Dropdown / Pill — filters by the REAL, live
+              domain_categories.feedSourceId (via feedSources, the actual
+              nguồn cấp dữ liệu list), not the frozen domains.source label a
+              domain happened to be created with. See types.ts's note on
+              MANUAL_SOURCE_FILTER and getDomains' own note in queries.ts. */}
           {selectedSource ? (
             <div className="flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-cyan-50 dark:bg-cyan-950/60 border border-cyan-200 dark:border-cyan-800 text-cyan-700 dark:text-cyan-300 text-xs font-mono font-semibold">
-              <span>source: {selectedSource}</span>
+              <span>nguồn: {selectedSourceLabel}</span>
               <button
                 onClick={() => setSelectedSource('')}
                 className="hover:text-cyan-900 dark:hover:text-cyan-100 p-0.5 rounded ml-1 cursor-pointer"
@@ -293,25 +307,35 @@ export const DomainTable: React.FC<DomainTableProps> = ({
                 <span>Nguồn Feed</span>
               </button>
               {sourceFilterOpen && (
-                <div className="absolute left-0 mt-1 w-52 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl py-1.5 z-40 text-left">
+                <div className="absolute left-0 mt-1 w-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl py-1.5 z-40 text-left max-h-80 overflow-y-auto">
                   <div className="px-3 py-1 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-                    Lọc theo nguồn dữ liệu
+                    Lọc theo nguồn feed (thực tế đang gán)
                   </div>
-                  {availableSources.map((src) => (
+                  {feedSources.map((fs) => (
                     <button
-                      key={src}
+                      key={fs.id}
                       onClick={() => {
-                        setSelectedSource(src);
+                        setSelectedSource(fs.id);
                         setSourceFilterOpen(false);
                       }}
-                      className="w-full px-3 py-1.5 text-xs text-slate-700 dark:text-slate-300 hover:bg-cyan-50 dark:hover:bg-cyan-950/50 hover:text-cyan-700 dark:hover:text-cyan-300 font-mono flex items-center justify-between text-left cursor-pointer"
+                      className="w-full px-3 py-1.5 text-xs text-slate-700 dark:text-slate-300 hover:bg-cyan-50 dark:hover:bg-cyan-950/50 hover:text-cyan-700 dark:hover:text-cyan-300 flex items-center justify-between text-left cursor-pointer"
                     >
-                      <span className="truncate">{src}</span>
-                      <span className="text-xs text-slate-400 dark:text-slate-500 ml-2">
-                        {domains.filter((d) => d.source === src).length}
+                      <span className="truncate">{fs.name}</span>
+                      <span className="text-xs text-slate-400 dark:text-slate-500 ml-2 flex-shrink-0">
+                        {fs.domainCount.toLocaleString('vi-VN')}
                       </span>
                     </button>
                   ))}
+                  <div className="my-1 border-t border-slate-100 dark:border-slate-700" />
+                  <button
+                    onClick={() => {
+                      setSelectedSource(MANUAL_SOURCE_FILTER);
+                      setSourceFilterOpen(false);
+                    }}
+                    className="w-full px-3 py-1.5 text-xs text-slate-500 dark:text-slate-400 hover:bg-cyan-50 dark:hover:bg-cyan-950/50 hover:text-cyan-700 dark:hover:text-cyan-300 italic text-left cursor-pointer"
+                  >
+                    Thủ công (không qua Feed)
+                  </button>
                 </div>
               )}
             </div>
