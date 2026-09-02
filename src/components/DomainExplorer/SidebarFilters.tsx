@@ -1,6 +1,6 @@
 import React from 'react';
 import { CategoryInfo, SavedFilter, DomainStatus } from '../../types';
-import { Plus, Bookmark, Filter, X, Check } from 'lucide-react';
+import { Plus, Bookmark, Filter, X } from 'lucide-react';
 
 const STATUS_OPTIONS: { value: DomainStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'Tất cả' },
@@ -168,43 +168,59 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
         </button>
       </div>
 
-      {/* TRẠNG THÁI SECTION — segmented toggle block (2x2): a single
-          grooved "track" with 4 floating pill segments, the active one
-          filled solid emerald like a switch's ON state. Still strictly
-          single-select (selectedStatus is one value, never independent
-          booleans) — chosen over 4 literal iOS-style on/off switches
-          specifically because real toggle switches conventionally imply
-          independent state, which would misrepresent a mutually-exclusive
-          choice (turning one "on" always turns the others "off"). This is
-          the segmented-control reading of "toggle switch" instead. */}
+      {/* TRẠNG THÁI SECTION — 4 real iOS-style toggle switches (pill track +
+          sliding circular thumb), one row per status. Explicitly requested
+          over the earlier segmented-block design after seeing a literal
+          switch-style reference image — the trade-off this implies was
+          already flagged and accepted: selectedStatus is still one single
+          value (never independent booleans), so tapping any switch ON
+          always visually turns the other three OFF as a side effect —
+          there is no way to end up with zero or multiple switches lit at
+          once, by construction (isOn is derived, never stored per-switch). */}
       <div>
         <div className="px-2 mb-2.5 text-slate-400 dark:text-slate-500 font-bold tracking-wider text-xs uppercase">
           TRẠNG THÁI BLOCKLIST
         </div>
-        <div className="grid grid-cols-2 gap-1 p-1 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-100/70 dark:bg-slate-800/60">
+        <div className="space-y-1">
           {STATUS_OPTIONS.map((opt) => {
-            const isSelected = selectedStatus === opt.value;
+            const isOn = selectedStatus === opt.value;
             return (
               <button
                 key={opt.value}
                 type="button"
-                aria-pressed={isSelected}
+                role="switch"
+                aria-checked={isOn}
                 onClick={() => {
                   onSelectStatus(opt.value);
                   if (onCloseMobile) onCloseMobile();
                 }}
-                className={`flex flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-2.5 text-center leading-tight transition-all duration-200 cursor-pointer ${
-                  isSelected
-                    ? 'bg-emerald-600 dark:bg-emerald-600 text-white font-bold shadow-sm'
-                    : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 font-semibold hover:bg-emerald-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
+                className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl transition-colors text-left cursor-pointer ${
+                  isOn ? 'bg-emerald-50 dark:bg-emerald-950/40' : 'hover:bg-slate-50 dark:hover:bg-slate-800'
                 }`}
               >
-                <span className="flex items-center justify-center gap-1">
-                  {isSelected && <Check className="w-3 h-3 flex-shrink-0" />}
-                  <span>{opt.label}</span>
+                <span className="flex flex-col min-w-0 truncate">
+                  <span className={`truncate ${isOn ? 'text-emerald-700 dark:text-emerald-300 font-bold' : 'text-slate-700 dark:text-slate-300 font-semibold'}`}>
+                    {opt.label}
+                  </span>
+                  <span className="font-mono text-xs text-slate-400 dark:text-slate-500">
+                    {opt.value === 'all' ? formatNumber(allStatusCount) : formatStatusCount(opt.value)}
+                  </span>
                 </span>
-                <span className={`font-mono text-xs ${isSelected ? 'text-emerald-50' : 'text-slate-400 dark:text-slate-500'}`}>
-                  {opt.value === 'all' ? formatNumber(allStatusCount) : formatStatusCount(opt.value)}
+                {/* The switch itself: a plain decorative <span> (not a
+                    nested <button>) — the whole row above is the real,
+                    already-large click target and the interactive element;
+                    nesting a second interactive control inside it would be
+                    invalid HTML. */}
+                <span
+                  className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors duration-200 ${
+                    isOn ? 'bg-emerald-600' : 'bg-slate-300 dark:bg-slate-600'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                      isOn ? 'translate-x-4' : 'translate-x-0.5'
+                    }`}
+                  />
                 </span>
               </button>
             );
