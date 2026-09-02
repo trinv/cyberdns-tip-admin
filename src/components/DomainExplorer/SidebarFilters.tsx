@@ -1,6 +1,6 @@
 import React from 'react';
 import { CategoryInfo, SavedFilter, DomainStatus } from '../../types';
-import { Plus, Tag, Bookmark, CheckSquare, Square, FolderPlus, Sparkles, Filter, X } from 'lucide-react';
+import { Plus, Bookmark, Filter, X, Check } from 'lucide-react';
 
 const STATUS_OPTIONS: { value: DomainStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'Tất cả' },
@@ -168,15 +168,21 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
         </button>
       </div>
 
-      {/* TRẠNG THÁI SECTION — single-select toggle group (was a dropdown)
-          matching how a saved filter/category selection already only ever
-          carries ONE status at a time. */}
+      {/* TRẠNG THÁI SECTION — segmented toggle block (2x2): a single
+          grooved "track" with 4 floating pill segments, the active one
+          filled solid emerald like a switch's ON state. Still strictly
+          single-select (selectedStatus is one value, never independent
+          booleans) — chosen over 4 literal iOS-style on/off switches
+          specifically because real toggle switches conventionally imply
+          independent state, which would misrepresent a mutually-exclusive
+          choice (turning one "on" always turns the others "off"). This is
+          the segmented-control reading of "toggle switch" instead. */}
       <div>
         <div className="px-2 mb-2.5 text-slate-400 dark:text-slate-500 font-bold tracking-wider text-xs uppercase">
           TRẠNG THÁI BLOCKLIST
         </div>
-        <div className="flex flex-col rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-900">
-          {STATUS_OPTIONS.map((opt, idx) => {
+        <div className="grid grid-cols-2 gap-1 p-1 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-100/70 dark:bg-slate-800/60">
+          {STATUS_OPTIONS.map((opt) => {
             const isSelected = selectedStatus === opt.value;
             return (
               <button
@@ -187,20 +193,17 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
                   onSelectStatus(opt.value);
                   if (onCloseMobile) onCloseMobile();
                 }}
-                className={`w-full flex items-center justify-between px-3 py-2 text-left text-xs font-semibold transition-colors cursor-pointer ${
-                  idx !== 0 ? 'border-t border-slate-100 dark:border-slate-800' : ''
-                } ${
+                className={`flex flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-2.5 text-center leading-tight transition-all duration-200 cursor-pointer ${
                   isSelected
-                    ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
-                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    ? 'bg-emerald-600 dark:bg-emerald-600 text-white font-bold shadow-sm'
+                    : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 font-semibold hover:bg-emerald-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
-                <span>{opt.label}</span>
-                <span className={`font-mono text-xs px-1.5 py-0.5 rounded ${
-                  isSelected
-                    ? 'bg-emerald-100/80 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 font-bold'
-                    : 'text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800'
-                }`}>
+                <span className="flex items-center justify-center gap-1">
+                  {isSelected && <Check className="w-3 h-3 flex-shrink-0" />}
+                  <span>{opt.label}</span>
+                </span>
+                <span className={`font-mono text-xs ${isSelected ? 'text-emerald-50' : 'text-slate-400 dark:text-slate-500'}`}>
                   {opt.value === 'all' ? formatNumber(allStatusCount) : formatStatusCount(opt.value)}
                 </span>
               </button>
