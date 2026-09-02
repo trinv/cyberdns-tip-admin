@@ -499,11 +499,22 @@ export async function getDashboardStats() {
         count: Number(t.count),
         percent: totalActive > 0 ? (Number(t.count) / totalActive) * 100 : 0,
       })),
-      statusBreakdown: statusRows.map((s) => ({
-        status: s.status,
-        count: Number(s.count),
-        percent: totalAll > 0 ? (Number(s.count) / totalAll) * 100 : 0,
-      })),
+      // GROUP BY status only ever returns rows for statuses that currently
+      // have at least one domain — a status with zero domains right now
+      // (e.g. nothing in 'allowlist' yet) is simply ABSENT from statusRows,
+      // not present with count 0. Left as-is, that made the sidebar's
+      // "Trong allowlist" badge show "…" (its designed-in "stats haven't
+      // loaded yet" placeholder — see SidebarFilters.tsx's formatStatusCount)
+      // FOREVER once real data had already loaded, indistinguishable from a
+      // stuck loading spinner — a real, reported UI defect, not a loading
+      // state. Filling in every known status explicitly (defaulting to 0)
+      // makes "genuinely zero" and "not loaded yet" distinguishable again:
+      // only the latter now produces undefined.
+      statusBreakdown: (['active', 'unblocked', 'allowlist', 'protected'] as const).map((status) => {
+        const row = statusRows.find((s) => s.status === status);
+        const count = Number(row?.count || 0);
+        return { status, count, percent: totalAll > 0 ? (count / totalAll) * 100 : 0 };
+      }),
       recentActive,
     };
   } catch (error) {
@@ -952,7 +963,7 @@ export async function bulkCreateDomains(data: {
   onPhaseProgress?: (fraction: number, label: string) => void | Promise<void>;
 }) {
   const cleanDomains = Array.from(new Set(data.domains.map((d) => d.toLowerCase().trim()).filter(Boolean)));
-  if (cleanDomains.length === 0) return { insertedCount: 0, newCount: 0, existingCount: 0 };
+  if (cleanDomains.length === 0) return { insertedCount: 0, newCount: 0, existingCount: 0, soleOwnerCount: 0, stillBackedElsewhereCount: 0 };
 
   const categoryId = data.categories[0];
   if (!categoryId) throw new Error('bulkCreateDomains requires at least one category.');
@@ -1003,6 +1014,36 @@ export async function bulkCreateDomains(data: {
     const existingCount = Number(existingResult.rows[0].count);
     const newCount = cleanDomains.length - existingCount;
 
+    // A SEPARATE number from existingCount above — that one only answers
+    // "has THIS source already tagged this domain in THIS category before"
+    // (scoped, by design, to this source's own sync history), which is what
+    // caused a real, reported confusion: "51.365 mới, 0 đã tồn tại" reads
+    // as "no overlap with anything," which it never meant — a domain can be
+    // "mới" for this source's own bookkeeping while simultaneously already
+    // blocked by a different source/category. This number answers the
+    // question that actually matters to an admin instead: "of what I just
+    // synced, exactly how many would stay blocked if I paused this source
+    // RIGHT NOW" — same predicate as getDomainIdsToUnblockForFeedSource
+    // (only a manual entry or a currently-NON-paused other source counts as
+    // real protection; a domain backed only by an ALREADY-paused source
+    // would still unblock, so that doesn't count here either), computed
+    // against the whole batch rather than just its "existing" subset — this
+    // makes the sync message able to state the exact pause outcome
+    // up front, not just hint at possible overlap.
+    const stillBackedElsewhereResult = await client.query<{ count: string }>(
+      `SELECT count(*) FROM tmp_sync_domains t
+       WHERE EXISTS (
+         SELECT 1 FROM domains d
+         JOIN domain_categories dc ON dc.domain_id = d.id
+         LEFT JOIN feed_sources fs2 ON fs2.id = dc.feed_source_id
+         WHERE d.domain = t.domain
+           AND NOT (dc.category_id = $1 AND dc.feed_source_id IS NOT DISTINCT FROM $2)
+           AND (dc.feed_source_id IS NULL OR fs2.is_paused = false)
+       );`,
+      [categoryId, data.feedSourceId || null]
+    );
+    const stillBackedElsewhereCount = Number(stillBackedElsewhereResult.rows[0].count);
+
     await client.query(UPSERT_DOMAINS_SQL, [sourceLabel, sourceDetail]);
     await data.onPhaseProgress?.(0.75, 'Đã ghi vào bảng domains — đang gán nhóm danh mục...');
 
@@ -1052,13 +1093,21 @@ export async function bulkCreateDomains(data: {
       details: [
         `Số lượng: ${cleanDomains.length}`,
         `Nhóm: ${categoryId}`,
-        `Mới: ${newCount}`,
-        `Đã tồn tại: ${existingCount}`,
+        `Mới qua nguồn/nhóm này (số nội bộ, không phải "mới toàn hệ thống"): ${newCount}`,
+        `Đã từng qua nguồn/nhóm này trước đó: ${existingCount}`,
+        `Chỉ do nguồn này chặn (sẽ thôi chặn nếu tạm dừng nguồn này): ${cleanDomains.length - stillBackedElsewhereCount}`,
+        `Còn được nhóm/nguồn khác đang hoạt động chặn (sẽ TIẾP TỤC bị chặn nếu tạm dừng nguồn này): ${stillBackedElsewhereCount}`,
         'Để hoàn tác: dùng "Tạm dừng nguồn" ở tab Nguồn cấp dữ liệu.',
       ],
     });
 
-    return { insertedCount: cleanDomains.length, newCount, existingCount };
+    return {
+      insertedCount: cleanDomains.length,
+      newCount,
+      existingCount,
+      soleOwnerCount: cleanDomains.length - stillBackedElsewhereCount,
+      stillBackedElsewhereCount,
+    };
   } catch (error: any) {
     failed = true;
     await client.query('ROLLBACK').catch(() => {});
@@ -1790,7 +1839,21 @@ async function runFeedSourceSyncJob(id: string, actingUser?: { email?: string; r
         lastSync: new Date(),
         status: 'healthy',
         errorMessage: null,
-        lastSyncMessage: `Đã nạp ${parsedDomains.length.toLocaleString('vi-VN')} domain — ${result.newCount.toLocaleString('vi-VN')} mới, ${result.existingCount.toLocaleString('vi-VN')} đã tồn tại (trùng lặp, đã bỏ qua/cập nhật).`,
+        // Deliberately does NOT use "mới"/"đã tồn tại" wording here anymore
+        // — those are scoped to THIS source's own sync history (see
+        // bulkCreateDomains' own note on existingCount), and a real,
+        // reported case of user confusion showed that framing reads as "no
+        // overlap with anything" even when it isn't. Leads instead with the
+        // two numbers that actually matter and directly states the exact
+        // consequence of each, in plain language, so nothing needs
+        // decoding: how many of what was just synced are backed ONLY by
+        // this source (would unblock on a future pause) vs. still backed by
+        // something else active (would stay blocked) — same predicate
+        // pauseFeedSource itself uses, computed up front.
+        lastSyncMessage: `Đã nạp ${parsedDomains.length.toLocaleString('vi-VN')} domain — ` +
+          (result.stillBackedElsewhereCount > 0
+            ? `${result.soleOwnerCount.toLocaleString('vi-VN')} domain CHỈ do nguồn này chặn (sẽ thôi chặn nếu tạm dừng nguồn này), ${result.stillBackedElsewhereCount.toLocaleString('vi-VN')} domain còn được nhóm/nguồn KHÁC đang hoạt động chặn (sẽ TIẾP TỤC bị chặn nếu tạm dừng nguồn này).`
+            : `toàn bộ hiện chỉ do nguồn này chặn (sẽ thôi chặn hết nếu tạm dừng nguồn này).`),
         domainCount: liveDomainCount.length,
         syncProgress: 100,
         syncPhase: null,

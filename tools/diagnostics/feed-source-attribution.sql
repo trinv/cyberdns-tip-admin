@@ -91,3 +91,46 @@ WHERE dc.feed_source_id IS NOT NULL
   )
 ORDER BY dc.added_at DESC
 LIMIT 200;
+
+-- Query 4: after pausing/deleting a source, this reproduces EXACTLY what
+-- pauseFeedSource/deleteFeedSource itself computed (same predicate as
+-- getDomainIdsToUnblockForFeedSource in src/db/queries.ts) so you can see,
+-- for one specific source, the full breakdown with REASONS — not just a
+-- count. Replace 'your-source-id' below (the id shown in the Sources tab
+-- URL/card, e.g. 'hagezi-malware-xxxxx').
+--   * unblocked_correctly:   domains that WOULD move/moved to 'unblocked'
+--   * kept_blocked_reason:   for every domain still 'active', WHICH other
+--     source (or 'THỦ CÔNG (manual)') is the reason it's correctly kept —
+--     if this list is empty for a domain that's still 'active', that IS a
+--     real bug worth reporting back, since it means nothing justifies
+--     keeping it blocked.
+WITH target AS (SELECT 'your-source-id'::varchar AS id),
+this_source_domains AS (
+  SELECT DISTINCT dc.domain_id
+  FROM domain_categories dc, target
+  WHERE dc.feed_source_id = target.id
+)
+SELECT
+  d.domain,
+  d.status,
+  CASE WHEN NOT EXISTS (
+    SELECT 1 FROM domain_categories dc2
+    LEFT JOIN feed_sources fs2 ON fs2.id = dc2.feed_source_id
+    WHERE dc2.domain_id = tsd.domain_id
+      AND (dc2.feed_source_id IS NULL OR (dc2.feed_source_id != (SELECT id FROM target) AND fs2.is_paused = false))
+  ) THEN 'unblocked_correctly' ELSE 'kept_blocked' END AS pause_outcome,
+  -- All the OTHER rows backing this same domain, for a human-readable reason:
+  (
+    SELECT string_agg(
+      COALESCE(fs3.name, 'THỦ CÔNG (manual)') || ' [' || dc3.category_id || ']'
+             || CASE WHEN fs3.is_paused THEN ' (đã tạm dừng)' ELSE '' END,
+      ', '
+    )
+    FROM domain_categories dc3
+    LEFT JOIN feed_sources fs3 ON fs3.id = dc3.feed_source_id
+    WHERE dc3.domain_id = tsd.domain_id AND dc3.feed_source_id IS DISTINCT FROM (SELECT id FROM target)
+  ) AS other_backing
+FROM this_source_domains tsd
+JOIN domains d ON d.id = tsd.domain_id
+ORDER BY pause_outcome, d.domain
+LIMIT 500;  -- bỏ LIMIT hoặc tăng lên nếu muốn xem hết

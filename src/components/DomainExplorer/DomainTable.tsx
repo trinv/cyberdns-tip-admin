@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { DomainItem, CategoryInfo, DomainStatus, FeedSource, MANUAL_SOURCE_FILTER } from '../../types';
 import { useClickOutside } from '../../hooks/useClickOutside';
+import { copyToClipboard } from '../../lib/clipboard';
 import {
   Search, X, Plus, Download, ShieldAlert,
   ArrowUpDown,
@@ -28,8 +29,6 @@ interface DomainTableProps {
   sortField: 'domain' | 'firstSeen' | 'lastSeen';
   sortDirection: 'asc' | 'desc';
   onSortChange: (field: 'domain' | 'firstSeen' | 'lastSeen', direction: 'asc' | 'desc') => void;
-  activeDomainId: string | null;
-  onSetActiveDomainId: (id: string) => void;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
   selectedCategory: string;
@@ -75,8 +74,6 @@ export const DomainTable: React.FC<DomainTableProps> = ({
   sortField,
   sortDirection,
   onSortChange,
-  activeDomainId,
-  onSetActiveDomainId,
   searchQuery,
   setSearchQuery,
   selectedCategory,
@@ -182,11 +179,17 @@ export const DomainTable: React.FC<DomainTableProps> = ({
     }
   };
 
-  const handleCopy = (e: React.MouseEvent, domainName: string) => {
+  const handleCopy = async (e: React.MouseEvent, domainName: string) => {
     e.stopPropagation();
-    navigator.clipboard.writeText(domainName);
-    setCopiedDomain(domainName);
-    setTimeout(() => setCopiedDomain(null), 1500);
+    // Only show the "copied" checkmark once the copy actually succeeded —
+    // see copyToClipboard's own note on why the old unconditional
+    // navigator.clipboard.writeText call could silently do nothing (no
+    // HTTPS/secure context) while still claiming success.
+    const ok = await copyToClipboard(domainName);
+    if (ok) {
+      setCopiedDomain(domainName);
+      setTimeout(() => setCopiedDomain(null), 1500);
+    }
   };
 
   return (
@@ -524,31 +527,20 @@ export const DomainTable: React.FC<DomainTableProps> = ({
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
               {domains.map((item) => {
                 const isSelected = selectedDomainIds.has(item.id);
-                const isActive = activeDomainId === item.id;
 
                 return (
                   <tr
                     key={item.id}
-                    onClick={() => onSetActiveDomainId(item.id)}
-                    className={`group transition-colors cursor-pointer relative ${
-                      isActive
-                        ? 'bg-emerald-50/60 dark:bg-slate-800 font-medium'
-                        : isSelected
+                    className={`group transition-colors ${
+                      isSelected
                         ? 'bg-emerald-50/30 dark:bg-slate-800/60'
                         : 'hover:bg-slate-50/80 dark:hover:bg-slate-800/40'
                     }`}
                   >
-                    {/* Active row emerald bar indicator */}
                     <td
-                      className="px-4 py-3 text-center relative"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onToggleSelectDomain(item.id);
-                      }}
+                      className="px-4 py-3 text-center"
+                      onClick={() => onToggleSelectDomain(item.id)}
                     >
-                      {isActive && (
-                        <span className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-600 rounded-r"></span>
-                      )}
                       <input
                         type="checkbox"
                         checked={isSelected}

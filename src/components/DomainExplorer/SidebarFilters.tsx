@@ -20,10 +20,16 @@ interface SidebarFiltersProps {
   onSelectSavedFilter: (filter: SavedFilter) => void;
   onOpenAddCategory: () => void;
   onSaveCurrentFilter: () => void;
-  totalDomainCount: number;
-  // Real count across every status (dashboardStats.totalAll) — the
-  // "Tất cả" option's own count, distinct from totalDomainCount above
-  // (which is active-only, used by the CATEGORY section's "Tất cả nhóm").
+  // Real count across EVERY status (dashboardStats.totalAll) — shared by
+  // BOTH the CATEGORY section's "Tất cả nhóm" and the STATUS section's
+  // "Tất cả", deliberately the same number in both places. Each category's
+  // own badge (cat.count, below) is also all-status — so "Tất cả nhóm" and
+  // an individual category's count are directly comparable (the whole is
+  // never smaller than one of its parts). This used to be two different
+  // props — "Tất cả nhóm" wired to an ACTIVE-ONLY count while every
+  // category badge next to it was all-status — which could show a single
+  // category with a HIGHER count than "Tất cả nhóm" itself: a real,
+  // reported "the total is less than one part" confusion.
   allStatusCount: number;
   // Real per-status counts from GET /api/dashboard/stats — undefined/null
   // while stats haven't loaded yet, rendered as "…" rather than a guessed
@@ -44,7 +50,6 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
   onSelectSavedFilter,
   onOpenAddCategory,
   onSaveCurrentFilter,
-  totalDomainCount,
   allStatusCount,
   statusCounts,
   isOpenMobile = false,
@@ -109,7 +114,7 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
                 ? 'bg-emerald-100/80 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 font-bold' 
                 : 'text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800'
             }`}>
-              {formatNumber(totalDomainCount)}
+              {formatNumber(allStatusCount)}
             </span>
           </button>
 
@@ -127,6 +132,12 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
                   isSelected
                     ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-200/80 dark:border-emerald-800/80 shadow-xs'
                     : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                } ${
+                  // A still-empty category (created but never synced/filled)
+                  // recedes visually so the eye lands on groups that actually
+                  // have domains — it stays fully legible and clickable,
+                  // just quieter, and never dims while it's the active filter.
+                  cat.count === 0 && !isSelected ? 'opacity-60' : ''
                 }`}
               >
                 <div className="flex items-center space-x-2.5 truncate">

@@ -39,7 +39,6 @@ import { Header, HeaderNotification } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { SidebarFilters } from './components/DomainExplorer/SidebarFilters';
 import { DomainTable } from './components/DomainExplorer/DomainTable';
-import { DomainInspector } from './components/DomainExplorer/DomainInspector';
 import { DomainBulkModal } from './components/DomainExplorer/DomainBulkModal';
 import { DashboardView } from './components/Dashboard/DashboardView';
 import { ReleasesView } from './components/Releases/ReleasesView';
@@ -325,9 +324,8 @@ export default function App() {
   const [sortField, setSortField] = useState<'domain' | 'firstSeen' | 'lastSeen'>('lastSeen');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
-  // Selection & Inspector States
+  // Selection State
   const [selectedDomainIds, setSelectedDomainIds] = useState<Set<string>>(new Set());
-  const [activeDomainId, setActiveDomainId] = useState<string | null>(null);
 
   // Modals States
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState<boolean>(false);
@@ -517,7 +515,6 @@ export default function App() {
   useEffect(() => {
     setDomainsPage(1);
     setSelectedDomainIds(new Set());
-    setActiveDomainId(null);
   }, [selectedCategory, selectedStatus, selectedTld, selectedSource, debouncedSearchQuery]);
 
   // Keyboard shortcut listener
@@ -540,15 +537,6 @@ export default function App() {
 
   // `domains` is now already exactly the current filtered/sorted/paginated
   // server page (see refreshDomains above) — no client-side re-filtering.
-
-  // Selected domain object for Inspector. Only looks within the currently
-  // loaded page — if the inspected domain isn't on this page (e.g. the user
-  // changed page/filter), the inspector naturally closes rather than
-  // showing stale data.
-  const activeDomain = useMemo(() => {
-    if (!activeDomainId) return null;
-    return domains.find((d) => d.id === activeDomainId) || null;
-  }, [domains, activeDomainId]);
 
   // Toggle selection
   const handleToggleSelectDomain = (id: string) => {
@@ -1027,7 +1015,6 @@ export default function App() {
                 onSelectSavedFilter={handleSelectSavedFilter}
                 onOpenAddCategory={() => setIsCategoryModalOpen(true)}
                 onSaveCurrentFilter={() => showToast('Đã lưu bộ lọc tìm kiếm hiện tại vào danh sách!', 'info')}
-                totalDomainCount={dashboardStats?.totalActive ?? 0}
                 allStatusCount={dashboardStats?.totalAll ?? 0}
                 statusCounts={statusCountsMap}
                 isOpenMobile={isMobileFiltersOpen}
@@ -1051,8 +1038,6 @@ export default function App() {
                 sortField={sortField}
                 sortDirection={sortDirection}
                 onSortChange={(field, direction) => { setSortField(field); setSortDirection(direction); }}
-                activeDomainId={activeDomainId}
-                onSetActiveDomainId={setActiveDomainId}
                 searchQuery={searchQuery}
                 setSearchQuery={setSearchQuery}
                 selectedCategory={selectedCategory}
@@ -1072,14 +1057,6 @@ export default function App() {
                 onQuickExportCsv={handleQuickExportCsv}
                 onSaveFilter={() => showToast('Đã lưu bộ lọc tìm kiếm hiện tại vào danh sách!', 'info')}
                 onOpenMobileFilters={() => setIsMobileFiltersOpen(true)}
-              />
-
-              {/* Right Domain Inspector Drawer — purely informational now,
-                  no per-domain actions here (see DomainInspector.tsx). */}
-              <DomainInspector
-                domain={activeDomain}
-                categories={categories}
-                onClose={() => setActiveDomainId(null)}
               />
             </div>
           )}

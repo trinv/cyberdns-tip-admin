@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Download, Copy, Check, FileText, Code2, Database, Shield, FileSpreadsheet, Loader2, AlertTriangle } from 'lucide-react';
 import { DomainItem } from '../../types';
+import { copyToClipboard } from '../../lib/clipboard';
 
 export type ExportFormat = 'txt' | 'csv' | 'hosts' | 'rpz' | 'adblock' | 'dnsmasq';
 
@@ -144,10 +145,15 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     onClose();
   };
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(previewText);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopy = async () => {
+    // See copyToClipboard's own note — the old direct
+    // navigator.clipboard.writeText call silently did nothing outside a
+    // secure (HTTPS) context, while still claiming success unconditionally.
+    const ok = await copyToClipboard(previewText);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   return (
