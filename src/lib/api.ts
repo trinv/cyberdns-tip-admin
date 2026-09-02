@@ -1,4 +1,4 @@
-import { DomainItem, CategoryInfo, FeedSource, ReleaseItem, AuditLog, ReviewDomainItem, DashboardStats, AppUser, LoginLog } from '../types';
+import { DomainItem, CategoryInfo, FeedSource, ReleaseItem, AuditLog, ReviewDomainItem, DashboardStats, CategoryStatusBreakdown, AppUser, LoginLog } from '../types';
 
 export const API_BASE = '/api';
 
@@ -75,6 +75,16 @@ export async function fetchHealth(): Promise<{ status: string; engine: string }>
 export async function fetchDashboardStats(): Promise<DashboardStats> {
   const res = await fetch(`${API_BASE}/dashboard/stats`);
   if (!res.ok) throw new Error('Failed to fetch dashboard stats');
+  return res.json();
+}
+
+// Powers the "TRẠNG THÁI BLOCKLIST" sidebar section — its counts follow
+// whichever category is currently selected above it. Pass 'all' or omit
+// for the unscoped, whole-system breakdown.
+export async function fetchStatusBreakdown(category?: string): Promise<CategoryStatusBreakdown> {
+  const query = category && category !== 'all' ? `?category=${encodeURIComponent(category)}` : '';
+  const res = await fetch(`${API_BASE}/domains/status-breakdown${query}`);
+  if (!res.ok) throw new Error('Failed to fetch status breakdown');
   return res.json();
 }
 

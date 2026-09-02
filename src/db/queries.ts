@@ -523,6 +523,50 @@ export async function getDashboardStats() {
   }
 }
 
+// Status breakdown SCOPED to one category (or every domain when omitted/
+// 'all') — a separate, lighter query from getDashboardStats' own
+// statusBreakdown (which is always global) specifically for the Domain
+// Explorer sidebar's "TRẠNG THÁI BLOCKLIST" section: its counts must follow
+// whichever category is currently selected in the "NHÓM DANH MỤC" section
+// above it, not always show the whole system's totals regardless of that
+// selection (a real, reported UX gap — clicking a category didn't change
+// the status breakdown shown right below it at all). getDashboardStats
+// itself is deliberately left untouched — the Dashboard tab's own KPI
+// cards/MetricDetailModal need the true global picture regardless of
+// whatever category happens to be selected elsewhere in the app.
+export async function getStatusBreakdownForCategory(categoryId?: string) {
+  try {
+    // Same jsonb containment check as getDomains' own category filter (see
+    // its note) — a domain can belong to several categories at once, so
+    // this must check containment in the array, not equality against a
+    // single primaryCategory column.
+    const categoryFilter =
+      categoryId && categoryId !== 'all' ? sql`${domains.categories} @> ${JSON.stringify([categoryId])}::jsonb` : undefined;
+
+    const [totalAllRows, statusRows] = await Promise.all([
+      db.select({ count: sql<number>`count(*)` }).from(domains).where(categoryFilter),
+      db.select({ status: domains.status, count: sql<number>`count(*)` }).from(domains).where(categoryFilter).groupBy(domains.status),
+    ]);
+
+    const totalAll = Number(totalAllRows[0]?.count || 0);
+
+    return {
+      totalAll,
+      // Same "fill in every known status with 0 instead of omitting it"
+      // fix as getDashboardStats — see its own note on why GROUP BY alone
+      // would otherwise make a genuine zero indistinguishable from "stats
+      // haven't loaded yet" in the sidebar.
+      statusBreakdown: (['active', 'unblocked', 'allowlist', 'protected'] as const).map((status) => {
+        const row = statusRows.find((s) => s.status === status);
+        return { status, count: Number(row?.count || 0) };
+      }),
+    };
+  } catch (error) {
+    console.error('getStatusBreakdownForCategory failed:', error);
+    throw new Error('Failed to compute category status breakdown', { cause: error });
+  }
+}
+
 // 4. Domain Queries & Mutations
 const DOMAIN_SORT_COLUMNS = {
   domain: domains.domain,

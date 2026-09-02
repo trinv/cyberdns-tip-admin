@@ -167,6 +167,17 @@ export interface DashboardStats {
   recentActive: DomainItem[];
 }
 
+// Response shape of GET /api/domains/status-breakdown — the "TRẠNG THÁI
+// BLOCKLIST" sidebar section's counts, scoped to whichever category is
+// currently selected above it. Deliberately its own small type rather than
+// reusing DashboardStats: this is always category-scoped and only ever
+// needs totals + a status breakdown, not every field a full dashboard
+// stats payload carries.
+export interface CategoryStatusBreakdown {
+  totalAll: number;
+  statusBreakdown: { status: string; count: number }[];
+}
+
 export interface SavedFilter {
   id: string;
   name: string;

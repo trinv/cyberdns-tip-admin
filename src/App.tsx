@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { DomainItem, CategoryInfo, FeedSource, ReleaseItem, AuditLog, ReviewDomainItem, SavedFilter, DomainStatus, DashboardStats, AppUser } from './types';
+import { DomainItem, CategoryInfo, FeedSource, ReleaseItem, AuditLog, ReviewDomainItem, SavedFilter, DomainStatus, DashboardStats, CategoryStatusBreakdown, AppUser } from './types';
 import {
   fetchDashboardStats,
+  fetchStatusBreakdown,
   fetchCategories,
   fetchDomains,
   fetchFeedSources,
@@ -237,15 +238,21 @@ export default function App() {
   const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
   const [managedUsers, setManagedUsers] = useState<AppUser[]>([]);
+  // Backs the sidebar's "TRẠNG THÁI BLOCKLIST" section specifically — SCOPED
+  // to whichever category is currently selected above it (see the effect
+  // below), unlike dashboardStats' own statusBreakdown, which is always
+  // global and drives the Dashboard tab's KPI cards instead. null until it
+  // has loaded at least once for the current category.
+  const [categoryStatusBreakdown, setCategoryStatusBreakdown] = useState<CategoryStatusBreakdown | null>(null);
 
   // Real per-status domain counts (drives the sidebar's "TRẠNG THÁI
   // BLOCKLIST" checklist) — null until stats have loaded at least once.
   const statusCountsMap = useMemo(() => {
-    if (!dashboardStats) return null;
+    if (!categoryStatusBreakdown) return null;
     const map: Partial<Record<DomainStatus, number>> = {};
-    for (const s of dashboardStats.statusBreakdown) map[s.status as DomainStatus] = s.count;
+    for (const s of categoryStatusBreakdown.statusBreakdown) map[s.status as DomainStatus] = s.count;
     return map;
-  }, [dashboardStats]);
+  }, [categoryStatusBreakdown]);
 
   // Header notification bell — real current-state summaries derived from
   // actual data (pending reviews, feed sources that errored/warned/are
@@ -400,6 +407,20 @@ export default function App() {
     }
   }, [selectedCategory, selectedStatus, selectedTld, selectedSource, debouncedSearchQuery, domainsPage, domainsPageSize, sortField, sortDirection]);
 
+  // Sidebar "TRẠNG THÁI BLOCKLIST" counts — scoped to selectedCategory only
+  // (not status/tld/source/search: this section IS the status filter, and
+  // its own counts must reflect every status regardless of which one is
+  // currently active, so a filtered-out status doesn't just disappear from
+  // view).
+  const refreshCategoryStatusBreakdown = useCallback(async () => {
+    try {
+      const stats = await fetchStatusBreakdown(selectedCategory);
+      setCategoryStatusBreakdown(stats);
+    } catch (err) {
+      console.warn('fetchStatusBreakdown failed:', err);
+    }
+  }, [selectedCategory]);
+
   // Same filters as refreshDomains, but paginated through in chunks instead
   // of one unbounded request — used by the Export modal's "toàn bộ danh
   // mục" scope and by the quick-export toolbar buttons so exporting is
@@ -457,6 +478,16 @@ export default function App() {
   useEffect(() => {
     refreshDomains();
   }, [refreshDomains]);
+
+  // Re-fetch whenever the category selection changes, AND whenever the
+  // global dashboardStats refreshes for any other reason (bulk actions,
+  // pause/resume/delete a feed source, a feed sync completing, etc. all
+  // already trigger a dashboardStats refetch elsewhere in this file) —
+  // piggybacking on that instead of threading a second, separate refresh
+  // call through every one of those mutation call sites individually.
+  useEffect(() => {
+    refreshCategoryStatusBreakdown();
+  }, [refreshCategoryStatusBreakdown, dashboardStats]);
 
   // Feed sync progress poll — lives at the App level (always mounted,
   // regardless of which tab is active) rather than inside SourcesView, so a
@@ -1015,7 +1046,8 @@ export default function App() {
                 onSelectSavedFilter={handleSelectSavedFilter}
                 onOpenAddCategory={() => setIsCategoryModalOpen(true)}
                 onSaveCurrentFilter={() => showToast('Đã lưu bộ lọc tìm kiếm hiện tại vào danh sách!', 'info')}
-                allStatusCount={dashboardStats?.totalAll ?? 0}
+                allCategoriesCount={dashboardStats?.totalAll ?? 0}
+                allStatusCount={categoryStatusBreakdown?.totalAll ?? 0}
                 statusCounts={statusCountsMap}
                 isOpenMobile={isMobileFiltersOpen}
                 onCloseMobile={() => setIsMobileFiltersOpen(false)}

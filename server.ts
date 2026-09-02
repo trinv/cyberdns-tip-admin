@@ -17,6 +17,7 @@ import { ensureDomainCategoryTriggers, ensureSearchIndexes } from './src/db/trig
 import { pool } from './src/db/index.ts';
 import {
   getDashboardStats,
+  getStatusBreakdownForCategory,
   getDomains,
   updateDomain,
   bulkUpdateDomains,
@@ -251,6 +252,22 @@ async function startServer() {
       res.json(stats);
     } catch (error: any) {
       console.error('API /api/dashboard/stats error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Status breakdown for the Domain Explorer sidebar's "TRẠNG THÁI
+  // BLOCKLIST" section, scoped to whichever category is currently selected
+  // above it (?category=..., omitted or 'all' = every domain) — separate
+  // from /api/dashboard/stats, which always stays global for the Dashboard
+  // tab's own KPI cards.
+  app.get('/api/domains/status-breakdown', async (req, res) => {
+    try {
+      const { category } = req.query;
+      const stats = await getStatusBreakdownForCategory(category as string | undefined);
+      res.json(stats);
+    } catch (error: any) {
+      console.error('API /api/domains/status-breakdown error:', error);
       res.status(500).json({ error: error.message });
     }
   });

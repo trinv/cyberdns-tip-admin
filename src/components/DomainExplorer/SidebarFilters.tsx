@@ -20,20 +20,28 @@ interface SidebarFiltersProps {
   onSelectSavedFilter: (filter: SavedFilter) => void;
   onOpenAddCategory: () => void;
   onSaveCurrentFilter: () => void;
-  // Real count across EVERY status (dashboardStats.totalAll) — shared by
-  // BOTH the CATEGORY section's "Tất cả nhóm" and the STATUS section's
-  // "Tất cả", deliberately the same number in both places. Each category's
-  // own badge (cat.count, below) is also all-status — so "Tất cả nhóm" and
-  // an individual category's count are directly comparable (the whole is
-  // never smaller than one of its parts). This used to be two different
-  // props — "Tất cả nhóm" wired to an ACTIVE-ONLY count while every
-  // category badge next to it was all-status — which could show a single
-  // category with a HIGHER count than "Tất cả nhóm" itself: a real,
-  // reported "the total is less than one part" confusion.
+  // Real count across EVERY status AND every category (dashboardStats.
+  // totalAll) — always global, regardless of which category is currently
+  // selected. Backs ONLY the CATEGORY section's "Tất cả nhóm" badge. Each
+  // category's own badge (cat.count, below) is also all-status — so "Tất
+  // cả nhóm" and an individual category's count are directly comparable
+  // (the whole is never smaller than one of its parts). This used to be
+  // wired to an ACTIVE-ONLY count while every category badge next to it
+  // was all-status — which could show a single category with a HIGHER
+  // count than "Tất cả nhóm" itself: a real, reported "the total is less
+  // than one part" confusion.
+  allCategoriesCount: number;
+  // Real count across every status, SCOPED to whichever category is
+  // currently selected (or the same as allCategoriesCount when 'all' is
+  // selected) — backs ONLY the STATUS section's own "Tất cả" badge, kept
+  // deliberately separate from allCategoriesCount above: this one changes
+  // as selectedCategory changes, that one never does. See the DB audit's
+  // own note on why this section's counts must follow the category
+  // selection above it instead of always showing whole-system totals.
   allStatusCount: number;
-  // Real per-status counts from GET /api/dashboard/stats — undefined/null
-  // while stats haven't loaded yet, rendered as "…" rather than a guessed
-  // number.
+  // Real per-status counts, SCOPED the same way as allStatusCount above —
+  // undefined/null while stats haven't loaded yet for the current category,
+  // rendered as "…" rather than a guessed number.
   statusCounts: Partial<Record<DomainStatus, number>> | null;
   isOpenMobile?: boolean;
   onCloseMobile?: () => void;
@@ -50,6 +58,7 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
   onSelectSavedFilter,
   onOpenAddCategory,
   onSaveCurrentFilter,
+  allCategoriesCount,
   allStatusCount,
   statusCounts,
   isOpenMobile = false,
@@ -114,7 +123,7 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
                 ? 'bg-emerald-100/80 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 font-bold' 
                 : 'text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800'
             }`}>
-              {formatNumber(allStatusCount)}
+              {formatNumber(allCategoriesCount)}
             </span>
           </button>
 
