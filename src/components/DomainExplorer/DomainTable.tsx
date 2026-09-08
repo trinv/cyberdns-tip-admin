@@ -127,37 +127,57 @@ export const DomainTable: React.FC<DomainTableProps> = ({
     else onSortChange(field, defaultAsc ? 'asc' : 'desc');
   };
 
-  // Real color assigned to the category in Category Manager (same field
-  // Sidebar/Dashboard already use) — not a hardcoded name→color map, so a
-  // newly-created category always renders correctly without needing a code
-  // change here.
-  const getCategoryColor = (catId: string) => categories.find((c) => c.id === catId)?.color || '#64748b';
+  const getCategoryBadgeClass = (catName: string) => {
+    switch (catName) {
+      case 'gambling':
+        return 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200/80 dark:border-purple-800/80';
+      case 'malware-phishing':
+        return 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200/80 dark:border-rose-800/80';
+      case 'tracking-adware':
+        return 'bg-cyan-50 dark:bg-cyan-950/60 text-cyan-700 dark:text-cyan-300 border-cyan-200/80 dark:border-cyan-800/80';
+      case 'nsfw':
+        return 'bg-pink-50 dark:bg-pink-950/60 text-pink-700 dark:text-pink-300 border-pink-200/80 dark:border-pink-800/80';
+      case 'social':
+        return 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-200/80 dark:border-blue-800/80';
+      case 'crypto-scam':
+        return 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200/80 dark:border-amber-800/80';
+      default:
+        return 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700';
+    }
+  };
 
   const renderStatus = (status: DomainStatus) => {
     switch (status) {
       case 'active':
-        // Green, not the app's primary blue — a status signal ("blocking is
-        // actively working"), distinct from primary/brand actions.
+        // Green, not the app's new primary blue (see index.css's file-level
+        // note): this dot means "blocking is actively working" — a status
+        // signal, distinct from primary/brand actions like buttons and nav.
         return (
-          <div className="d-flex align-items-center gap-2 small">
-            <span className="rounded-circle bg-success" style={{ width: 8, height: 8 }} />
+          <div className="flex items-center space-x-1.5 text-xs text-slate-700 dark:text-slate-300 font-medium">
+            <span className="w-2 h-2 rounded-full bg-green-500"></span>
             <span>đang chặn</span>
           </div>
         );
       case 'protected':
         return (
-          <div className="d-flex align-items-center gap-2 small text-body-secondary">
-            <span className="rounded-circle bg-secondary" style={{ width: 8, height: 8 }} />
+          <div className="flex items-center space-x-1.5 text-xs text-slate-500 dark:text-slate-400">
+            <span className="w-2 h-2 rounded-full bg-slate-400 dark:bg-slate-500"></span>
             <span>protected – không chặn</span>
           </div>
         );
       case 'allowlist':
-        // Same reasoning as 'active' above — a positive/allowed STATUS.
-        return <span className="badge rounded-pill text-bg-success-subtle text-success">trong allowlist</span>;
+        // Same reasoning as 'active' above — a positive/allowed STATUS, kept
+        // green rather than the new primary blue.
+        return (
+          <div className="flex items-center space-x-1.5 text-xs text-green-700 dark:text-green-300 font-semibold bg-green-50 dark:bg-green-950/60 px-2 py-0.5 rounded-full border border-green-200 dark:border-green-800 inline-flex">
+            <span className="w-2 h-2 rounded-full bg-green-500"></span>
+            <span>trong allowlist</span>
+          </div>
+        );
       case 'unblocked':
         return (
-          <div className="d-flex align-items-center gap-2 small text-body-secondary">
-            <span className="rounded-circle bg-secondary-subtle" style={{ width: 8, height: 8 }} />
+          <div className="flex items-center space-x-1.5 text-xs text-slate-400 dark:text-slate-500">
+            <span className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-600"></span>
             <span>đã thôi chặn</span>
           </div>
         );
@@ -178,69 +198,91 @@ export const DomainTable: React.FC<DomainTableProps> = ({
   };
 
   return (
-    <div className="flex-grow-1 d-flex flex-column h-100 bg-body overflow-hidden">
+    <div className="flex-1 flex flex-col h-full bg-[#f8fafc] dark:bg-[#0B1120] overflow-hidden font-sans transition-colors">
       {/* Top Filter Bar (Search & Filter Pills) */}
-      <div className="p-3 border-bottom bg-body d-flex flex-wrap align-items-center justify-content-between gap-3">
-        <div className="d-flex flex-wrap align-items-center gap-2 flex-grow-1" style={{ minWidth: 280 }}>
+      <div className="p-3 sm:p-4 border-b border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-wrap items-center justify-between gap-3 shadow-xs transition-colors">
+        <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[280px]">
           {/* Mobile Filter Toggle Button */}
           {onOpenMobileFilters && (
             <button
               onClick={onOpenMobileFilters}
               id="btn-mobile-filter-drawer"
-              className="d-lg-none btn btn-light btn-sm border d-flex align-items-center gap-2"
+              className="lg:hidden flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-slate-700 text-xs font-semibold cursor-pointer active-press"
               title="Mở danh mục & bộ lọc"
             >
-              <Filter size={14} className="text-primary" />
+              <Filter className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
               <span>Lọc</span>
             </button>
           )}
 
           {/* Search Box */}
-          <div className="input-group input-group-sm flex-grow-1" style={{ maxWidth: 288 }}>
-            <span className="input-group-text bg-body">
-              <Search size={14} className="text-body-secondary" />
-            </span>
+          <div className="relative flex items-center bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 focus-within:border-emerald-500 focus-within:bg-white dark:focus-within:bg-slate-800 focus-within:ring-2 focus-within:ring-emerald-100 dark:focus-within:ring-emerald-950/60 rounded-xl px-3 py-1.5 text-xs flex-1 sm:w-72 sm:flex-initial transition-all">
+            <Search className="w-4 h-4 text-slate-400 dark:text-slate-500 mr-2 flex-shrink-0" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Tìm kiếm domain (nohu, hitclub, bet88...)"
               id="input-domain-search"
-              className="form-control font-monospace"
+              className="bg-transparent text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none w-full font-mono text-xs"
             />
+            <kbd className="text-xs text-slate-400 dark:text-slate-500 font-mono flex-shrink-0 ml-1 bg-slate-200/60 dark:bg-slate-700 px-1 py-0.5 rounded hidden sm:inline-block">
+              ⌘K
+            </kbd>
           </div>
 
           {/* Group Filter Pill */}
           {selectedCategory !== 'all' && (
-            <span className="badge rounded-pill text-bg-primary-subtle text-primary d-flex align-items-center gap-2 font-monospace fw-normal">
+            <div className="flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs font-mono font-semibold">
               <span>group: {selectedCategory}</span>
-              <button onClick={onClearCategoryFilter} title="Xóa lọc nhóm" className="btn-close btn-close-sm" style={{ fontSize: '0.55rem' }} />
-            </span>
+              <button
+                onClick={onClearCategoryFilter}
+                className="hover:text-emerald-900 dark:hover:text-emerald-100 p-0.5 rounded ml-1 cursor-pointer"
+                title="Xóa lọc nhóm"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
           )}
 
           {/* TLD Filter Dropdown / Pill */}
           {selectedTld ? (
-            <span className="badge rounded-pill text-bg-secondary-subtle d-flex align-items-center gap-2 font-monospace fw-normal">
+            <div className="flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 text-xs font-mono font-semibold">
               <span>tld: .{selectedTld}</span>
-              <button onClick={() => setSelectedTld('')} className="btn-close btn-close-sm" style={{ fontSize: '0.55rem' }} />
-            </span>
+              <button
+                onClick={() => setSelectedTld('')}
+                className="hover:text-purple-900 dark:hover:text-purple-100 p-0.5 rounded ml-1 cursor-pointer"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
           ) : (
-            <div className="position-relative" ref={tldFilterRef}>
-              <button onClick={() => setTldFilterOpen(!tldFilterOpen)} className="btn btn-light btn-sm border d-flex align-items-center gap-1">
-                <Plus size={12} />
+            <div className="relative" ref={tldFilterRef}>
+              <button
+                onClick={() => setTldFilterOpen(!tldFilterOpen)}
+                className="flex items-center space-x-1 px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white text-xs font-medium cursor-pointer transition-colors shadow-xs"
+              >
+                <Plus className="w-3 h-3" />
                 <span>TLD</span>
               </button>
               {tldFilterOpen && (
-                <div className="dropdown-menu show mt-1" style={{ width: 176 }}>
-                  <div className="px-3 py-1 small text-uppercase text-body-secondary fw-bold">Lọc đuôi tên miền</div>
+                <div className="absolute left-0 mt-1 w-44 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl py-1.5 z-40 text-left">
+                  <div className="px-3 py-1 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                    Lọc đuôi tên miền
+                  </div>
                   {availableTlds.map((tld) => (
                     <button
                       key={tld}
-                      onClick={() => { setSelectedTld(tld); setTldFilterOpen(false); }}
-                      className="dropdown-item d-flex align-items-center justify-content-between font-monospace small"
+                      onClick={() => {
+                        setSelectedTld(tld);
+                        setTldFilterOpen(false);
+                      }}
+                      className="w-full px-3 py-1.5 text-xs text-slate-700 dark:text-slate-300 hover:bg-purple-50 dark:hover:bg-purple-950/50 hover:text-purple-700 dark:hover:text-purple-300 font-mono flex items-center justify-between text-left cursor-pointer"
                     >
                       <span>.{tld}</span>
-                      <span className="text-body-secondary">{domains.filter((d) => d.tld === tld).length}</span>
+                      <span className="text-xs text-slate-400 dark:text-slate-500">
+                        {domains.filter((d) => d.tld === tld).length}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -254,33 +296,51 @@ export const DomainTable: React.FC<DomainTableProps> = ({
               domain happened to be created with. See types.ts's note on
               MANUAL_SOURCE_FILTER and getDomains' own note in queries.ts. */}
           {selectedSource ? (
-            <span className="badge rounded-pill text-bg-info-subtle text-info d-flex align-items-center gap-2 font-monospace fw-normal">
+            <div className="flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-cyan-50 dark:bg-cyan-950/60 border border-cyan-200 dark:border-cyan-800 text-cyan-700 dark:text-cyan-300 text-xs font-mono font-semibold">
               <span>nguồn: {selectedSourceLabel}</span>
-              <button onClick={() => setSelectedSource('')} className="btn-close btn-close-sm" style={{ fontSize: '0.55rem' }} />
-            </span>
+              <button
+                onClick={() => setSelectedSource('')}
+                className="hover:text-cyan-900 dark:hover:text-cyan-100 p-0.5 rounded ml-1 cursor-pointer"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
           ) : (
-            <div className="position-relative" ref={sourceFilterRef}>
-              <button onClick={() => setSourceFilterOpen(!sourceFilterOpen)} className="btn btn-light btn-sm border d-flex align-items-center gap-1">
-                <Plus size={12} />
+            <div className="relative" ref={sourceFilterRef}>
+              <button
+                onClick={() => setSourceFilterOpen(!sourceFilterOpen)}
+                className="flex items-center space-x-1 px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white text-xs font-medium cursor-pointer transition-colors shadow-xs"
+              >
+                <Plus className="w-3 h-3" />
                 <span>Nguồn Feed</span>
               </button>
               {sourceFilterOpen && (
-                <div className="dropdown-menu show mt-1" style={{ width: 256, maxHeight: 320, overflowY: 'auto' }}>
-                  <div className="px-3 py-1 small text-uppercase text-body-secondary fw-bold">Lọc theo nguồn feed (thực tế đang gán)</div>
+                <div className="absolute left-0 mt-1 w-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl py-1.5 z-40 text-left max-h-80 overflow-y-auto">
+                  <div className="px-3 py-1 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                    Lọc theo nguồn feed (thực tế đang gán)
+                  </div>
                   {feedSources.map((fs) => (
                     <button
                       key={fs.id}
-                      onClick={() => { setSelectedSource(fs.id); setSourceFilterOpen(false); }}
-                      className="dropdown-item d-flex align-items-center justify-content-between small"
+                      onClick={() => {
+                        setSelectedSource(fs.id);
+                        setSourceFilterOpen(false);
+                      }}
+                      className="w-full px-3 py-1.5 text-xs text-slate-700 dark:text-slate-300 hover:bg-cyan-50 dark:hover:bg-cyan-950/50 hover:text-cyan-700 dark:hover:text-cyan-300 flex items-center justify-between text-left cursor-pointer"
                     >
-                      <span className="text-truncate">{fs.name}</span>
-                      <span className="text-body-secondary ms-2 flex-shrink-0">{fs.domainCount.toLocaleString('vi-VN')}</span>
+                      <span className="truncate">{fs.name}</span>
+                      <span className="text-xs text-slate-400 dark:text-slate-500 ml-2 flex-shrink-0">
+                        {fs.domainCount.toLocaleString('vi-VN')}
+                      </span>
                     </button>
                   ))}
-                  <div className="dropdown-divider" />
+                  <div className="my-1 border-t border-slate-100 dark:border-slate-700" />
                   <button
-                    onClick={() => { setSelectedSource(MANUAL_SOURCE_FILTER); setSourceFilterOpen(false); }}
-                    className="dropdown-item small fst-italic text-body-secondary"
+                    onClick={() => {
+                      setSelectedSource(MANUAL_SOURCE_FILTER);
+                      setSourceFilterOpen(false);
+                    }}
+                    className="w-full px-3 py-1.5 text-xs text-slate-500 dark:text-slate-400 hover:bg-cyan-50 dark:hover:bg-cyan-950/50 hover:text-cyan-700 dark:hover:text-cyan-300 italic text-left cursor-pointer"
                   >
                     Thủ công (không qua Feed)
                   </button>
@@ -290,49 +350,88 @@ export const DomainTable: React.FC<DomainTableProps> = ({
           )}
 
           {/* Save Filter Button */}
-          <button onClick={onSaveFilter} className="btn btn-link btn-sm text-decoration-none">
+          <button
+            onClick={onSaveFilter}
+            className="text-xs text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 font-semibold px-2.5 py-1.5 rounded-xl hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors cursor-pointer"
+          >
             Lưu bộ lọc
           </button>
         </div>
 
         {/* Export Dropdown Menu */}
-        <div className="position-relative" ref={exportMenuRef}>
-          <button onClick={() => setExportMenuOpen(!exportMenuOpen)} className="btn btn-light btn-sm border d-flex align-items-center gap-2">
-            <Download size={14} className="text-primary" />
-            <span>Xuất dữ liệu...</span>
-          </button>
+        <div className="relative" ref={exportMenuRef}>
+          <div className="flex items-center space-x-1">
+            <button
+              onClick={() => setExportMenuOpen(!exportMenuOpen)}
+              className="px-3.5 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center space-x-1.5 transition-colors cursor-pointer shadow-xs active-press"
+            >
+              <Download className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Xuất dữ liệu...</span>
+            </button>
+          </div>
 
           {exportMenuOpen && (
-            <div className="dropdown-menu show mt-1" style={{ width: 288, right: 0, left: 'auto' }}>
-              <div className="px-3 py-1 small text-uppercase text-body-secondary fw-bold">Tùy chọn xuất nhanh</div>
+            <div className="absolute right-0 mt-1 w-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl py-2 z-40 text-left animate-in fade-in zoom-in-95 duration-100">
+              <div className="px-3.5 py-1 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                TÙY CHỌN XUẤT NHANH
+              </div>
               {/* Which scope "Xuất nhanh" below will actually use — nothing
                   ticked exports the whole filtered list; anything ticked
                   exports exactly that selection (see handleQuickExportTxt/
                   Csv in App.tsx). Spelled out here so it's never a silent
                   surprise which one you're about to get. */}
-              <div className={`mx-3 mb-2 px-2 py-2 rounded-2 small fw-semibold ${selectedDomainIds.size > 0 ? 'text-bg-success-subtle text-success' : 'text-bg-secondary-subtle text-secondary'}`}>
-                {selectedDomainIds.size > 0 ? `Sẽ xuất ${selectedDomainIds.size} tên miền đã chọn` : 'Sẽ xuất toàn bộ danh sách đang lọc'}
+              <div
+                className={`mx-3.5 mb-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold ${
+                  selectedDomainIds.size > 0
+                    ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300'
+                    : 'bg-slate-50 dark:bg-slate-700/60 text-slate-500 dark:text-slate-400'
+                }`}
+              >
+                {selectedDomainIds.size > 0
+                  ? `Sẽ xuất ${selectedDomainIds.size} tên miền đã chọn`
+                  : 'Sẽ xuất toàn bộ danh sách đang lọc'}
               </div>
-              <button onClick={() => { onQuickExportTxt(); setExportMenuOpen(false); }} className="dropdown-item d-flex align-items-start gap-2">
-                <FileText size={16} className="text-primary mt-1 flex-shrink-0" />
+              <button
+                onClick={() => {
+                  onQuickExportTxt();
+                  setExportMenuOpen(false);
+                }}
+                className="w-full px-3.5 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 hover:text-emerald-700 dark:hover:text-emerald-300 flex items-center space-x-2.5 font-medium cursor-pointer"
+              >
+                <FileText className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 <div>
-                  <div className="fw-bold small">Xuất file .TXT (Danh sách Domain)</div>
-                  <div className="text-body-secondary" style={{ fontSize: '0.75rem' }}>Một tên miền mỗi dòng (Feed/Script)</div>
+                  <div className="font-bold">Xuất file .TXT (Danh sách Domain)</div>
+                  <div className="text-xs text-slate-400 dark:text-slate-500">Một tên miền mỗi dòng (Feed/Script)</div>
                 </div>
               </button>
-              <button onClick={() => { onQuickExportCsv(); setExportMenuOpen(false); }} className="dropdown-item d-flex align-items-start gap-2">
-                <FileSpreadsheet size={16} className="text-info mt-1 flex-shrink-0" />
+
+              <button
+                onClick={() => {
+                  onQuickExportCsv();
+                  setExportMenuOpen(false);
+                }}
+                className="w-full px-3.5 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-teal-50 dark:hover:bg-teal-950/50 hover:text-teal-700 dark:hover:text-teal-300 flex items-center space-x-2.5 font-medium cursor-pointer"
+              >
+                <FileSpreadsheet className="w-4 h-4 text-teal-600 dark:text-teal-400" />
                 <div>
-                  <div className="fw-bold small">Xuất file .CSV (Đầy đủ thuộc tính)</div>
-                  <div className="text-body-secondary" style={{ fontSize: '0.75rem' }}>Bao gồm nhóm, trạng thái, nguồn và mốc thời gian</div>
+                  <div className="font-bold">Xuất file .CSV (Đầy đủ thuộc tính)</div>
+                  <div className="text-xs text-slate-400 dark:text-slate-500">Bao gồm nhóm, trạng thái, nguồn và mốc thời gian</div>
                 </div>
               </button>
-              <div className="dropdown-divider" />
-              <button onClick={() => { onOpenExportModal(); setExportMenuOpen(false); }} className="dropdown-item d-flex align-items-start gap-2">
-                <Database size={16} className="mt-1 flex-shrink-0" style={{ color: 'var(--bs-purple, #6f42c1)' }} />
+
+              <div className="border-t border-slate-100 dark:border-slate-700 my-1"></div>
+
+              <button
+                onClick={() => {
+                  onOpenExportModal();
+                  setExportMenuOpen(false);
+                }}
+                className="w-full px-3.5 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-purple-50 dark:hover:bg-purple-950/50 hover:text-purple-700 dark:hover:text-purple-300 flex items-center space-x-2.5 font-bold cursor-pointer"
+              >
+                <Database className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                 <div>
-                  <div className="fw-bold small">Hộp thoại đa định dạng nâng cao...</div>
-                  <div className="text-body-secondary" style={{ fontSize: '0.75rem' }}>Hỗ trợ .HOSTS, RPZ Zone, AdBlock, Dnsmasq</div>
+                  <div>Hộp thoại đa định dạng nâng cao...</div>
+                  <div className="text-xs text-slate-400 dark:text-slate-500 font-normal">Hỗ trợ .HOSTS, RPZ Zone, AdBlock, Dnsmasq</div>
                 </div>
               </button>
             </div>
@@ -342,151 +441,203 @@ export const DomainTable: React.FC<DomainTableProps> = ({
 
       {/* Bulk Action Bar (When domains are selected) */}
       {selectedDomainIds.size > 0 && (
-        <div className="bg-primary-subtle border-bottom px-4 py-2 d-flex flex-wrap align-items-center justify-content-between gap-3 small">
-          <div className="d-flex align-items-center gap-2 fw-medium">
+        <div className="bg-emerald-50/90 dark:bg-slate-800 border-b border-emerald-200/80 dark:border-slate-700 px-5 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs animate-in fade-in duration-150">
+          <div className="flex items-center space-x-2.5 text-slate-800 dark:text-slate-200 font-medium">
             <input
               type="checkbox"
               checked={isAllSelectedOnPage}
               onChange={(e) => onSelectAllDomains(e.target.checked)}
-              className="form-check-input m-0"
+              className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-emerald-600 focus:ring-0 cursor-pointer accent-emerald-600"
             />
-            <span className="fw-bold text-primary-emphasis">
+            <span className="font-bold text-emerald-950 dark:text-emerald-300">
               Đã chọn {selectedDomainIds.size} / {domains.length} dòng trên trang này
             </span>
           </div>
 
-          <div className="d-flex align-items-center gap-2">
-            <button onClick={() => onOpenBulkModal('add_group')} className="btn btn-primary btn-sm">Thêm vào nhóm...</button>
-            <button onClick={() => onOpenBulkModal('allowlist')} className="btn btn-outline-info btn-sm">Allowlist...</button>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => onOpenBulkModal('add_group')}
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all shadow-xs cursor-pointer active-press"
+            >
+              Thêm vào nhóm...
+            </button>
+            <button
+              onClick={() => onOpenBulkModal('allowlist')}
+              className="px-3 py-1.5 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800 font-bold rounded-xl transition-colors cursor-pointer shadow-xs active-press"
+            >
+              Allowlist...
+            </button>
             {selectedStatus === 'unblocked' ? (
-              <button onClick={() => onOpenBulkModal('block')} className="btn btn-outline-success btn-sm">Chặn...</button>
+              <button
+                onClick={() => onOpenBulkModal('block')}
+                className="px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-bold rounded-xl transition-colors cursor-pointer shadow-xs active-press"
+              >
+                Chặn...
+              </button>
             ) : (
-              <button onClick={() => onOpenBulkModal('unblock')} className="btn btn-outline-danger btn-sm">Thôi chặn...</button>
+              <button
+                onClick={() => onOpenBulkModal('unblock')}
+                className="px-3 py-1.5 bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800 font-bold rounded-xl transition-colors cursor-pointer shadow-xs active-press"
+              >
+                Thôi chặn...
+              </button>
             )}
           </div>
         </div>
       )}
 
       {/* Main Table Content */}
-      <div className="flex-grow-1 overflow-auto p-3">
-        <div className="card">
-          <div className="table-responsive">
-            <table className="table table-hover align-middle mb-0" style={{ minWidth: 750 }}>
-              <thead className="sticky-top bg-body-tertiary" style={{ zIndex: 2 }}>
-                <tr className="small">
-                  <th style={{ width: 48 }} className="text-center">
-                    <input
-                      type="checkbox"
-                      checked={isAllSelectedOnPage}
-                      onChange={(e) => onSelectAllDomains(e.target.checked)}
-                      className="form-check-input m-0"
-                    />
-                  </th>
-                  <th onClick={() => handleSortClick('domain', true)} role="button">
-                    <div className="d-flex align-items-center gap-1">
-                      <span>Tên miền (Domain)</span>
-                      {sortField === 'domain' ? (
-                        <span className="text-primary font-monospace">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                      ) : (
-                        <ArrowUpDown size={12} className="text-body-secondary" />
-                      )}
-                    </div>
-                  </th>
-                  <th>Nhóm danh mục</th>
-                  <th>Nguồn feed</th>
-                  <th>Trạng thái</th>
-                  <th onClick={() => handleSortClick('firstSeen', false)} role="button">
-                    <div className="d-flex align-items-center gap-1">
-                      <span>Thấy lần đầu</span>
-                      {sortField === 'firstSeen' && (
-                        <span className="text-primary font-monospace">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                      )}
-                    </div>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="small">
-                {domains.map((item) => {
-                  const isSelected = selectedDomainIds.has(item.id);
-                  return (
-                    <tr key={item.id} className={isSelected ? 'table-active' : ''}>
-                      <td className="text-center" onClick={() => onToggleSelectDomain(item.id)} style={{ cursor: 'pointer' }}>
-                        <input type="checkbox" checked={isSelected} onChange={() => {}} className="form-check-input m-0" />
-                      </td>
+      <div className="flex-1 overflow-y-auto overflow-x-auto p-3 sm:p-4">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl shadow-xs overflow-hidden transition-colors">
+          <table className="w-full text-left text-xs border-collapse min-w-[750px]">
+            <thead className="bg-slate-50/80 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 font-bold border-b border-slate-100 dark:border-slate-800 sticky top-0 z-20 select-none">
+              <tr>
+                <th className="w-12 px-4 py-3 text-center">
+                  <input
+                    type="checkbox"
+                    checked={isAllSelectedOnPage}
+                    onChange={(e) => onSelectAllDomains(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-emerald-600 focus:ring-0 cursor-pointer accent-emerald-600"
+                  />
+                </th>
+                <th
+                  onClick={() => handleSortClick('domain', true)}
+                  className="px-4 py-3 text-slate-700 dark:text-slate-300 font-bold cursor-pointer hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+                >
+                  <div className="flex items-center space-x-1">
+                    <span>TÊN MIỀN (DOMAIN)</span>
+                    {sortField === 'domain' ? (
+                      <span className="text-emerald-600 dark:text-emerald-400 font-mono">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                    ) : (
+                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                    )}
+                  </div>
+                </th>
+                <th className="px-4 py-3 text-slate-500 dark:text-slate-400">NHÓM DANH MỤC</th>
+                <th className="px-4 py-3 text-slate-500 dark:text-slate-400">NGUỒN FEED</th>
+                <th className="px-4 py-3 text-slate-500 dark:text-slate-400">TRẠNG THÁI</th>
+                <th
+                  onClick={() => handleSortClick('firstSeen', false)}
+                  className="px-4 py-3 text-slate-500 dark:text-slate-400 cursor-pointer hover:text-emerald-600 dark:hover:text-emerald-400"
+                >
+                  <div className="flex items-center space-x-1">
+                    <span>THẤY LẦN ĐẦU</span>
+                    {sortField === 'firstSeen' && (
+                      <span className="text-emerald-600 dark:text-emerald-400 font-mono">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                    )}
+                  </div>
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
+              {domains.map((item) => {
+                const isSelected = selectedDomainIds.has(item.id);
 
-                      {/* Domain Name */}
-                      <td className="font-monospace">
-                        <div className="d-flex align-items-center gap-2">
-                          <span className="fw-bold">{item.domain}</span>
-                          <button
-                            onClick={(e) => handleCopy(e, item.domain)}
-                            title="Sao chép tên miền"
-                            className="btn btn-link btn-sm p-0 text-body-secondary"
+                return (
+                  <tr
+                    key={item.id}
+                    className={`group transition-colors ${
+                      isSelected
+                        ? 'bg-emerald-50/30 dark:bg-slate-800/60'
+                        : 'hover:bg-slate-50/80 dark:hover:bg-slate-800/40'
+                    }`}
+                  >
+                    <td
+                      className="px-4 py-3 text-center"
+                      onClick={() => onToggleSelectDomain(item.id)}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => {}}
+                        className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-emerald-600 focus:ring-0 cursor-pointer accent-emerald-600"
+                      />
+                    </td>
+
+                    {/* Domain Name */}
+                    <td className="px-4 py-3 font-mono text-slate-800 dark:text-slate-200">
+                      <div className="flex items-center space-x-2">
+                        <span className="font-bold text-slate-900 dark:text-slate-100 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                          {item.domain}
+                        </span>
+                        <button
+                          onClick={(e) => handleCopy(e, item.domain)}
+                          title="Sao chép tên miền"
+                          className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 p-0.5 rounded transition-opacity"
+                        >
+                          {copiedDomain === item.domain ? (
+                            <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                          ) : (
+                            <Copy className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      </div>
+                    </td>
+
+                    {/* Categories Pills */}
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap gap-1.5">
+                        {item.categories.map((cat) => (
+                          <span
+                            key={cat}
+                            className={`px-2 py-0.5 rounded-md text-xs font-semibold border ${getCategoryBadgeClass(
+                              cat
+                            )}`}
                           >
-                            {copiedDomain === item.domain ? <Check size={14} className="text-success" /> : <Copy size={14} />}
-                          </button>
-                        </div>
-                      </td>
+                            {cat}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
 
-                      {/* Categories Pills — real category color, not a
-                          hardcoded name→color map (see getCategoryColor). */}
-                      <td>
-                        <div className="d-flex flex-wrap gap-1">
-                          {item.categories.map((cat) => {
-                            const color = getCategoryColor(cat);
-                            return (
-                              <span
-                                key={cat}
-                                className="badge rounded-pill fw-semibold"
-                                style={{ backgroundColor: `${color}22`, color, border: `1px solid ${color}55` }}
-                              >
-                                {cat}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      </td>
+                    {/* Source */}
+                    <td className="px-4 py-3 font-mono text-slate-500 dark:text-slate-400 font-medium">
+                      {item.source}
+                    </td>
 
-                      {/* Source */}
-                      <td className="font-monospace text-body-secondary">{item.source}</td>
+                    {/* Status */}
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {renderStatus(item.status)}
+                    </td>
 
-                      {/* Status */}
-                      <td className="text-nowrap">{renderStatus(item.status)}</td>
+                    {/* First Seen */}
+                    <td className="px-4 py-3 font-mono text-slate-400 dark:text-slate-500 whitespace-nowrap">
+                      {item.firstSeen}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
 
-                      {/* First Seen */}
-                      <td className="font-monospace text-body-secondary text-nowrap">{item.firstSeen}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-
-            {/* Empty / loading state */}
-            {domains.length === 0 && (
-              <div className="text-center py-5 text-body-secondary">
-                <ShieldAlert size={32} className="mx-auto mb-2 text-body-tertiary" />
-                <p className="fw-semibold mb-1">{isLoading ? 'Đang tải...' : 'Không tìm thấy tên miền nào khớp bộ lọc'}</p>
-                {!isLoading && <p className="small mb-0">Hãy thử đổi từ khóa tìm kiếm hoặc bỏ chọn các điều kiện lọc</p>}
-              </div>
-            )}
-          </div>
+          {/* Empty / loading state */}
+          {domains.length === 0 && (
+            <div className="text-center py-12 text-slate-400 dark:text-slate-500 space-y-2">
+              <ShieldAlert className="w-8 h-8 mx-auto text-slate-300 dark:text-slate-600" />
+              <p className="font-semibold text-slate-600 dark:text-slate-300">
+                {isLoading ? 'Đang tải...' : 'Không tìm thấy tên miền nào khớp bộ lọc'}
+              </p>
+              {!isLoading && (
+                <p className="text-xs text-slate-400 dark:text-slate-500">Hãy thử đổi từ khóa tìm kiếm hoặc bỏ chọn các điều kiện lọc</p>
+              )}
+            </div>
+          )}
 
           {/* Pagination Footer — reflects the real server-side total, not
               just what happens to be loaded on this page. */}
           {domains.length > 0 && (
-            <div className="card-footer bg-body-tertiary d-flex flex-wrap align-items-center justify-content-between gap-3 small">
-              <div className="d-flex align-items-center gap-3">
+            <div className="px-5 py-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600 dark:text-slate-400">
+              <div className="flex items-center space-x-3">
                 <span>
-                  Hiển thị <strong>{(page - 1) * pageSize + 1} - {Math.min(page * pageSize, totalCount)}</strong> trên{' '}
-                  <strong>{totalCount.toLocaleString('vi-VN')}</strong> kết quả
+                  Hiển thị <span className="font-bold text-slate-800 dark:text-slate-200">{(page - 1) * pageSize + 1} - {Math.min(page * pageSize, totalCount)}</span> trên <span className="font-bold text-slate-800 dark:text-slate-200">{totalCount.toLocaleString('vi-VN')}</span> kết quả
                 </span>
-                <div className="d-flex align-items-center gap-2">
-                  <span className="text-body-secondary">Số dòng/trang:</span>
+                <span className="text-slate-300 dark:text-slate-700">|</span>
+                <div className="flex items-center space-x-1.5">
+                  <span className="text-slate-500 dark:text-slate-400">Số dòng/trang:</span>
                   <select
                     value={pageSize}
                     onChange={(e) => onPageSizeChange(Number(e.target.value))}
-                    className="form-select form-select-sm"
-                    style={{ width: 'auto' }}
+                    className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-700 dark:text-slate-300 font-semibold focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
                   >
                     <option value={15}>15 dòng</option>
                     <option value={25}>25 dòng</option>
@@ -496,50 +647,78 @@ export const DomainTable: React.FC<DomainTableProps> = ({
                 </div>
               </div>
 
-              {/* Page navigation — real Bootstrap pagination component */}
-              <nav>
-                <ul className="pagination pagination-sm mb-0">
-                  <li className={`page-item ${page === 1 ? 'disabled' : ''}`}>
-                    <button className="page-link" onClick={() => onPageChange(1)} title="Trang đầu"><ChevronsLeft size={14} /></button>
-                  </li>
-                  <li className={`page-item ${page === 1 ? 'disabled' : ''}`}>
-                    <button className="page-link" onClick={() => onPageChange(Math.max(1, page - 1))} title="Trang trước"><ChevronLeft size={14} /></button>
-                  </li>
-                  <li className="page-item disabled">
-                    <span className="page-link font-monospace">Trang {page} / {totalPages}</span>
-                  </li>
-                  <li className={`page-item ${page === totalPages ? 'disabled' : ''}`}>
-                    <button className="page-link" onClick={() => onPageChange(Math.min(totalPages, page + 1))} title="Trang tiếp"><ChevronRight size={14} /></button>
-                  </li>
-                  <li className={`page-item ${page === totalPages ? 'disabled' : ''}`}>
-                    <button className="page-link" onClick={() => onPageChange(totalPages)} title="Trang cuối"><ChevronsRight size={14} /></button>
-                  </li>
-                </ul>
-              </nav>
+              {/* Page navigation buttons */}
+              <div className="flex items-center space-x-1.5">
+                <button
+                  onClick={() => onPageChange(1)}
+                  disabled={page === 1}
+                  title="Trang đầu"
+                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  <ChevronsLeft className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => onPageChange(Math.max(1, page - 1))}
+                  disabled={page === 1}
+                  title="Trang trước"
+                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+
+                <div className="px-3 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono text-xs font-semibold text-slate-800 dark:text-slate-200">
+                  Trang {page} / {totalPages}
+                </div>
+
+                <button
+                  onClick={() => onPageChange(Math.min(totalPages, page + 1))}
+                  disabled={page === totalPages}
+                  title="Trang tiếp"
+                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => onPageChange(totalPages)}
+                  disabled={page === totalPages}
+                  title="Trang cuối"
+                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  <ChevronsRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
           )}
         </div>
       </div>
 
       {/* Bottom Status Bar & Shortcuts */}
-      <div className="px-4 py-2 bg-body border-top d-flex flex-wrap align-items-center justify-content-between text-body-secondary small">
-        <div>
-          <span>Tổng số khớp bộ lọc: <strong className="font-monospace">{totalCount.toLocaleString('vi-VN')}</strong></span>
+      <div className="px-5 py-2 bg-white dark:bg-slate-900 border-t border-slate-200/80 dark:border-slate-800 flex flex-wrap items-center justify-between text-xs text-slate-500 dark:text-slate-400 select-none shadow-xs transition-colors">
+        <div className="flex items-center space-x-2">
+          <span>Tổng số khớp bộ lọc: <strong className="text-slate-800 dark:text-slate-200 font-mono">{totalCount.toLocaleString('vi-VN')}</strong></span>
         </div>
 
-        <div className="d-none d-md-flex align-items-center gap-3 font-monospace">
-          <div className="d-flex align-items-center gap-1">
-            <kbd>j</kbd>
-            <kbd>k</kbd>
-            <span className="ms-1">di chuyển</span>
+        <div className="hidden md:flex items-center space-x-3 text-slate-500 dark:text-slate-400 font-mono text-xs">
+          <div className="flex items-center space-x-1">
+            <kbd className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold">
+              j
+            </kbd>
+            <kbd className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold">
+              k
+            </kbd>
+            <span className="ml-0.5">di chuyển</span>
           </div>
-          <div className="d-flex align-items-center gap-1">
-            <kbd>x</kbd>
-            <span className="ms-1">chọn</span>
+          <div className="flex items-center space-x-1">
+            <kbd className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold">
+              x
+            </kbd>
+            <span className="ml-0.5">chọn</span>
           </div>
-          <div className="d-flex align-items-center gap-1">
-            <kbd>⌘Z</kbd>
-            <span className="ms-1">hoàn tác</span>
+          <div className="flex items-center space-x-1">
+            <kbd className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold">
+              ⌘Z
+            </kbd>
+            <span className="ml-0.5">hoàn tác</span>
           </div>
         </div>
       </div>

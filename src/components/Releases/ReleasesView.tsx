@@ -91,92 +91,125 @@ export const ReleasesView: React.FC<ReleasesViewProps> = ({ categories, stats, o
   };
 
   return (
-    <div className="flex-grow-1 overflow-y-auto p-3 p-sm-4 bg-body d-flex flex-column gap-4">
+    <div className="flex-1 bg-[#f8fafc] dark:bg-[#0B1120] overflow-y-auto p-4 sm:p-6 space-y-6 transition-colors">
       {/* Header */}
-      <div className="card">
-        <div className="card-body d-flex flex-wrap align-items-center justify-content-between gap-3">
-          <div className="d-flex align-items-center gap-3">
-            <div className="kpi-icon bg-primary-subtle text-primary flex-shrink-0">
-              <Rocket size={18} />
-            </div>
-            <div>
-              <h1 className="fs-5 fw-bold mb-1">Blocklist URL Đã Phát Hành</h1>
-              <p className="text-body-secondary small mb-0">
-                Mỗi Category có 1 URL text thuần, luôn phản ánh dữ liệu mới nhất trong CSDL — Blocky (hoặc bộ chặn DNS khác) tải định kỳ.
-              </p>
-            </div>
+      <div className="flex flex-wrap items-center justify-between gap-4 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs transition-colors">
+        <div className="flex items-center space-x-3.5">
+          <div className="w-11 h-11 rounded-xl bg-primary-soft border border-primary/20 flex items-center justify-center text-primary flex-shrink-0">
+            <Rocket className="w-5 h-5" />
           </div>
-
-          <button onClick={runCheckAll} className="btn btn-primary btn-sm d-flex align-items-center gap-2">
-            <RefreshCw size={14} />
-            <span>Kiểm tra tất cả</span>
-          </button>
+          <div>
+            <h1 className="text-lg font-bold font-sans text-slate-900 dark:text-white">
+              Blocklist URL Đã Phát Hành
+            </h1>
+            <p className="text-slate-500 dark:text-slate-400 text-xs mt-1">
+              Mỗi Category có 1 URL text thuần, luôn phản ánh dữ liệu mới nhất trong CSDL — Blocky (hoặc bộ chặn DNS khác) tải định kỳ.
+            </p>
+          </div>
         </div>
+
+        <button
+          onClick={runCheckAll}
+          className="px-3.5 py-2 bg-primary hover:bg-primary-hover text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center space-x-2 cursor-pointer active-press"
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+          <span>Kiểm tra tất cả</span>
+        </button>
       </div>
 
       {/* Table */}
-      <div className="card">
-        <div className="table-responsive">
-          <table className="table table-hover align-middle mb-0" style={{ minWidth: 820 }}>
+      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xs transition-colors">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs border-collapse min-w-[860px]">
             <thead>
-              <tr className="small">
-                <th>Nhóm danh mục</th>
-                <th>URL</th>
-                <th className="text-end">Domain (CSDL)</th>
-                <th>Trạng thái kiểm tra</th>
-                <th className="text-end">Thao tác</th>
+              <tr className="bg-slate-50/80 dark:bg-slate-800/60 text-slate-400 dark:text-slate-500 font-mono font-medium text-[10px] tracking-[.14em] uppercase border-b border-slate-100 dark:border-slate-800">
+                <th className="px-5 py-3">Nhóm danh mục</th>
+                <th className="px-5 py-3">URL</th>
+                <th className="px-5 py-3 text-right">Domain (CSDL)</th>
+                <th className="px-5 py-3">Trạng thái kiểm tra</th>
+                <th className="px-5 py-3 text-right">Thao tác</th>
               </tr>
             </thead>
-            <tbody className="small">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {categories.map((cat) => {
                 const url = buildBlocklistUrl(cat.id);
                 const check = checks[cat.id] || { kind: 'idle' as const };
                 const isCopied = copiedId === cat.id;
                 return (
-                  <tr key={cat.id}>
-                    <td>
-                      <div className="d-flex align-items-center gap-2">
-                        <span className="rounded-circle flex-shrink-0" style={{ width: 10, height: 10, backgroundColor: cat.color || '#64748b' }} />
-                        <span className="fw-semibold">{cat.name}</span>
+                  <tr key={cat.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
+                    <td className="px-5 py-3">
+                      <div className="flex items-center space-x-2">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: cat.color || '#64748b' }}
+                        />
+                        <span className="font-semibold text-slate-700 dark:text-slate-200">{cat.name}</span>
                       </div>
                     </td>
-                    <td style={{ maxWidth: 260 }}>
-                      <code className="d-block text-truncate text-body-secondary" title={url}>{url}</code>
+                    <td className="px-5 py-3 max-w-[260px]">
+                      <code className="block truncate text-slate-500 dark:text-slate-400 font-mono text-xs" title={url}>
+                        {url}
+                      </code>
                     </td>
-                    <td className="text-end fw-semibold font-monospace">{activeCountFor(cat.id).toLocaleString('vi-VN')}</td>
-                    <td>
-                      {check.kind === 'idle' && <span className="tag" style={{ background: 'var(--bs-tertiary-bg)', color: 'var(--bs-secondary-color)' }}>Chưa kiểm tra</span>}
-                      {check.kind === 'checking' && <span className="tag" style={{ background: 'var(--bs-info-bg-subtle)', color: 'var(--bs-info-text-emphasis)' }}>Đang kiểm tra…</span>}
+                    <td className="px-5 py-3 text-right font-mono font-semibold text-slate-700 dark:text-slate-200 tabular-nums">
+                      {activeCountFor(cat.id).toLocaleString('vi-VN')}
+                    </td>
+                    <td className="px-5 py-3">
+                      {check.kind === 'idle' && (
+                        <span className="tag" style={{ background: 'var(--bg-subtle)', color: 'var(--text-muted)' }}>
+                          Chưa kiểm tra
+                        </span>
+                      )}
+                      {check.kind === 'checking' && <span className="tag t-info">Đang kiểm tra…</span>}
                       {check.kind === 'ok' && (
-                        <div>
-                          <span className="tag" style={{ background: 'var(--bs-success-bg-subtle)', color: 'var(--bs-success-text-emphasis)' }}>OK · {check.status}</span>
-                          <div className="text-body-secondary font-monospace" style={{ fontSize: '0.6875rem' }}>
-                            {formatBytes(check.bytes)} · {check.lines.toLocaleString('vi-VN')} dòng · {check.ms} ms · {check.checkedAt.toLocaleTimeString('vi-VN')}
+                        <div className="space-y-0.5">
+                          <span className="tag t-active">OK · {check.status}</span>
+                          <div className="text-[11px] font-mono text-slate-400 dark:text-slate-500">
+                            {formatBytes(check.bytes)} · {check.lines.toLocaleString('vi-VN')} dòng · {check.ms} ms ·{' '}
+                            {check.checkedAt.toLocaleTimeString('vi-VN')}
                           </div>
                         </div>
                       )}
                       {check.kind === 'error' && (
-                        <div>
-                          <span className="tag" style={{ background: 'var(--bs-danger-bg-subtle)', color: 'var(--bs-danger-text-emphasis)' }}>Lỗi{check.status ? ` · ${check.status}` : ''}</span>
-                          <div className="text-danger font-monospace" style={{ fontSize: '0.6875rem' }}>
+                        <div className="space-y-0.5">
+                          <span className="tag t-unavail">Lỗi{check.status ? ` · ${check.status}` : ''}</span>
+                          <div className="text-[11px] font-mono text-rose-500 dark:text-rose-400">
                             {check.message} · {check.checkedAt.toLocaleTimeString('vi-VN')}
                           </div>
                         </div>
                       )}
                     </td>
-                    <td>
-                      <div className="d-flex align-items-center justify-content-end gap-1">
-                        <button onClick={() => runCheck(cat.id)} title="Kiểm tra lại" className="app-header-icon-btn" style={{ width: 28, height: 28 }}>
-                          <RefreshCw size={14} className={check.kind === 'checking' ? 'spin-slow' : ''} />
+                    <td className="px-5 py-3">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => runCheck(cat.id)}
+                          title="Kiểm tra lại"
+                          className="w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${check.kind === 'checking' ? 'animate-spin' : ''}`} />
                         </button>
-                        <button onClick={() => handleCopy(cat.id)} title="Sao chép URL" className="app-header-icon-btn" style={{ width: 28, height: 28 }}>
-                          {isCopied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
+                        <button
+                          onClick={() => handleCopy(cat.id)}
+                          title="Sao chép URL"
+                          className="w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                        >
+                          {isCopied ? <Check className="w-3.5 h-3.5 text-green-600 dark:text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
                         </button>
-                        <a href={url} target="_blank" rel="noreferrer" title="Mở URL trong tab mới" className="app-header-icon-btn" style={{ width: 28, height: 28 }}>
-                          <ExternalLink size={14} />
+                        <a
+                          href={url}
+                          target="_blank"
+                          rel="noreferrer"
+                          title="Mở URL trong tab mới"
+                          className="w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
                         </a>
-                        <button onClick={() => onViewDomainsList(cat.id)} title="Xem domain của nhóm này trong Domain Explorer" className="app-header-icon-btn" style={{ width: 28, height: 28 }}>
-                          <Globe2 size={14} />
+                        <button
+                          onClick={() => onViewDomainsList(cat.id)}
+                          title="Xem domain của nhóm này trong Domain Explorer"
+                          className="w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                        >
+                          <Globe2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </td>
@@ -185,7 +218,9 @@ export const ReleasesView: React.FC<ReleasesViewProps> = ({ categories, stats, o
               })}
               {categories.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="text-center py-4 text-body-secondary">Chưa có Category nào.</td>
+                  <td colSpan={5} className="px-5 py-6 text-center text-slate-400 dark:text-slate-500">
+                    Chưa có Category nào.
+                  </td>
                 </tr>
               )}
             </tbody>
@@ -194,8 +229,8 @@ export const ReleasesView: React.FC<ReleasesViewProps> = ({ categories, stats, o
       </div>
 
       {/* Honest caveat: this check runs from the admin's own browser, not
-          from wherever Blocky actually runs. */}
-      <p className="text-body-secondary px-1 mb-0" style={{ fontSize: '0.6875rem', lineHeight: 1.6 }}>
+          from wherever Blocky actually runs — see the plan's rationale. */}
+      <p className="text-[11px] text-slate-400 dark:text-slate-600 leading-relaxed px-1">
         Kiểm tra chạy trực tiếp từ trình duyệt của bạn tới URL công khai ở trên — phản ánh đúng nội dung server đang phục vụ
         tại thời điểm kiểm tra, nhưng không đại diện cho độ trễ mạng thực tế mà Blocky (chạy ở nơi khác) sẽ thấy.
       </p>

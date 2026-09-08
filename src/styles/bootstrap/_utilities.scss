@@ -9,20 +9,3 @@
 .overflow-y-auto {
   overflow-y: auto;
 }
-
-// Same small status-pill shape as index.css's own `.tag` (Tailwind side) —
-// redeclared here so files on the Bootstrap side (ReleasesView's health-
-// check badges) don't depend on Tailwind's stylesheet for it. Color comes
-// from an inline style per use (Bootstrap's own `--bs-*-bg-subtle`/
-// `--bs-*-text-emphasis` variables), not a variant class, since the two
-// sides use different token names.
-.tag {
-  display: inline-flex;
-  align-items: center;
-  border-radius: $border-radius-pill;
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  line-height: 1;
-  padding: 3px 9px;
-}

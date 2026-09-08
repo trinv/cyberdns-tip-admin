@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { FeedSource, CategoryInfo } from '../../types';
 import {
-  RefreshCw, Plus, CheckCircle2, AlertTriangle,
-  Trash2, Pause, Play,
+  RefreshCw, Plus, Globe, CheckCircle2, AlertTriangle,
+  Trash2, Edit3, Clock, ArrowRight, ShieldCheck, Activity, Pause, Play,
   LayoutGrid, List
 } from 'lucide-react';
 import { ConfirmModal, ConfirmTone } from '../Modals/ConfirmModal';
@@ -20,19 +20,6 @@ interface SourcesViewProps {
   // currently backs (via domain_categories.feedSourceId) — mirrors
   // ReleasesView's onViewDomainsList (category-scoped) in App.tsx.
   onViewDomainsList: (feedSourceId: string) => void;
-}
-
-// Status badge variant — real semantic mapping shared by both the grid
-// cards and the compact table below.
-function statusBadgeVariant(src: FeedSource): string {
-  if (src.isPaused) return 'text-bg-secondary';
-  switch (src.status) {
-    case 'healthy': return 'text-bg-success-subtle text-success';
-    case 'warning': return 'text-bg-warning-subtle text-warning';
-    case 'error': return 'text-bg-danger-subtle text-danger';
-    case 'syncing': return 'text-bg-info-subtle text-info';
-    default: return 'text-bg-secondary-subtle';
-  }
 }
 
 export const SourcesView: React.FC<SourcesViewProps> = ({
@@ -54,6 +41,11 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
   // the real DB and can differ (or not have loaded yet) on any given
   // deployment; the effect below picks a REAL category id once `categories`
   // is available, and re-anchors if the previously-picked one is deleted.
+  // Submitting an id that isn't in `categories` fails at the DB's foreign
+  // key (domain_categories.category_id references categories.id) the
+  // moment a sync from this source tries to write a domain — this bug once
+  // let that happen silently, since the <select> below still visually shows
+  // its first real option regardless of what the controlled value actually is.
   const [newSourceCategory, setNewSourceCategory] = useState('');
   useEffect(() => {
     if (categories.length === 0) return;
@@ -111,6 +103,10 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
 
   // Sync IS whatever `src.status === 'syncing'` says, straight from the
   // server (see App.tsx's polling effect) — no local "isSyncing" flag here.
+  // That's what makes progress survive switching away from this tab and
+  // back: this component can fully unmount mid-sync and remount later, and
+  // it will correctly show the sync still in progress because the truth
+  // lives in PostgreSQL, not in this component's state.
   const handleSyncClick = (id: string) => {
     onSyncSingle(id);
   };
@@ -137,45 +133,60 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
   };
 
   return (
-    <div className="flex-grow-1 overflow-y-auto p-3 p-sm-4 bg-body d-flex flex-column gap-4">
-      <div className="card">
-        <div className="card-body d-flex flex-wrap align-items-center justify-content-between gap-3">
-          <div>
-            <h1 className="fs-5 fw-bold mb-1">Quản lý nguồn cấp dữ liệu (Threat Intel Feeds)</h1>
-            <p className="text-body-secondary small mb-0">
-              Cấu hình định kỳ đồng bộ danh sách chặn từ các nguồn uy tín toàn cầu (Hagezi, OISD) và Crawler nội bộ CyberDNS.
-            </p>
+    <div className="flex-1 bg-[#f8fafc] dark:bg-[#0B1120] overflow-y-auto p-4 sm:p-6 space-y-6 text-slate-700 dark:text-slate-300 text-xs transition-colors">
+      <div className="flex flex-wrap items-center justify-between gap-4 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs transition-colors">
+        <div>
+          <h1 className="text-lg font-bold font-sans text-slate-900 dark:text-white flex items-center space-x-2">
+            <span>Quản lý nguồn cấp dữ liệu (Threat Intel Feeds)</span>
+          </h1>
+          <p className="text-slate-500 dark:text-slate-400 text-xs mt-1">
+            Cấu hình định kỳ đồng bộ danh sách chặn từ các nguồn uy tín toàn cầu (Hagezi, OISD) và Crawler nội bộ CyberDNS.
+          </p>
+        </div>
+
+        <div className="flex items-center space-x-2.5">
+          {/* Card / compact view toggle — a compact list scales better once
+              there are many sources to scan/act on. */}
+          <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-1 border border-slate-200/80 dark:border-slate-700">
+            <button
+              onClick={() => handleSetViewMode('grid')}
+              title="Dạng thẻ"
+              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                viewMode === 'grid'
+                  ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-xs'
+                  : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'
+              }`}
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => handleSetViewMode('compact')}
+              title="Dạng rút gọn"
+              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                viewMode === 'compact'
+                  ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-xs'
+                  : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'
+              }`}
+            >
+              <List className="w-4 h-4" />
+            </button>
           </div>
 
-          <div className="d-flex align-items-center gap-2">
-            {/* Card / compact view toggle */}
-            <div className="btn-group" role="group">
-              <button
-                onClick={() => handleSetViewMode('grid')}
-                title="Dạng thẻ"
-                className={`btn btn-sm ${viewMode === 'grid' ? 'btn-primary' : 'btn-outline-secondary'}`}
-              >
-                <LayoutGrid size={16} />
-              </button>
-              <button
-                onClick={() => handleSetViewMode('compact')}
-                title="Dạng rút gọn"
-                className={`btn btn-sm ${viewMode === 'compact' ? 'btn-primary' : 'btn-outline-secondary'}`}
-              >
-                <List size={16} />
-              </button>
-            </div>
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl font-semibold transition-colors flex items-center space-x-1.5 cursor-pointer shadow-xs active-press"
+          >
+            <Plus className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <span>Thêm nguồn mới</span>
+          </button>
 
-            <button onClick={() => setIsAddModalOpen(true)} className="btn btn-light btn-sm border d-flex align-items-center gap-2">
-              <Plus size={16} />
-              <span>Thêm nguồn mới</span>
-            </button>
-
-            <button onClick={onSyncAll} className="btn btn-primary btn-sm d-flex align-items-center gap-2">
-              <RefreshCw size={16} />
-              <span>Đồng bộ tất cả</span>
-            </button>
-          </div>
+          <button
+            onClick={onSyncAll}
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all flex items-center space-x-1.5 cursor-pointer shadow-xs active-press"
+          >
+            <RefreshCw className="w-4 h-4" />
+            <span>Đồng bộ tất cả</span>
+          </button>
         </div>
       </div>
 
@@ -190,226 +201,261 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
           onViewDomainsList={onViewDomainsList}
         />
       ) : (
-        /* Sources Grid */
-        <div className="row g-4">
-          {sources.map((src) => (
-            <div className="col-12 col-md-6 col-lg-4" key={src.id}>
-              <div className="card h-100">
-                <div className="card-body d-flex flex-column gap-3">
-                  <div className="d-flex align-items-start justify-content-between">
-                    <div className="d-flex align-items-center gap-2">
-                      <span className="rounded-circle flex-shrink-0" style={{ width: 12, height: 12, backgroundColor: src.color }} />
-                      <h3 className="fs-6 fw-bold mb-0">{src.name}</h3>
-                    </div>
-                    <span className={`badge rounded-pill font-monospace text-uppercase ${statusBadgeVariant(src)}`}>
-                      {src.isPaused ? 'paused' : src.status}
-                    </span>
-                  </div>
-
-                  <div className="font-monospace small text-body-secondary text-truncate bg-body-tertiary p-2 rounded-2 border">
-                    {src.url}
-                  </div>
-
-                  <div>
-                    <span className="d-block text-body-secondary text-uppercase fw-bold mb-1" style={{ fontSize: '0.6875rem' }}>Nhóm</span>
-                    {(() => {
-                      const cat = getCategoryInfo(src.category);
-                      return cat ? (
-                        <span className="d-inline-flex align-items-center gap-2 fw-semibold">
-                          <span className="rounded-circle flex-shrink-0" style={{ width: 8, height: 8, backgroundColor: cat.color }} />
-                          <span className="text-truncate">{cat.name}</span>
-                        </span>
-                      ) : (
-                        <span className="fst-italic text-body-secondary">Không rõ nhóm</span>
-                      );
-                    })()}
-                  </div>
-
-                  <div className="row g-2 font-monospace">
-                    <div className="col-6">
-                      <span className="d-block text-body-secondary text-uppercase fw-bold mb-1" style={{ fontSize: '0.6875rem' }}>Số lượng tên miền</span>
-                      <button
-                        onClick={() => onViewDomainsList(src.id)}
-                        title={`Xem danh sách tên miền đang thuộc nguồn "${src.name}"`}
-                        className="btn btn-link p-0 fw-bold text-decoration-none"
-                      >
-                        {src.domainCount.toLocaleString('vi-VN')}
-                      </button>
-                    </div>
-                    <div className="col-6">
-                      <span className="d-block text-body-secondary text-uppercase fw-bold mb-1" style={{ fontSize: '0.6875rem' }}>Chu kỳ</span>
-                      <span className="fw-semibold">{src.syncInterval}</span>
-                    </div>
-                  </div>
-
-                  {/* Real progress bar — percent + current phase, both driven
-                      directly by the server-persisted syncProgress/syncPhase
-                      (see runFeedSourceSyncJob). */}
-                  {src.status === 'syncing' && (
-                    <div>
-                      <div className="d-flex align-items-center justify-content-between font-monospace small mb-1">
-                        <span className="text-info text-truncate pe-2">{src.syncPhase || 'Đang đồng bộ...'}</span>
-                        <span className="text-info fw-bold flex-shrink-0">{src.syncProgress ?? 0}%</span>
-                      </div>
-                      <div className="progress" style={{ height: 8 }}>
-                        <div className="progress-bar bg-info" style={{ width: `${src.syncProgress ?? 0}%` }} />
-                      </div>
-                    </div>
-                  )}
-
-                  {src.status === 'error' && src.errorMessage && (
-                    <div className="alert alert-danger d-flex align-items-start gap-2 py-2 px-3 small mb-0">
-                      <AlertTriangle size={16} className="flex-shrink-0 mt-1" />
-                      <span>{src.errorMessage}</span>
-                    </div>
-                  )}
-
-                  {src.status === 'warning' && src.errorMessage && (
-                    <div className="alert alert-warning d-flex align-items-start gap-2 py-2 px-3 small mb-0">
-                      <AlertTriangle size={16} className="flex-shrink-0 mt-1" />
-                      <span>{src.errorMessage}</span>
-                    </div>
-                  )}
-
-                  {src.status === 'healthy' && src.lastSyncMessage && (
-                    <div className="alert alert-success d-flex align-items-start gap-2 py-2 px-3 small mb-0">
-                      <CheckCircle2 size={16} className="flex-shrink-0 mt-1" />
-                      <span>{src.lastSyncMessage}</span>
-                    </div>
-                  )}
-
-                  {src.isPaused && (
-                    <div className="alert alert-secondary d-flex align-items-start gap-2 py-2 px-3 small mb-0">
-                      <Pause size={16} className="flex-shrink-0 mt-1" />
-                      <span>Đã tạm dừng — mọi tên miền của nguồn này đã chuyển sang "Thôi chặn". Bấm "Tiếp tục" để đồng bộ lại và tự động chặn lại đúng những tên miền đó.</span>
-                    </div>
-                  )}
+      /* Sources Grid */
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        {sources.map((src) => (
+          <div
+            key={src.id}
+            className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-emerald-300 dark:hover:border-emerald-700 rounded-2xl p-5 space-y-4 shadow-xs flex flex-col justify-between transition-all"
+          >
+            <div className="space-y-3.5">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center space-x-2.5">
+                  <span
+                    className="w-3 h-3 rounded-full flex-shrink-0 shadow-xs"
+                    style={{ backgroundColor: src.color }}
+                  ></span>
+                  <h3 className="font-bold text-sm text-slate-900 dark:text-white font-sans">{src.name}</h3>
                 </div>
 
-                <div className="card-footer bg-body d-flex flex-column gap-2">
-                  <span className="text-body-secondary small">
-                    Lần đồng bộ: {src.lastSync ? src.lastSync : 'Chưa đồng bộ lần nào'}
+                {src.isPaused ? (
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-mono uppercase font-bold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-300 dark:border-slate-600">
+                    paused
                   </span>
-                  <div className="d-flex align-items-center justify-content-between gap-2">
-                    {src.isPaused ? (
-                      <button onClick={() => onResumeSource(src.id)} className="btn btn-outline-success btn-sm flex-grow-1 d-flex align-items-center justify-content-center gap-2">
-                        <Play size={14} />
-                        <span>Tiếp tục</span>
-                      </button>
+                ) : (
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-xs font-mono uppercase font-bold ${
+                      src.status === 'healthy'
+                        ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                        : src.status === 'warning'
+                        ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
+                        : src.status === 'error'
+                        ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
+                        : src.status === 'syncing'
+                        ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                    }`}
+                  >
+                    {src.status}
+                  </span>
+                )}
+              </div>
+
+              <div className="font-mono text-xs text-slate-500 dark:text-slate-400 truncate bg-slate-50 dark:bg-slate-800/60 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                {src.url}
+              </div>
+
+              <div className="space-y-2">
+                <div>
+                  <span className="text-slate-400 dark:text-slate-500 block text-xs uppercase font-sans font-bold mb-0.5">NHÓM</span>
+                  {(() => {
+                    const cat = getCategoryInfo(src.category);
+                    return cat ? (
+                      <span className="inline-flex items-center space-x-1.5 font-sans font-semibold text-slate-700 dark:text-slate-300">
+                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }}></span>
+                        <span className="truncate">{cat.name}</span>
+                      </span>
                     ) : (
-                      <button
-                        onClick={() => handleSyncClick(src.id)}
-                        disabled={src.status === 'syncing'}
-                        className="btn btn-outline-success btn-sm flex-grow-1 d-flex align-items-center justify-content-center gap-2"
-                      >
-                        <RefreshCw size={14} className={src.status === 'syncing' ? 'spin-slow' : ''} />
-                        <span>{src.status === 'syncing' ? `Đang nạp... ${src.syncProgress ?? 0}%` : 'Đồng bộ'}</span>
-                      </button>
-                    )}
-
-                    {!src.isPaused && (
-                      <button
-                        onClick={() => setConfirmAction({ source: src, kind: 'pause' })}
-                        disabled={src.status === 'syncing'}
-                        title="Tạm dừng nguồn"
-                        className="btn btn-outline-secondary btn-sm flex-shrink-0"
-                      >
-                        <Pause size={14} />
-                      </button>
-                    )}
-
+                      <span className="font-sans italic text-slate-400 dark:text-slate-500">Không rõ nhóm</span>
+                    );
+                  })()}
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                  <div>
+                    <span className="text-slate-400 dark:text-slate-500 block text-xs uppercase font-sans font-bold mb-0.5">SỐ LƯỢNG TÊN MIỀN</span>
                     <button
-                      onClick={() => setConfirmAction({ source: src, kind: 'delete' })}
-                      disabled={src.status === 'syncing'}
-                      title="Xoá nguồn"
-                      className="btn btn-outline-danger btn-sm flex-shrink-0"
+                      onClick={() => onViewDomainsList(src.id)}
+                      title={`Xem danh sách tên miền đang thuộc nguồn "${src.name}"`}
+                      className="font-bold text-emerald-600 dark:text-emerald-400 text-sm font-mono hover:underline cursor-pointer"
                     >
-                      <Trash2 size={14} />
+                      {src.domainCount.toLocaleString('vi-VN')}
                     </button>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 dark:text-slate-500 block text-xs uppercase font-sans font-bold mb-0.5">CHU KỲ</span>
+                    <span className="text-slate-700 dark:text-slate-300 font-semibold font-sans">{src.syncInterval}</span>
                   </div>
                 </div>
               </div>
+
+              {/* Real progress bar — percent + current phase, both driven
+                  directly by the server-persisted syncProgress/syncPhase
+                  (see runFeedSourceSyncJob), so it's accurate whether this
+                  card was mounted the whole time or just got remounted after
+                  a tab switch mid-sync. */}
+              {src.status === 'syncing' && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs font-mono">
+                    <span className="text-blue-700 dark:text-blue-300 font-semibold truncate pr-2">{src.syncPhase || 'Đang đồng bộ...'}</span>
+                    <span className="text-blue-600 dark:text-blue-400 font-bold flex-shrink-0">{src.syncProgress ?? 0}%</span>
+                  </div>
+                  <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                    <div
+                      className="bg-blue-500 h-full rounded-full transition-all duration-500"
+                      style={{ width: `${src.syncProgress ?? 0}%` }}
+                    ></div>
+                  </div>
+                </div>
+              )}
+
+              {src.status === 'error' && src.errorMessage && (
+                <div className="bg-rose-50 dark:bg-rose-950/60 border border-rose-200/80 dark:border-rose-900 p-3 rounded-xl text-xs text-rose-800 dark:text-rose-200 leading-relaxed flex items-start space-x-1.5">
+                  <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 flex-shrink-0 mt-0.5" />
+                  <span>{src.errorMessage}</span>
+                </div>
+              )}
+
+              {src.status === 'warning' && src.errorMessage && (
+                <div className="bg-amber-50 dark:bg-amber-950/60 border border-amber-200/80 dark:border-amber-900 p-3 rounded-xl text-xs text-amber-800 dark:text-amber-200 leading-relaxed flex items-start space-x-1.5">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                  <span>{src.errorMessage}</span>
+                </div>
+              )}
+
+              {src.status === 'healthy' && src.lastSyncMessage && (
+                <div className="bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-900 p-3 rounded-xl text-xs text-emerald-800 dark:text-emerald-300 leading-relaxed flex items-start space-x-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5" />
+                  <span>{src.lastSyncMessage}</span>
+                </div>
+              )}
+
+              {src.isPaused && (
+                <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 p-3 rounded-xl text-xs text-slate-600 dark:text-slate-300 leading-relaxed flex items-start space-x-1.5">
+                  <Pause className="w-4 h-4 text-slate-500 dark:text-slate-400 flex-shrink-0 mt-0.5" />
+                  <span>Đã tạm dừng — mọi tên miền của nguồn này đã chuyển sang "Thôi chặn". Bấm "Tiếp tục" để đồng bộ lại và tự động chặn lại đúng những tên miền đó.</span>
+                </div>
+              )}
             </div>
-          ))}
-        </div>
-      )}
 
-      {/* Modal: Add Custom Feed Source — real Bootstrap modal markup,
-          shown/hidden by React state directly (no Bootstrap JS needed). */}
-      {isAddModalOpen && (
-        <>
-          <div className="modal-backdrop fade show" />
-          <div className="modal fade show d-block" tabIndex={-1} role="dialog">
-            <div className="modal-dialog modal-dialog-centered">
-              <div className="modal-content">
-                <form onSubmit={handleAddSubmit}>
-                  <div className="modal-header">
-                    <h2 className="modal-title fs-6 fw-bold">Thêm nguồn Threat Feed mới</h2>
-                    <button type="button" onClick={() => setIsAddModalOpen(false)} className="btn-close" />
-                  </div>
-                  <div className="modal-body d-flex flex-column gap-3">
-                    <div>
-                      <label className="form-label small fw-bold">Tên nguồn</label>
-                      <input
-                        type="text"
-                        required
-                        value={newSourceName}
-                        onChange={(e) => setNewSourceName(e.target.value)}
-                        placeholder="ví dụ: phishtank/verified-online"
-                        className="form-control"
-                      />
-                    </div>
+            <div className="flex flex-col gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <span className="text-slate-400 dark:text-slate-500 text-xs">
+                Lần đồng bộ: {src.lastSync ? src.lastSync : 'Chưa đồng bộ lần nào'}
+              </span>
+              <div className="flex items-center justify-between gap-2">
+                {src.isPaused ? (
+                  <button
+                    onClick={() => onResumeSource(src.id)}
+                    className="flex-1 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs font-bold flex items-center justify-center space-x-1 transition-colors cursor-pointer active-press"
+                  >
+                    <Play className="w-3.5 h-3.5" />
+                    <span>Tiếp tục</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleSyncClick(src.id)}
+                    disabled={src.status === 'syncing'}
+                    className="flex-1 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs font-bold flex items-center justify-center space-x-1 transition-colors cursor-pointer active-press disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${src.status === 'syncing' ? 'animate-spin' : ''}`} />
+                    <span>{src.status === 'syncing' ? `Đang nạp... ${src.syncProgress ?? 0}%` : 'Đồng bộ'}</span>
+                  </button>
+                )}
 
-                    <div>
-                      <label className="form-label small fw-bold">URL Feed (Raw txt/hosts)</label>
-                      <input
-                        type="url"
-                        required
-                        value={newSourceUrl}
-                        onChange={(e) => setNewSourceUrl(e.target.value)}
-                        placeholder="https://data.phishtank.com/data/online-valid.txt"
-                        className="form-control font-monospace"
-                      />
-                    </div>
+                {!src.isPaused && (
+                  <button
+                    onClick={() => setConfirmAction({ source: src, kind: 'pause' })}
+                    disabled={src.status === 'syncing'}
+                    title="Tạm dừng nguồn"
+                    className="p-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 rounded-xl transition-colors cursor-pointer active-press disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+                  >
+                    <Pause className="w-3.5 h-3.5" />
+                  </button>
+                )}
 
-                    <div className="row g-3">
-                      <div className="col-6">
-                        <label className="form-label small fw-bold">Nhóm mặc định</label>
-                        <select
-                          value={newSourceCategory}
-                          onChange={(e) => setNewSourceCategory(e.target.value)}
-                          className="form-select"
-                        >
-                          {categories.map((c) => (
-                            <option key={c.id} value={c.id}>{c.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="col-6">
-                        <label className="form-label small fw-bold">Chu kỳ đồng bộ</label>
-                        <select
-                          value={newSourceInterval}
-                          onChange={(e) => setNewSourceInterval(e.target.value)}
-                          className="form-select"
-                        >
-                          <option value="Cho đến khi bật đồng bộ">Cho đến khi bật đồng bộ (thủ công)</option>
-                          <option value="1 giờ">1 giờ</option>
-                          <option value="4 giờ">4 giờ</option>
-                          <option value="12 giờ">12 giờ</option>
-                          <option value="24 giờ">24 giờ</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="modal-footer">
-                    <button type="button" onClick={() => setIsAddModalOpen(false)} className="btn btn-light border">Hủy</button>
-                    <button type="submit" className="btn btn-primary">Lưu nguồn</button>
-                  </div>
-                </form>
+                <button
+                  onClick={() => setConfirmAction({ source: src, kind: 'delete' })}
+                  disabled={src.status === 'syncing'}
+                  title="Xoá nguồn"
+                  className="p-1.5 bg-white dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/60 text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-700 hover:border-rose-200 dark:hover:border-rose-800 rounded-xl transition-colors cursor-pointer active-press disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
               </div>
             </div>
           </div>
-        </>
+        ))}
+      </div>
+      )}
+
+      {/* Modal Add Custom Feed Source */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl text-xs text-slate-700 dark:text-slate-300">
+            <h2 className="text-base font-bold text-slate-900 dark:text-white font-sans">Thêm nguồn Threat Feed mới</h2>
+            <form onSubmit={handleAddSubmit} className="space-y-3.5">
+              <div className="space-y-1">
+                <label className="block text-slate-800 dark:text-slate-200 font-bold">Tên nguồn</label>
+                <input
+                  type="text"
+                  required
+                  value={newSourceName}
+                  onChange={(e) => setNewSourceName(e.target.value)}
+                  placeholder="ví dụ: phishtank/verified-online"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-800 rounded-xl px-3.5 py-2 text-slate-800 dark:text-slate-100 font-medium focus:outline-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-slate-800 dark:text-slate-200 font-bold">URL Feed (Raw txt/hosts)</label>
+                <input
+                  type="url"
+                  required
+                  value={newSourceUrl}
+                  onChange={(e) => setNewSourceUrl(e.target.value)}
+                  placeholder="https://data.phishtank.com/data/online-valid.txt"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-800 rounded-xl px-3.5 py-2 text-slate-800 dark:text-slate-100 font-mono focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="block text-slate-800 dark:text-slate-200 font-bold">Nhóm mặc định</label>
+                  <select
+                    value={newSourceCategory}
+                    onChange={(e) => setNewSourceCategory(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-emerald-700 dark:text-emerald-300 font-bold focus:outline-none"
+                  >
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-slate-800 dark:text-slate-200 font-bold">Chu kỳ đồng bộ</label>
+                  <select
+                    value={newSourceInterval}
+                    onChange={(e) => setNewSourceInterval(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-700 dark:text-slate-300 font-medium focus:outline-none"
+                  >
+                    <option value="Cho đến khi bật đồng bộ">Cho đến khi bật đồng bộ (thủ công)</option>
+                    <option value="1 giờ">1 giờ</option>
+                    <option value="4 giờ">4 giờ</option>
+                    <option value="12 giờ">12 giờ</option>
+                    <option value="24 giờ">24 giờ</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl font-semibold cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl cursor-pointer shadow-xs active-press"
+                >
+                  Lưu nguồn
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       <ConfirmModal
@@ -444,72 +490,115 @@ const SourcesCompactList: React.FC<{
   onDelete: (src: FeedSource) => void;
   onViewDomainsList: (feedSourceId: string) => void;
 }> = ({ sources, getCategoryInfo, onSyncSingle, onResumeSource, onPause, onDelete, onViewDomainsList }) => {
+  const statusBadgeClass = (src: FeedSource) => {
+    if (src.isPaused) return 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600';
+    switch (src.status) {
+      case 'healthy':
+        return 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800';
+      case 'warning':
+        return 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800';
+      case 'error':
+        return 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800';
+      case 'syncing':
+        return 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800';
+      default:
+        return 'bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700';
+    }
+  };
+
   return (
-    <div className="card">
-      <div className="table-responsive">
-        <table className="table table-hover align-middle mb-0" style={{ minWidth: 760 }}>
-          <thead>
-            <tr className="small">
-              <th>Nguồn</th>
-              <th>Nhóm</th>
-              <th className="text-end">Số lượng tên miền</th>
-              <th>Chu kỳ</th>
-              <th>Trạng thái</th>
-              <th>Lần đồng bộ</th>
-              <th className="text-end">Thao tác</th>
+    <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xs transition-colors">
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-xs border-collapse min-w-[760px]">
+          <thead className="bg-slate-50/80 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 font-bold border-b border-slate-100 dark:border-slate-800">
+            <tr>
+              <th className="px-4 py-3">NGUỒN</th>
+              <th className="px-4 py-3">NHÓM</th>
+              <th className="px-4 py-3 text-right">SỐ LƯỢNG TÊN MIỀN</th>
+              <th className="px-4 py-3">CHU KỲ</th>
+              <th className="px-4 py-3">TRẠNG THÁI</th>
+              <th className="px-4 py-3">LẦN ĐỒNG BỘ</th>
+              <th className="px-4 py-3 text-right">THAO TÁC</th>
             </tr>
           </thead>
-          <tbody className="small">
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
             {sources.map((src) => {
               const cat = getCategoryInfo(src.category);
               return (
-                <tr key={src.id}>
-                  <td>
-                    <div className="d-flex align-items-center gap-2 min-w-0">
-                      <span className="rounded-circle flex-shrink-0" style={{ width: 10, height: 10, backgroundColor: src.color }} />
-                      <span className="fw-bold text-truncate" style={{ maxWidth: 220 }} title={src.name}>{src.name}</span>
+                <tr key={src.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center space-x-2 min-w-0">
+                      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: src.color }}></span>
+                      <span className="font-bold text-slate-900 dark:text-white font-sans truncate max-w-[220px]" title={src.name}>
+                        {src.name}
+                      </span>
                     </div>
                   </td>
-                  <td>
+                  <td className="px-4 py-3">
                     {cat ? (
-                      <span className="d-inline-flex align-items-center gap-2">
-                        <span className="rounded-circle flex-shrink-0" style={{ width: 8, height: 8, backgroundColor: cat.color }} />
-                        <span className="text-truncate" style={{ maxWidth: 140 }}>{cat.name}</span>
+                      <span className="inline-flex items-center space-x-1.5 font-sans">
+                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }}></span>
+                        <span className="truncate max-w-[140px]">{cat.name}</span>
                       </span>
                     ) : (
-                      <span className="fst-italic text-body-secondary">Không rõ</span>
+                      <span className="italic text-slate-400 dark:text-slate-500 font-sans">Không rõ</span>
                     )}
                   </td>
-                  <td className="text-end fw-bold text-primary font-monospace">
-                    <button onClick={() => onViewDomainsList(src.id)} title={`Xem danh sách tên miền đang thuộc nguồn "${src.name}"`} className="btn btn-link p-0 text-decoration-none">
+                  <td className="px-4 py-3 text-right font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+                    <button
+                      onClick={() => onViewDomainsList(src.id)}
+                      title={`Xem danh sách tên miền đang thuộc nguồn "${src.name}"`}
+                      className="hover:underline cursor-pointer"
+                    >
                       {src.domainCount.toLocaleString('vi-VN')}
                     </button>
                   </td>
-                  <td className="text-body-secondary text-nowrap">{src.syncInterval}</td>
-                  <td>
-                    <span className={`badge rounded-pill font-monospace text-uppercase ${statusBadgeVariant(src)}`}>
+                  <td className="px-4 py-3 text-slate-600 dark:text-slate-400 font-sans whitespace-nowrap">{src.syncInterval}</td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-mono uppercase font-bold border ${statusBadgeClass(src)}`}>
                       {src.isPaused ? 'paused' : src.status === 'syncing' ? `${src.syncProgress ?? 0}%` : src.status}
                     </span>
                   </td>
-                  <td className="text-body-secondary text-nowrap">{src.lastSync ? src.lastSync : 'Chưa đồng bộ'}</td>
-                  <td>
-                    <div className="d-flex align-items-center justify-content-end gap-1">
+                  <td className="px-4 py-3 text-slate-400 dark:text-slate-500 whitespace-nowrap">
+                    {src.lastSync ? src.lastSync : 'Chưa đồng bộ'}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center justify-end space-x-1.5">
                       {src.isPaused ? (
-                        <button onClick={() => onResumeSource(src.id)} title="Tiếp tục" className="btn btn-outline-success btn-sm">
-                          <Play size={14} />
+                        <button
+                          onClick={() => onResumeSource(src.id)}
+                          title="Tiếp tục"
+                          className="p-1.5 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-lg transition-colors cursor-pointer active-press flex-shrink-0"
+                        >
+                          <Play className="w-3.5 h-3.5" />
                         </button>
                       ) : (
-                        <button onClick={() => onSyncSingle(src.id)} disabled={src.status === 'syncing'} title="Đồng bộ" className="btn btn-outline-success btn-sm">
-                          <RefreshCw size={14} className={src.status === 'syncing' ? 'spin-slow' : ''} />
+                        <button
+                          onClick={() => onSyncSingle(src.id)}
+                          disabled={src.status === 'syncing'}
+                          title="Đồng bộ"
+                          className="p-1.5 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-lg transition-colors cursor-pointer active-press disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${src.status === 'syncing' ? 'animate-spin' : ''}`} />
                         </button>
                       )}
                       {!src.isPaused && (
-                        <button onClick={() => onPause(src)} disabled={src.status === 'syncing'} title="Tạm dừng nguồn" className="btn btn-outline-secondary btn-sm">
-                          <Pause size={14} />
+                        <button
+                          onClick={() => onPause(src)}
+                          disabled={src.status === 'syncing'}
+                          title="Tạm dừng nguồn"
+                          className="p-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors cursor-pointer active-press disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+                        >
+                          <Pause className="w-3.5 h-3.5" />
                         </button>
                       )}
-                      <button onClick={() => onDelete(src)} disabled={src.status === 'syncing'} title="Xoá nguồn" className="btn btn-outline-danger btn-sm">
-                        <Trash2 size={14} />
+                      <button
+                        onClick={() => onDelete(src)}
+                        disabled={src.status === 'syncing'}
+                        title="Xoá nguồn"
+                        className="p-1.5 bg-white dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/60 text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-700 hover:border-rose-200 dark:hover:border-rose-800 rounded-lg transition-colors cursor-pointer active-press disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </td>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Tag, Trash2, Edit3 } from 'lucide-react';
+import { X, Plus, Tag, ShieldCheck, Trash2, Edit3 } from 'lucide-react';
 import { CategoryInfo } from '../../types';
 import { ConfirmModal } from './ConfirmModal';
 
@@ -91,138 +91,179 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   };
 
   return (
-    <>
-      <div className="modal-backdrop fade show" />
-      <div className="modal fade show d-block" tabIndex={-1} role="dialog">
-        <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h2 className="modal-title fs-6 fw-bold d-flex align-items-center gap-2">
-                <Tag size={16} className="text-primary" />
-                <span>Quản lý nhóm danh mục (Categories)</span>
-              </h2>
-              <button onClick={onClose} className="btn-close" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-xs p-4">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden text-xs text-slate-700 dark:text-slate-300">
+        <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/40">
+          <h2 className="text-sm font-bold text-slate-900 dark:text-white font-sans flex items-center space-x-2">
+            <Tag className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <span>Quản lý nhóm danh mục (Categories)</span>
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-5">
+          {/* Current Categories List */}
+          <div className="space-y-2">
+            <div className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+              CÁC NHÓM HIỆN CÓ ({categories.length})
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-52 overflow-y-auto pr-1">
+              {categories.map((c) =>
+                editingId === c.id ? (
+                  <div
+                    key={c.id}
+                    className="bg-white dark:bg-slate-900 border border-emerald-300 dark:border-emerald-700 rounded-xl p-2.5 space-y-1.5 font-mono col-span-1 sm:col-span-2"
+                  >
+                    <div className="flex items-center space-x-1.5">
+                      <input
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-xs font-sans focus:outline-none focus:border-emerald-500"
+                      />
+                      <input
+                        type="number"
+                        step="0.5"
+                        value={editDelta}
+                        onChange={(e) => setEditDelta(parseFloat(e.target.value))}
+                        className="w-16 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                    <div className="flex items-center justify-end space-x-1.5 font-sans">
+                      <button
+                        type="button"
+                        onClick={cancelEditing}
+                        className="px-2.5 py-1 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 font-semibold cursor-pointer"
+                      >
+                        Hủy
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => saveEditing(c.id)}
+                        className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold cursor-pointer"
+                      >
+                        Lưu
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    key={c.id}
+                    className="group bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 rounded-xl p-2.5 flex items-center justify-between font-mono"
+                  >
+                    <div className="flex items-center space-x-2 truncate">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-xs"
+                        style={{ backgroundColor: c.color }}
+                      ></span>
+                      <span className="truncate text-slate-800 dark:text-slate-200 font-medium text-xs font-sans">{c.name}</span>
+                    </div>
+                    <div className="flex items-center space-x-1.5 flex-shrink-0">
+                      <span className="text-xs text-slate-400 dark:text-slate-500 font-bold">
+                        ±{c.deltaThreshold || 3}%
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => startEditing(c)}
+                        title="Sửa nhóm"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-white dark:hover:bg-slate-700 cursor-pointer"
+                      >
+                        <Edit3 className="w-3 h-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(c)}
+                        title="Xóa nhóm"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-white dark:hover:bg-slate-700 cursor-pointer"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                )
+              )}
+            </div>
+          </div>
+
+          {/* Form to add a new category */}
+          <form onSubmit={handleSubmit} className="space-y-3.5 pt-4 border-t border-slate-100 dark:border-slate-800">
+            <div className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+              + TẠO NHÓM DANH MỤC MỚI
             </div>
 
-            <div className="modal-body d-flex flex-column gap-4">
-              {/* Current Categories List */}
-              <div>
-                <div className="text-body-secondary text-uppercase fw-bold mb-2" style={{ fontSize: '0.6875rem', letterSpacing: '.06em' }}>
-                  Các nhóm hiện có ({categories.length})
-                </div>
-                <div className="row g-2" style={{ maxHeight: 208, overflowY: 'auto' }}>
-                  {categories.map((c) => (
-                    <div className="col-12 col-sm-6" key={c.id}>
-                      {editingId === c.id ? (
-                        <div className="border border-primary rounded-3 p-2 d-flex flex-column gap-2 font-monospace">
-                          <div className="d-flex align-items-center gap-2">
-                            <input
-                              type="text"
-                              value={editName}
-                              onChange={(e) => setEditName(e.target.value)}
-                              className="form-control form-control-sm font-sans"
-                            />
-                            <input
-                              type="number"
-                              step="0.5"
-                              value={editDelta}
-                              onChange={(e) => setEditDelta(parseFloat(e.target.value))}
-                              className="form-control form-control-sm"
-                              style={{ width: 64 }}
-                            />
-                          </div>
-                          <div className="d-flex align-items-center justify-content-end gap-2 font-sans">
-                            <button type="button" onClick={cancelEditing} className="btn btn-link btn-sm text-decoration-none">Hủy</button>
-                            <button type="button" onClick={() => saveEditing(c.id)} className="btn btn-primary btn-sm">Lưu</button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="bg-body-tertiary border rounded-3 p-2 d-flex align-items-center justify-content-between font-monospace">
-                          <div className="d-flex align-items-center gap-2 text-truncate">
-                            <span className="rounded-circle flex-shrink-0" style={{ width: 10, height: 10, backgroundColor: c.color }} />
-                            <span className="text-truncate font-sans small">{c.name}</span>
-                          </div>
-                          <div className="d-flex align-items-center gap-1 flex-shrink-0">
-                            <span className="text-body-secondary fw-bold small">±{c.deltaThreshold || 3}%</span>
-                            <button type="button" onClick={() => startEditing(c)} title="Sửa nhóm" className="app-header-icon-btn" style={{ width: 24, height: 24 }}>
-                              <Edit3 size={12} />
-                            </button>
-                            <button type="button" onClick={() => handleDelete(c)} title="Xóa nhóm" className="app-header-icon-btn" style={{ width: 24, height: 24 }}>
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+            <div className="space-y-1">
+              <label className="block text-slate-800 dark:text-slate-200 font-bold">Tên nhóm danh mục</label>
+              <input
+                type="text"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="ví dụ: Tin giả (Fake News), Vi phạm bản quyền"
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-800 rounded-xl px-3.5 py-2 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 text-xs focus:outline-none"
+              />
+              <p className="text-xs text-slate-400 dark:text-slate-500">
+                Mã định danh (id) sẽ được hệ thống tự sinh và giữ nguyên vĩnh viễn — đổi tên ở đây sau này sẽ không làm thay đổi mã đó.
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <label className="block text-slate-800 dark:text-slate-200 font-bold">Mô tả chính sách</label>
+              <input
+                type="text"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Mô tả mục đích và tiêu chuẩn nhận diện nhóm này..."
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-800 rounded-xl px-3.5 py-2 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 text-xs focus:outline-none"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="block text-slate-800 dark:text-slate-200 font-bold">Màu hiển thị</label>
+                <div className="flex items-center space-x-2.5">
+                  <input
+                    type="color"
+                    value={color}
+                    onChange={(e) => setColor(e.target.value)}
+                    className="w-8 h-8 rounded-lg bg-transparent border border-slate-300 dark:border-slate-600 cursor-pointer"
+                  />
+                  <span className="font-mono text-xs text-slate-700 dark:text-slate-300 font-bold">{color}</span>
                 </div>
               </div>
 
-              {/* Form to add a new category */}
-              <form onSubmit={handleSubmit} className="d-flex flex-column gap-3 pt-3 border-top">
-                <div className="text-primary text-uppercase fw-bold" style={{ fontSize: '0.6875rem', letterSpacing: '.06em' }}>
-                  + Tạo nhóm danh mục mới
-                </div>
-
-                <div>
-                  <label className="form-label small fw-bold">Tên nhóm danh mục</label>
-                  <input
-                    type="text"
-                    required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="ví dụ: Tin giả (Fake News), Vi phạm bản quyền"
-                    className="form-control"
-                  />
-                  <p className="text-body-secondary small mt-1 mb-0">
-                    Mã định danh (id) sẽ được hệ thống tự sinh và giữ nguyên vĩnh viễn — đổi tên ở đây sau này sẽ không làm thay đổi mã đó.
-                  </p>
-                </div>
-
-                <div>
-                  <label className="form-label small fw-bold">Mô tả chính sách</label>
-                  <input
-                    type="text"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Mô tả mục đích và tiêu chuẩn nhận diện nhóm này..."
-                    className="form-control"
-                  />
-                </div>
-
-                <div className="row g-3">
-                  <div className="col-6">
-                    <label className="form-label small fw-bold">Màu hiển thị</label>
-                    <div className="d-flex align-items-center gap-2">
-                      <input
-                        type="color"
-                        value={color}
-                        onChange={(e) => setColor(e.target.value)}
-                        className="form-control form-control-color"
-                      />
-                      <span className="font-monospace small fw-bold">{color}</span>
-                    </div>
-                  </div>
-
-                  <div className="col-6">
-                    <label className="form-label small fw-bold">Ngưỡng cảnh báo delta (±%)</label>
-                    <input
-                      type="number"
-                      step="0.5"
-                      value={deltaThreshold}
-                      onChange={(e) => setDeltaThreshold(parseFloat(e.target.value))}
-                      className="form-control font-monospace"
-                    />
-                  </div>
-                </div>
-
-                <div className="d-flex align-items-center justify-content-end gap-2 pt-2 border-top">
-                  <button type="button" onClick={onClose} className="btn btn-light border">Đóng</button>
-                  <button type="submit" className="btn btn-primary">Tạo nhóm mới</button>
-                </div>
-              </form>
+              <div className="space-y-1">
+                <label className="block text-slate-800 dark:text-slate-200 font-bold">Ngưỡng cảnh báo delta (±%)</label>
+                <input
+                  type="number"
+                  step="0.5"
+                  value={deltaThreshold}
+                  onChange={(e) => setDeltaThreshold(parseFloat(e.target.value))}
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-800 rounded-xl px-3.5 py-2 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 font-mono text-xs focus:outline-none"
+                />
+              </div>
             </div>
-          </div>
+
+            <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl font-semibold cursor-pointer"
+              >
+                Đóng
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl cursor-pointer shadow-xs active-press"
+              >
+                Tạo nhóm mới
+              </button>
+            </div>
+          </form>
         </div>
       </div>
 
@@ -239,6 +280,6 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
         onConfirm={confirmDelete}
         onCancel={() => setDeleteTarget(null)}
       />
-    </>
+    </div>
   );
 };
