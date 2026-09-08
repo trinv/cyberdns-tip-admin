@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, AlertTriangle, Info } from 'lucide-react';
+import { AlertTriangle, Info } from 'lucide-react';
 
 export type ConfirmTone = 'danger' | 'warning' | 'default';
 
@@ -21,19 +21,19 @@ const TONE_STYLES: Record<ConfirmTone, {
   confirmBtn: string;
 }> = {
   danger: {
-    iconWrap: 'bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400',
+    iconWrap: 'bg-danger-subtle text-danger',
     icon: AlertTriangle,
-    confirmBtn: 'bg-rose-600 hover:bg-rose-700 shadow-rose-500/20',
+    confirmBtn: 'btn-danger',
   },
   warning: {
-    iconWrap: 'bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400',
+    iconWrap: 'bg-warning-subtle text-warning-emphasis',
     icon: AlertTriangle,
-    confirmBtn: 'bg-amber-600 hover:bg-amber-700 shadow-amber-500/20',
+    confirmBtn: 'btn-warning',
   },
   default: {
-    iconWrap: 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400',
+    iconWrap: 'bg-success-subtle text-success',
     icon: Info,
-    confirmBtn: 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/20',
+    confirmBtn: 'btn-primary',
   },
 };
 
@@ -57,46 +57,41 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   const { iconWrap, icon: ToneIcon, confirmBtn } = TONE_STYLES[tone];
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-xs p-4">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden text-xs text-slate-700 dark:text-slate-300 animate-in fade-in zoom-in-95 duration-150">
-        <div className="p-6 space-y-4">
-          <div className="flex items-start justify-between">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${iconWrap}`}>
-              <ToneIcon className="w-5 h-5" />
+    // ConfirmModal can appear ON TOP of another already-open modal (e.g.
+    // CategoryManagerModal's own delete confirmation) — Bootstrap has no
+    // built-in nested-modal stacking, so this one's own backdrop/dialog get
+    // explicit z-index values above Bootstrap's defaults
+    // (--bs-backdrop-zindex: 1050, --bs-modal-zindex: 1055) to guarantee it
+    // renders above a default-stacked parent modal.
+    <>
+      <div className="modal-backdrop fade show" style={{ zIndex: 1060 }} />
+      <div className="modal fade show d-block" tabIndex={-1} role="dialog" style={{ zIndex: 1065 }}>
+        <div className="modal-dialog modal-dialog-centered">
+          <div className="modal-content">
+            <div className="modal-body d-flex flex-column gap-3">
+              <div className="d-flex align-items-start justify-content-between">
+                <div className={`kpi-icon ${iconWrap}`}>
+                  <ToneIcon size={18} />
+                </div>
+                <button onClick={onCancel} className="btn-close" />
+              </div>
+
+              <div>
+                <h2 className="fs-6 fw-bold mb-1">{title}</h2>
+                <p className="text-body-secondary mb-0" style={{ lineHeight: 1.6 }}>{message}</p>
+              </div>
             </div>
-            <button
-              onClick={onCancel}
-              className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer -mt-1 -mr-1"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-
-          <div className="space-y-1.5">
-            <h2 className="text-sm font-bold text-slate-900 dark:text-white font-sans">{title}</h2>
-            <p className="text-slate-600 dark:text-slate-400 leading-relaxed">{message}</p>
-          </div>
-
-          <div className="flex items-center justify-end space-x-2.5 pt-2">
-            <button
-              type="button"
-              onClick={onCancel}
-              disabled={isProcessing}
-              className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold rounded-xl transition-colors cursor-pointer disabled:opacity-50"
-            >
-              {cancelLabel}
-            </button>
-            <button
-              type="button"
-              onClick={onConfirm}
-              disabled={isProcessing}
-              className={`px-5 py-2 text-white font-bold rounded-xl transition-all cursor-pointer shadow-md disabled:opacity-50 ${confirmBtn}`}
-            >
-              {isProcessing ? 'Đang xử lý...' : confirmLabel}
-            </button>
+            <div className="modal-footer">
+              <button type="button" onClick={onCancel} disabled={isProcessing} className="btn btn-light border">
+                {cancelLabel}
+              </button>
+              <button type="button" onClick={onConfirm} disabled={isProcessing} className={`btn ${confirmBtn}`}>
+                {isProcessing ? 'Đang xử lý...' : confirmLabel}
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };

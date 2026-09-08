@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Download, Copy, Check, FileText, Code2, Database, Shield, FileSpreadsheet, Loader2, AlertTriangle } from 'lucide-react';
+import { Download, Copy, Check, FileText, Code2, Database, Shield, FileSpreadsheet, Loader2, AlertTriangle } from 'lucide-react';
 import { DomainItem } from '../../types';
 import { copyToClipboard } from '../../lib/clipboard';
 
@@ -19,6 +19,15 @@ interface ExportModalProps {
   // category, however large. Called once per modal open, on demand.
   fetchAllFilteredDomains: () => Promise<DomainItem[]>;
 }
+
+const FORMAT_OPTIONS: { value: ExportFormat; label: string; desc: string; icon: React.ElementType; iconClass: string }[] = [
+  { value: 'txt', label: '.TXT (Plain Text)', desc: 'Một tên miền mỗi dòng, phù hợp cho custom script & parser', icon: FileText, iconClass: 'text-success' },
+  { value: 'csv', label: '.CSV (Full Data)', desc: 'Đầy đủ các cột nhóm, trạng thái và mốc thời gian', icon: FileSpreadsheet, iconClass: 'text-info' },
+  { value: 'hosts', label: '.HOSTS (0.0.0.0)', desc: 'Định dạng chuẩn Pi-hole, AdGuard Home và OS Hosts file', icon: Database, iconClass: 'text-primary' },
+  { value: 'rpz', label: '.RPZ (BIND Zone)', desc: 'Response Policy Zone cho ISP Edge Resolver (BIND9, Knot, PowerDNS)', icon: Code2, iconClass: 'text-warning-emphasis' },
+  { value: 'adblock', label: 'AdBlock Syntax', desc: 'Cú pháp quy tắc chặn ||domain.com^ cho trình duyệt & extension', icon: Shield, iconClass: 'text-danger' },
+  { value: 'dnsmasq', label: 'Dnsmasq Conf', desc: 'Cấu hình address=/domain/0.0.0.0 cho Router OpenWRT & MikroTik', icon: Code2, iconClass: 'text-info' },
+];
 
 export const ExportModal: React.FC<ExportModalProps> = ({
   isOpen,
@@ -157,254 +166,158 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-xs p-4">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden text-xs text-slate-700 dark:text-slate-300 animate-in fade-in zoom-in duration-150 flex flex-col max-h-[90vh]">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/40">
-          <div className="flex items-center space-x-2">
-            <Download className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-            <h2 className="text-sm font-bold text-slate-900 dark:text-white font-sans">
-              Xuất danh sách tên miền chặn (Export Blocklist)
-            </h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div className="p-6 space-y-4 overflow-y-auto flex-1">
-          {/* Format selection */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
-              ĐỊNH DẠNG XUẤT (EXPORT FORMAT)
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-              <button
-                type="button"
-                onClick={() => setFormat('txt')}
-                className={`p-3 rounded-xl border text-left cursor-pointer transition-all flex flex-col justify-between ${
-                  format === 'txt'
-                    ? 'bg-emerald-50/80 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-700 ring-2 ring-emerald-100 dark:ring-emerald-950 text-emerald-900 dark:text-emerald-200'
-                    : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-100/60 dark:hover:bg-slate-700/60 text-slate-700 dark:text-slate-300'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-bold text-xs font-mono">.TXT (Plain Text)</span>
-                  <FileText className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                </div>
-                <span className="text-xs text-slate-500 dark:text-slate-400 font-sans">
-                  Một tên miền mỗi dòng, phù hợp cho custom script & parser
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setFormat('csv')}
-                className={`p-3 rounded-xl border text-left cursor-pointer transition-all flex flex-col justify-between ${
-                  format === 'csv'
-                    ? 'bg-emerald-50/80 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-700 ring-2 ring-emerald-100 dark:ring-emerald-950 text-emerald-900 dark:text-emerald-200'
-                    : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-100/60 dark:hover:bg-slate-700/60 text-slate-700 dark:text-slate-300'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-bold text-xs font-mono">.CSV (Full Data)</span>
-                  <FileSpreadsheet className="w-4 h-4 text-teal-600 dark:text-teal-400" />
-                </div>
-                <span className="text-xs text-slate-500 dark:text-slate-400 font-sans">
-                  Đầy đủ các cột nhóm, trạng thái và mốc thời gian
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setFormat('hosts')}
-                className={`p-3 rounded-xl border text-left cursor-pointer transition-all flex flex-col justify-between ${
-                  format === 'hosts'
-                    ? 'bg-emerald-50/80 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-700 ring-2 ring-emerald-100 dark:ring-emerald-950 text-emerald-900 dark:text-emerald-200'
-                    : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-100/60 dark:hover:bg-slate-700/60 text-slate-700 dark:text-slate-300'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-bold text-xs font-mono">.HOSTS (0.0.0.0)</span>
-                  <Database className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                </div>
-                <span className="text-xs text-slate-500 dark:text-slate-400 font-sans">
-                  Định dạng chuẩn Pi-hole, AdGuard Home và OS Hosts file
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setFormat('rpz')}
-                className={`p-3 rounded-xl border text-left cursor-pointer transition-all flex flex-col justify-between ${
-                  format === 'rpz'
-                    ? 'bg-emerald-50/80 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-700 ring-2 ring-emerald-100 dark:ring-emerald-950 text-emerald-900 dark:text-emerald-200'
-                    : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-100/60 dark:hover:bg-slate-700/60 text-slate-700 dark:text-slate-300'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-bold text-xs font-mono">.RPZ (BIND Zone)</span>
-                  <Code2 className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                </div>
-                <span className="text-xs text-slate-500 dark:text-slate-400 font-sans">
-                  Response Policy Zone cho ISP Edge Resolver (BIND9, Knot, PowerDNS)
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setFormat('adblock')}
-                className={`p-3 rounded-xl border text-left cursor-pointer transition-all flex flex-col justify-between ${
-                  format === 'adblock'
-                    ? 'bg-emerald-50/80 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-700 ring-2 ring-emerald-100 dark:ring-emerald-950 text-emerald-900 dark:text-emerald-200'
-                    : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-100/60 dark:hover:bg-slate-700/60 text-slate-700 dark:text-slate-300'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-bold text-xs font-mono">AdBlock Syntax</span>
-                  <Shield className="w-4 h-4 text-rose-600 dark:text-rose-400" />
-                </div>
-                <span className="text-xs text-slate-500 dark:text-slate-400 font-sans">
-                  Cú pháp quy tắc chặn ||domain.com^ cho trình duyệt & extension
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setFormat('dnsmasq')}
-                className={`p-3 rounded-xl border text-left cursor-pointer transition-all flex flex-col justify-between ${
-                  format === 'dnsmasq'
-                    ? 'bg-emerald-50/80 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-700 ring-2 ring-emerald-100 dark:ring-emerald-950 text-emerald-900 dark:text-emerald-200'
-                    : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-100/60 dark:hover:bg-slate-700/60 text-slate-700 dark:text-slate-300'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-bold text-xs font-mono">Dnsmasq Conf</span>
-                  <Code2 className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
-                </div>
-                <span className="text-xs text-slate-500 dark:text-slate-400 font-sans">
-                  Cấu hình address=/domain/0.0.0.0 cho Router OpenWRT & MikroTik
-                </span>
-              </button>
+    <>
+      <div className="modal-backdrop fade show" />
+      <div className="modal fade show d-block" tabIndex={-1} role="dialog">
+        <div className="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h2 className="modal-title fs-6 fw-bold d-flex align-items-center gap-2">
+                <Download size={16} className="text-primary" />
+                <span>Xuất danh sách tên miền chặn (Export Blocklist)</span>
+              </h2>
+              <button onClick={onClose} className="btn-close" />
             </div>
-          </div>
 
-          {/* Scope selection */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50/80 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 rounded-xl p-3">
-            <div className="space-y-1">
-              <label className="block font-bold text-slate-800 dark:text-slate-200 text-xs">PHẠM VI DỮ LIỆU</label>
-              <div className="flex flex-wrap items-center gap-3">
-                <label className="flex items-center space-x-1.5 cursor-pointer font-medium">
-                  <input
-                    type="radio"
-                    name="scope"
-                    checked={scope === 'filtered'}
-                    onChange={() => setScope('filtered')}
-                    className="accent-emerald-600"
-                  />
-                  <span>Toàn bộ danh mục đang chọn ({totalFilteredCount.toLocaleString('vi-VN')} domain)</span>
-                </label>
-                {selectedCount > 0 && (
-                  <label className="flex items-center space-x-1.5 cursor-pointer font-medium text-emerald-600 dark:text-emerald-400">
+            <div className="modal-body d-flex flex-column gap-3">
+              {/* Format selection */}
+              <div>
+                <label className="form-label small fw-bold text-uppercase">Định dạng xuất (export format)</label>
+                <div className="row g-2">
+                  {FORMAT_OPTIONS.map((opt) => {
+                    const Icon = opt.icon;
+                    const isActive = format === opt.value;
+                    return (
+                      <div className="col-12 col-sm-6 col-lg-4" key={opt.value}>
+                        <button
+                          type="button"
+                          onClick={() => setFormat(opt.value)}
+                          className={`p-2 rounded-3 border text-start w-100 h-100 ${isActive ? 'border-primary bg-primary-subtle' : 'bg-body-tertiary'}`}
+                        >
+                          <div className="d-flex align-items-center justify-content-between mb-1">
+                            <span className="fw-bold font-monospace small">{opt.label}</span>
+                            <Icon size={16} className={opt.iconClass} />
+                          </div>
+                          <span className="text-body-secondary" style={{ fontSize: '0.75rem' }}>{opt.desc}</span>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Scope selection */}
+              <div className="row g-3 bg-body-tertiary border rounded-3 p-3">
+                <div className="col-12 col-sm-6">
+                  <label className="form-label small fw-bold">Phạm vi dữ liệu</label>
+                  <div className="d-flex flex-wrap align-items-center gap-3">
+                    <div className="form-check">
+                      <input
+                        type="radio"
+                        name="scope"
+                        id="scope-filtered"
+                        checked={scope === 'filtered'}
+                        onChange={() => setScope('filtered')}
+                        className="form-check-input"
+                      />
+                      <label htmlFor="scope-filtered" className="form-check-label small">
+                        Toàn bộ danh mục đang chọn ({totalFilteredCount.toLocaleString('vi-VN')} domain)
+                      </label>
+                    </div>
+                    {selectedCount > 0 && (
+                      <div className="form-check">
+                        <input
+                          type="radio"
+                          name="scope"
+                          id="scope-selected"
+                          checked={scope === 'selected'}
+                          onChange={() => setScope('selected')}
+                          className="form-check-input"
+                        />
+                        <label htmlFor="scope-selected" className="form-check-label small text-primary fw-medium">
+                          Chỉ {selectedCount} đã chọn
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="col-12 col-sm-6 d-flex align-items-end justify-content-sm-end">
+                  <div className="form-check">
                     <input
-                      type="radio"
-                      name="scope"
-                      checked={scope === 'selected'}
-                      onChange={() => setScope('selected')}
-                      className="accent-emerald-600"
+                      type="checkbox"
+                      id="include-header"
+                      checked={includeHeader}
+                      onChange={(e) => setIncludeHeader(e.target.checked)}
+                      className="form-check-input"
                     />
-                    <span>Chỉ {selectedCount} đã chọn</span>
-                  </label>
+                    <label htmlFor="include-header" className="form-check-label small">Kèm metadata header</label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Preview box */}
+              <div>
+                <div className="d-flex align-items-center justify-content-between mb-1">
+                  <span className="text-body-secondary text-uppercase fw-bold" style={{ fontSize: '0.6875rem', letterSpacing: '.06em' }}>
+                    Xem trước nội dung xuất ({targetList.length} bản ghi)
+                  </span>
+                  <button
+                    onClick={handleCopy}
+                    disabled={!isReady}
+                    className="btn btn-link btn-sm text-decoration-none d-flex align-items-center gap-1 p-0"
+                  >
+                    {copied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
+                    <span>{copied ? 'Đã sao chép!' : 'Sao chép nhanh'}</span>
+                  </button>
+                </div>
+                {isLoadingAll ? (
+                  <div className="bg-dark text-light font-monospace small p-3 rounded-3 d-flex align-items-center justify-content-center gap-2" style={{ height: 96 }}>
+                    <Loader2 size={16} className="spin-slow" />
+                    <span>Đang tải toàn bộ {totalFilteredCount.toLocaleString('vi-VN')} domain của danh mục...</span>
+                  </div>
+                ) : loadError ? (
+                  <div className="alert alert-danger d-flex align-items-center justify-content-between gap-3 mb-0">
+                    <span className="d-flex align-items-center gap-2 small">
+                      <AlertTriangle size={16} className="flex-shrink-0" />
+                      <span>{loadError}</span>
+                    </span>
+                    <button type="button" onClick={() => setAllFilteredDomains(null)} className="btn btn-light border btn-sm flex-shrink-0">Thử lại</button>
+                  </div>
+                ) : (
+                  <pre className="bg-dark text-light font-monospace small p-3 rounded-3 mb-0" style={{ maxHeight: 192, overflowY: 'auto', lineHeight: 1.6 }}>
+                    {previewText.split('\n').slice(0, 30).join('\n')}
+                    {previewText.split('\n').length > 30 && (
+                      <span className="d-block fst-italic pt-1" style={{ opacity: 0.6 }}>
+                        ... và còn {previewText.split('\n').length - 30} dòng nữa
+                      </span>
+                    )}
+                  </pre>
                 )}
               </div>
             </div>
 
-            <div className="space-y-1 flex items-center justify-start sm:justify-end">
-              <label className="flex items-center space-x-2 cursor-pointer font-medium">
-                <input
-                  type="checkbox"
-                  checked={includeHeader}
-                  onChange={(e) => setIncludeHeader(e.target.checked)}
-                  className="accent-emerald-600 rounded"
-                />
-                <span>Kèm metadata header</span>
-              </label>
-            </div>
-          </div>
-
-          {/* Preview box */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-              <span>XEM TRƯỚC NỘI DUNG XUẤT ({targetList.length} BẢN GHI)</span>
-              <button
-                onClick={handleCopy}
-                disabled={!isReady}
-                className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 font-semibold flex items-center space-x-1 cursor-pointer text-xs disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>{copied ? 'Đã sao chép!' : 'Sao chép nhanh'}</span>
-              </button>
-            </div>
-            {isLoadingAll ? (
-              <div className="bg-slate-950 text-slate-400 font-mono text-xs p-3.5 rounded-xl h-24 flex items-center justify-center space-x-2 border border-slate-800">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Đang tải toàn bộ {totalFilteredCount.toLocaleString('vi-VN')} domain của danh mục...</span>
-              </div>
-            ) : loadError ? (
-              <div className="bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 font-mono text-xs p-3.5 rounded-xl border border-rose-200 dark:border-rose-800 flex items-center justify-between gap-3">
-                <span className="flex items-center space-x-2">
-                  <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-                  <span>{loadError}</span>
-                </span>
+            {/* Footer actions */}
+            <div className="modal-footer d-flex flex-wrap align-items-center justify-content-between gap-3">
+              <span className="text-body-secondary font-monospace small">
+                Quy mô: {isReady ? targetList.length : '…'} domain · Nhóm: {activeCategory}
+              </span>
+              <div className="d-flex align-items-center gap-2">
+                <button type="button" onClick={onClose} className="btn btn-light border">Đóng</button>
                 <button
                   type="button"
-                  onClick={() => setAllFilteredDomains(null)}
-                  className="px-2.5 py-1 bg-white dark:bg-slate-800 border border-rose-200 dark:border-rose-800 rounded-lg font-sans font-semibold cursor-pointer flex-shrink-0"
+                  onClick={handleDownload}
+                  disabled={!isReady || targetList.length === 0}
+                  className="btn btn-primary d-flex align-items-center gap-2"
                 >
-                  Thử lại
+                  {isLoadingAll ? <Loader2 size={16} className="spin-slow" /> : <Download size={16} />}
+                  <span>Tải file .{format === 'csv' ? 'csv' : format === 'rpz' ? 'rpz' : 'txt'}</span>
                 </button>
               </div>
-            ) : (
-              <pre className="bg-slate-950 text-slate-200 font-mono text-xs p-3.5 rounded-xl max-h-48 overflow-y-auto leading-relaxed border border-slate-800">
-                {previewText.split('\n').slice(0, 30).join('\n')}
-                {previewText.split('\n').length > 30 && (
-                  <span className="text-slate-500 block italic pt-1">
-                    ... và còn {previewText.split('\n').length - 30} dòng nữa
-                  </span>
-                )}
-              </pre>
-            )}
-          </div>
-        </div>
-
-        {/* Footer actions */}
-        <div className="px-6 py-3.5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 flex flex-wrap items-center justify-between gap-3">
-          <span className="text-slate-400 dark:text-slate-500 text-xs font-medium font-mono">
-            Quy mô: {isReady ? targetList.length : '…'} domain · Nhóm: {activeCategory}
-          </span>
-          <div className="flex items-center space-x-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl font-semibold cursor-pointer"
-            >
-              Đóng
-            </button>
-            <button
-              type="button"
-              onClick={handleDownload}
-              disabled={!isReady || targetList.length === 0}
-              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl flex items-center space-x-1.5 cursor-pointer shadow-xs active-press disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoadingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-              <span>Tải file .{format === 'csv' ? 'csv' : format === 'rpz' ? 'rpz' : 'txt'}</span>
-            </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };

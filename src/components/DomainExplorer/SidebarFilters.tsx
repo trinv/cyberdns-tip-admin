@@ -25,19 +25,11 @@ interface SidebarFiltersProps {
   // selected. Backs ONLY the CATEGORY section's "Tất cả nhóm" badge. Each
   // category's own badge (cat.count, below) is also all-status — so "Tất
   // cả nhóm" and an individual category's count are directly comparable
-  // (the whole is never smaller than one of its parts). This used to be
-  // wired to an ACTIVE-ONLY count while every category badge next to it
-  // was all-status — which could show a single category with a HIGHER
-  // count than "Tất cả nhóm" itself: a real, reported "the total is less
-  // than one part" confusion.
+  // (the whole is never smaller than one of its parts).
   allCategoriesCount: number;
   // Real count across every status, SCOPED to whichever category is
   // currently selected (or the same as allCategoriesCount when 'all' is
-  // selected) — backs ONLY the STATUS section's own "Tất cả" badge, kept
-  // deliberately separate from allCategoriesCount above: this one changes
-  // as selectedCategory changes, that one never does. See the DB audit's
-  // own note on why this section's counts must follow the category
-  // selection above it instead of always showing whole-system totals.
+  // selected) — backs ONLY the STATUS section's own "Tất cả" badge.
   allStatusCount: number;
   // Real per-status counts, SCOPED the same way as allStatusCount above —
   // undefined/null while stats haven't loaded yet for the current category,
@@ -71,60 +63,38 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
   };
 
   const content = (
-    <div className="flex flex-col h-full overflow-y-auto select-none p-4 space-y-6 text-xs scrollbar-thin">
+    <div className="d-flex flex-column h-100 overflow-y-auto p-3 gap-4" style={{ fontSize: '0.8125rem' }}>
       {/* Mobile close bar */}
-      <div className="lg:hidden flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
-        <div className="flex items-center space-x-2 font-bold text-slate-800 dark:text-white text-sm">
-          <Filter className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-          <span>Bộ lọc & Danh mục</span>
+      <div className="d-lg-none d-flex align-items-center justify-content-between pb-2 border-bottom">
+        <div className="d-flex align-items-center gap-2 fw-bold">
+          <Filter size={16} className="text-primary" />
+          <span>Bộ lọc &amp; Danh mục</span>
         </div>
-        <button
-          onClick={onCloseMobile}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-        >
-          <X className="w-4 h-4" />
+        <button onClick={onCloseMobile} className="app-header-icon-btn" style={{ width: 28, height: 28 }}>
+          <X size={16} />
         </button>
       </div>
 
       {/* CATEGORY SECTION */}
       <div>
-        <div className="flex items-center justify-between px-2 mb-2.5 text-slate-400 dark:text-slate-500 font-bold tracking-wider text-xs uppercase">
-          <span className="flex items-center space-x-1.5">
-            <span>NHÓM DANH MỤC (CATEGORY)</span>
-          </span>
-          <button
-            onClick={onOpenAddCategory}
-            title="Thêm nhóm mới"
-            className="text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors p-0.5 rounded cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" />
+        <div className="app-nav-group-label d-flex align-items-center justify-content-between mt-0">
+          <span>Nhóm danh mục (Category)</span>
+          <button onClick={onOpenAddCategory} title="Thêm nhóm mới" className="btn btn-link btn-sm p-0 text-secondary">
+            <Plus size={14} />
           </button>
         </div>
 
-        <div className="space-y-1">
+        <div className="d-flex flex-column gap-1">
           {/* Tất cả */}
           <button
-            onClick={() => {
-              onSelectCategory('all');
-              if (onCloseMobile) onCloseMobile();
-            }}
-            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl transition-all text-left cursor-pointer ${
-              selectedCategory === 'all'
-                ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-200/80 dark:border-emerald-800/80 shadow-xs'
-                : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-            }`}
+            onClick={() => { onSelectCategory('all'); if (onCloseMobile) onCloseMobile(); }}
+            className={`app-filter-link ${selectedCategory === 'all' ? 'is-active' : ''}`}
           >
-            <div className="flex items-center space-x-2.5 truncate">
-              <span className="w-2.5 h-2.5 rounded-full bg-slate-400 dark:bg-slate-500"></span>
-              <span className="truncate">Tất cả nhóm</span>
-            </div>
-            <span className={`font-mono text-xs px-1.5 py-0.5 rounded ${
-              selectedCategory === 'all' 
-                ? 'bg-emerald-100/80 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 font-bold' 
-                : 'text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800'
-            }`}>
-              {formatNumber(allCategoriesCount)}
+            <span className="d-flex align-items-center gap-2 text-truncate">
+              <span className="rounded-circle bg-secondary flex-shrink-0" style={{ width: 10, height: 10 }} />
+              <span className="text-truncate">Tất cả nhóm</span>
             </span>
+            <span className="app-filter-count">{formatNumber(allCategoriesCount)}</span>
           </button>
 
           {/* Categories list */}
@@ -133,36 +103,14 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
             return (
               <button
                 key={cat.id}
-                onClick={() => {
-                  onSelectCategory(cat.id);
-                  if (onCloseMobile) onCloseMobile();
-                }}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl transition-all text-left cursor-pointer ${
-                  isSelected
-                    ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-200/80 dark:border-emerald-800/80 shadow-xs'
-                    : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-                } ${
-                  // A still-empty category (created but never synced/filled)
-                  // recedes visually so the eye lands on groups that actually
-                  // have domains — it stays fully legible and clickable,
-                  // just quieter, and never dims while it's the active filter.
-                  cat.count === 0 && !isSelected ? 'opacity-60' : ''
-                }`}
+                onClick={() => { onSelectCategory(cat.id); if (onCloseMobile) onCloseMobile(); }}
+                className={`app-filter-link ${isSelected ? 'is-active' : ''} ${cat.count === 0 && !isSelected ? 'is-muted' : ''}`}
               >
-                <div className="flex items-center space-x-2.5 truncate">
-                  <span
-                    className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-xs"
-                    style={{ backgroundColor: cat.color }}
-                  ></span>
-                  <span className="truncate">{cat.name}</span>
-                </div>
-                <span className={`font-mono text-xs px-1.5 py-0.5 rounded ${
-                  isSelected 
-                    ? 'bg-emerald-100/80 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 font-bold' 
-                    : 'text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800'
-                }`}>
-                  {formatNumber(cat.count)}
+                <span className="d-flex align-items-center gap-2 text-truncate">
+                  <span className="rounded-circle flex-shrink-0" style={{ width: 10, height: 10, backgroundColor: cat.color }} />
+                  <span className="text-truncate">{cat.name}</span>
                 </span>
+                <span className="app-filter-count">{formatNumber(cat.count)}</span>
               </button>
             );
           })}
@@ -170,68 +118,48 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
 
         <button
           onClick={onOpenAddCategory}
-          className="w-full mt-2.5 px-3 py-2 text-slate-500 dark:text-slate-400 hover:text-emerald-700 dark:hover:text-emerald-300 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/30 border border-dashed border-slate-300 dark:border-slate-700 rounded-xl text-xs font-semibold flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
+          className="btn btn-outline-secondary btn-sm w-100 mt-2 d-flex align-items-center justify-content-center gap-2"
+          style={{ borderStyle: 'dashed' }}
         >
-          <Plus className="w-3.5 h-3.5" />
+          <Plus size={14} />
           <span>Thêm nhóm mới</span>
         </button>
       </div>
 
-      {/* TRẠNG THÁI SECTION — 4 real iOS-style toggle switches (pill track +
-          sliding circular thumb), one row per status. Explicitly requested
-          over the earlier segmented-block design after seeing a literal
-          switch-style reference image — the trade-off this implies was
-          already flagged and accepted: selectedStatus is still one single
-          value (never independent booleans), so tapping any switch ON
-          always visually turns the other three OFF as a side effect —
-          there is no way to end up with zero or multiple switches lit at
-          once, by construction (isOn is derived, never stored per-switch). */}
+      {/* TRẠNG THÁI SECTION — real Bootstrap form-switch toggles, one row
+          per status. selectedStatus is still one single value (never
+          independent booleans), so switching any one ON always visually
+          turns the other three OFF as a side effect — there is no way to
+          end up with zero or multiple switches lit at once, by
+          construction (checked is derived, never stored per-switch). */}
       <div>
-        <div className="px-2 mb-2.5 text-slate-400 dark:text-slate-500 font-bold tracking-wider text-xs uppercase">
-          TRẠNG THÁI BLOCKLIST
-        </div>
-        <div className="space-y-1">
+        <div className="app-nav-group-label">Trạng thái blocklist</div>
+        <div className="d-flex flex-column gap-1">
           {STATUS_OPTIONS.map((opt) => {
             const isOn = selectedStatus === opt.value;
             return (
-              <button
+              <label
                 key={opt.value}
-                type="button"
-                role="switch"
-                aria-checked={isOn}
-                onClick={() => {
-                  onSelectStatus(opt.value);
-                  if (onCloseMobile) onCloseMobile();
-                }}
-                className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl transition-colors text-left cursor-pointer ${
-                  isOn ? 'bg-emerald-50 dark:bg-emerald-950/40' : 'hover:bg-slate-50 dark:hover:bg-slate-800'
-                }`}
+                className={`app-filter-link ${isOn ? 'is-active' : ''}`}
+                style={{ cursor: 'pointer' }}
               >
-                <span className="flex flex-col min-w-0 truncate">
-                  <span className={`truncate ${isOn ? 'text-emerald-700 dark:text-emerald-300 font-bold' : 'text-slate-700 dark:text-slate-300 font-semibold'}`}>
-                    {opt.label}
-                  </span>
-                  <span className="font-mono text-xs text-slate-400 dark:text-slate-500">
+                <span className="d-flex flex-column text-truncate">
+                  <span className="text-truncate">{opt.label}</span>
+                  <span className="font-monospace text-body-secondary" style={{ fontSize: '0.75rem' }}>
                     {opt.value === 'all' ? formatNumber(allStatusCount) : formatStatusCount(opt.value)}
                   </span>
                 </span>
-                {/* The switch itself: a plain decorative <span> (not a
-                    nested <button>) — the whole row above is the real,
-                    already-large click target and the interactive element;
-                    nesting a second interactive control inside it would be
-                    invalid HTML. */}
-                <span
-                  className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors duration-200 ${
-                    isOn ? 'bg-emerald-600' : 'bg-slate-300 dark:bg-slate-600'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${
-                      isOn ? 'translate-x-4' : 'translate-x-0.5'
-                    }`}
+                <span className="form-check form-switch flex-shrink-0 m-0">
+                  <input
+                    type="checkbox"
+                    role="switch"
+                    className="form-check-input"
+                    checked={isOn}
+                    onChange={() => { onSelectStatus(opt.value); if (onCloseMobile) onCloseMobile(); }}
+                    style={{ width: 34, height: 18 }}
                   />
                 </span>
-              </button>
+              </label>
             );
           })}
         </div>
@@ -239,47 +167,31 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
 
       {/* BỘ LỌC ĐÃ LƯU SECTION */}
       <div>
-        <div className="flex items-center justify-between px-2 mb-2.5 text-slate-400 dark:text-slate-500 font-bold tracking-wider text-xs uppercase">
-          <span>BỘ LỌC ĐÃ LƯU</span>
-          <button
-            onClick={onSaveCurrentFilter}
-            title="Lưu bộ lọc"
-            className="text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors p-0.5 rounded cursor-pointer"
-          >
-            <Bookmark className="w-3.5 h-3.5" />
+        <div className="app-nav-group-label d-flex align-items-center justify-content-between">
+          <span>Bộ lọc đã lưu</span>
+          <button onClick={onSaveCurrentFilter} title="Lưu bộ lọc" className="btn btn-link btn-sm p-0 text-secondary">
+            <Bookmark size={14} />
           </button>
         </div>
 
-        <div className="space-y-1">
+        <div className="d-flex flex-column gap-1">
           {savedFilters.map((sf) => {
             const isFilterActive = activeSavedFilter === sf.id;
             return (
               <button
                 key={sf.id}
-                onClick={() => {
-                  onSelectSavedFilter(sf);
-                  if (onCloseMobile) onCloseMobile();
-                }}
-                className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-left transition-colors cursor-pointer ${
-                  isFilterActive
-                    ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold'
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
-                }`}
+                onClick={() => { onSelectSavedFilter(sf); if (onCloseMobile) onCloseMobile(); }}
+                className={`app-filter-link ${isFilterActive ? 'is-active' : ''}`}
               >
-                <span className="truncate">{sf.name}</span>
-                <span className="font-mono text-xs text-slate-400 dark:text-slate-500 ml-1">
-                  {sf.count}
-                </span>
+                <span className="text-truncate">{sf.name}</span>
+                <span className="app-filter-count">{sf.count}</span>
               </button>
             );
           })}
         </div>
 
-        <button
-          onClick={onSaveCurrentFilter}
-          className="w-full mt-2 text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 text-xs py-1.5 text-left px-2 flex items-center space-x-1.5 transition-colors cursor-pointer font-medium"
-        >
-          <Plus className="w-3.5 h-3.5" />
+        <button onClick={onSaveCurrentFilter} className="btn btn-link btn-sm text-decoration-none d-flex align-items-center gap-2 mt-1 px-0">
+          <Plus size={14} />
           <span>Lưu bộ lọc hiện tại</span>
         </button>
       </div>
@@ -291,18 +203,19 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
       {/* Mobile Drawer */}
       {isOpenMobile && (
         <>
-          <div 
+          <div
             onClick={onCloseMobile}
-            className="lg:hidden fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 animate-in fade-in duration-200"
+            className="d-lg-none position-fixed top-0 start-0 end-0 bottom-0 bg-dark bg-opacity-75"
+            style={{ zIndex: 1039 }}
           />
-          <div className="lg:hidden fixed inset-y-0 left-0 w-72 bg-white dark:bg-slate-900 z-50 shadow-2xl border-r border-slate-200 dark:border-slate-800 animate-in slide-in-from-left duration-200 flex flex-col">
+          <div className="d-lg-none position-fixed top-0 bottom-0 start-0 bg-body shadow-lg border-end d-flex flex-column" style={{ width: 288, zIndex: 1040 }}>
             {content}
           </div>
         </>
       )}
 
       {/* Desktop Fixed Left Pane */}
-      <aside className="hidden lg:flex w-64 flex-shrink-0 bg-white dark:bg-slate-900 border-r border-slate-200/80 dark:border-slate-800 flex-col h-full shadow-xs transition-colors">
+      <aside className="d-none d-lg-flex flex-shrink-0 bg-body border-end flex-column h-100" style={{ width: 256 }}>
         {content}
       </aside>
     </>
