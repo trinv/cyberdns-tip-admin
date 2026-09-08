@@ -158,13 +158,6 @@ export const DomainTable: React.FC<DomainTableProps> = ({
             <span>đang chặn</span>
           </div>
         );
-      case 'protected':
-        return (
-          <div className="flex items-center space-x-1.5 text-xs text-slate-500 dark:text-slate-400">
-            <span className="w-2 h-2 rounded-full bg-slate-400 dark:bg-slate-500"></span>
-            <span>protected – không chặn</span>
-          </div>
-        );
       case 'allowlist':
         // Same reasoning as 'active' above — a positive/allowed STATUS, kept
         // green rather than the new primary blue.

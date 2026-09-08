@@ -34,7 +34,6 @@ const STATUS_LABELS: Record<string, string> = {
   active: 'Active (đang chặn)',
   allowlist: 'Allowlist',
   unblocked: 'Đã thôi chặn',
-  protected: 'Được bảo vệ',
 };
 
 export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({

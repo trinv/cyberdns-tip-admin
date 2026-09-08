@@ -123,7 +123,7 @@ export const domains = pgTable(
     primaryCategory: varchar('primary_category', { length: 100 }),
     source: text('source').notNull(),
     sourceDetail: text('source_detail'),
-    status: varchar('status', { length: 50 }).default('active').notNull(), // 'active' | 'unblocked' | 'allowlist' | 'protected' — 'grace_period' removed per explicit request
+    status: varchar('status', { length: 50 }).default('active').notNull(), // 'active' | 'unblocked' | 'allowlist' — 'grace_period' and 'protected' both removed per explicit request
     // True only when the CURRENT 'unblocked' status was set automatically by
     // pauseFeedSource/deleteFeedSource (queries.ts) reacting to its feed
     // source being paused/deleted — never by a human explicitly choosing to

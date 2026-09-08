@@ -537,7 +537,7 @@ export async function getDashboardStats() {
       // state. Filling in every known status explicitly (defaulting to 0)
       // makes "genuinely zero" and "not loaded yet" distinguishable again:
       // only the latter now produces undefined.
-      statusBreakdown: (['active', 'unblocked', 'allowlist', 'protected'] as const).map((status) => {
+      statusBreakdown: (['active', 'unblocked', 'allowlist'] as const).map((status) => {
         const row = statusRows.find((s) => s.status === status);
         const count = Number(row?.count || 0);
         return { status, count, percent: totalAll > 0 ? (count / totalAll) * 100 : 0 };
@@ -584,7 +584,7 @@ export async function getStatusBreakdownForCategory(categoryId?: string) {
       // fix as getDashboardStats — see its own note on why GROUP BY alone
       // would otherwise make a genuine zero indistinguishable from "stats
       // haven't loaded yet" in the sidebar.
-      statusBreakdown: (['active', 'unblocked', 'allowlist', 'protected'] as const).map((status) => {
+      statusBreakdown: (['active', 'unblocked', 'allowlist'] as const).map((status) => {
         const row = statusRows.find((s) => s.status === status);
         return { status, count: Number(row?.count || 0) };
       }),

@@ -110,15 +110,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const categoryBreakdownSource = liveCategoryBreakdown || [];
   const totalActiveDisplay = stats ? stats.totalActive.toLocaleString('vi-VN') : '—';
 
-  // Processing-status breakdown (active / allowlist / unblocked /
-  // protected — 'grace_period' removed per explicit request) — real
-  // counts across ALL domains, not just active ones, replacing what used
-  // to be a fabricated QPS/telemetry chart with no backing data pipeline.
+  // Processing-status breakdown (active / allowlist / unblocked —
+  // 'grace_period' and 'protected' both removed per explicit request) —
+  // real counts across ALL domains, not just active ones, replacing what
+  // used to be a fabricated QPS/telemetry chart with no backing data
+  // pipeline.
   const STATUS_LABELS: Record<string, string> = {
     active: 'Đang chặn',
     allowlist: 'Allowlist',
     unblocked: 'Đã thôi chặn',
-    protected: 'Được bảo vệ',
   };
   const statusBreakdown = stats?.statusBreakdown || [];
   // Sorted descending once, real counts — both the chart and its own
@@ -136,7 +136,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   // DomainTable's renderStatus) — a deliberate one-off for this chart only.
   const statusCanvasRef = useRef<HTMLCanvasElement>(null);
   const statusChartRef = useRef<Chart | null>(null);
-  const STATUS_BAR_SHADES = ['#1d4ed8', '#2563eb', '#60a5fa', '#93c5fd'];
+  const STATUS_BAR_SHADES = ['#1d4ed8', '#2563eb', '#60a5fa'];
 
   useEffect(() => {
     if (!statusCanvasRef.current || statusBreakdownSorted.length === 0) {

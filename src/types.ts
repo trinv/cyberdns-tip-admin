@@ -9,9 +9,13 @@ export type DomainCategory =
   | string;
 
 // 'grace_period' removed per explicit request — only 3 user-facing statuses
-// now (plus 'protected', system-managed, never actually written by any
-// backend path — see queries.ts).
-export type DomainStatus = 'active' | 'unblocked' | 'allowlist' | 'protected';
+// now. 'protected' (a system-managed status literal never actually written
+// by any backend path) was also removed per explicit request: it always
+// showed as a permanent, useless "Bảo vệ: 0" entry on every status
+// breakdown card. The separate isProtected boolean flag (DomainItem below —
+// protects specific domains like gov.vn from bulk actions, see
+// DomainBulkModal.tsx) is a different mechanism and is unaffected.
+export type DomainStatus = 'active' | 'unblocked' | 'allowlist';
 
 // Sentinel value the "Nguồn Feed" filter (DomainTable.tsx) sends as
 // feedSourceId to mean "domains with no feed-sourced membership at all"

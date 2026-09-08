@@ -53,7 +53,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ]
     },
     {
-      group: 'QUY TRÌNH & DUYỆT',
+      group: 'QUY TRÌNH & KIỂM DUYỆT',
       items: [
         { id: 'review', label: 'Hàng đợi duyệt', icon: CheckSquare },
         { id: 'release', label: 'Blocklist URL', icon: Rocket },
@@ -61,7 +61,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ]
     },
     {
-      group: 'TÌNH BÁO & KIỂM TOÁN',
+      group: 'MANAGEMENT & ACCOUNTS',
       items: [
         { id: 'sources', label: 'Nguồn Threat Feeds', icon: Rss },
         { id: 'logs', label: 'Nhật ký Audit Logs', icon: History },
