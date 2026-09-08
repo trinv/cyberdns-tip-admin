@@ -38,10 +38,6 @@ import {
   resolveReviewItem,
   getAuditLogs,
   rollbackAuditLog,
-  getReleases,
-  deployRemainingRelease,
-  overrideReleaseSafetyGate,
-  rollbackRelease,
   authenticateUser,
   createSession,
   deleteSession,
@@ -565,51 +561,9 @@ async function startServer() {
     }
   });
 
-  // Releases Pipeline API
-  app.get('/api/releases', async (req, res) => {
-    try {
-      const list = await getReleases();
-      res.json(list);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.post('/api/releases/:version/deploy', requireAuth, requireRole('Admin'), async (req: AuthRequest, res) => {
-    try {
-      const updated = await deployRemainingRelease(req.params.version, req.user?.email);
-      res.json({ success: true, release: updated });
-    } catch (error: any) {
-      console.error('API POST /api/releases/:version/deploy error:', error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.post('/api/releases/:version/override', requireAuth, requireRole('Admin'), async (req: AuthRequest, res) => {
-    try {
-      const { reason } = req.body;
-      const updated = await overrideReleaseSafetyGate(
-        req.params.version,
-        req.user?.email || 'Admin',
-        reason
-      );
-      res.json({ success: true, release: updated });
-    } catch (error: any) {
-      console.error('API POST /api/releases/:version/override error:', error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.post('/api/releases/:version/rollback', requireAuth, requireRole('Admin'), async (req: AuthRequest, res) => {
-    try {
-      const { reason } = req.body;
-      const updated = await rollbackRelease(req.params.version, req.user?.email || 'Admin', reason);
-      res.json({ success: true, release: updated });
-    } catch (error: any) {
-      console.error('API POST /api/releases/:version/rollback error:', error);
-      res.status(500).json({ error: error.message });
-    }
-  });
+  // (Releases Pipeline API removed — see schema.ts/queries.ts notes. The
+  // real published-blocklist endpoint is GET /v1/blocklist/:category.txt
+  // below.)
 
   // Audit Logs API
   app.get('/api/audit-logs', async (req, res) => {

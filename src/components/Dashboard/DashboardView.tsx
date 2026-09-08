@@ -18,6 +18,7 @@ import {
 import { FeedSource, CategoryInfo, DashboardStats, ReviewDomainItem, AppUser } from '../../types';
 import { MetricDetailModal, MetricType } from './MetricDetailModal';
 import { copyToClipboard } from '../../lib/clipboard';
+import { buildBlocklistUrl } from '../../lib/blocklistUrl';
 
 // Chart.js draws onto a <canvas> once, at creation time — unlike CSS, it
 // has no way to react to a CSS variable changing on its own, so a chart
@@ -231,14 +232,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   // anymore (removed: neither was ever backed by a real lookup/scoring
   // pipeline, just an honest-default placeholder or a fixed constant).
   const recentActiveDomains = stats?.recentActive || [];
-
-  // Base blocklist URL that Blocky (or any other DNS-level blocker) polls —
-  // one plain-text file per category, e.g. {origin}/v1/blocklist/ads.txt.
-  // Computed from window.location so it's correct in every environment
-  // (local dev, staging, tip.cyberdns.vn) without a hardcoded host.
-  const blocklistBaseUrl = `${window.location.origin}/v1/blocklist/`;
-
-  const buildBlocklistUrl = (categoryId: string) => `${blocklistBaseUrl}${categoryId}.txt`;
 
   const handleCopyBlocklistUrl = async (categoryId: string) => {
     const ok = await copyToClipboard(buildBlocklistUrl(categoryId));

@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { DomainItem, CategoryInfo, FeedSource, ReleaseItem, AuditLog, ReviewDomainItem, SavedFilter, DomainStatus, DashboardStats, CategoryStatusBreakdown, AppUser } from './types';
+import { DomainItem, CategoryInfo, FeedSource, AuditLog, ReviewDomainItem, SavedFilter, DomainStatus, DashboardStats, CategoryStatusBreakdown, AppUser } from './types';
 import {
   fetchDashboardStats,
   fetchStatusBreakdown,
   fetchCategories,
   fetchDomains,
   fetchFeedSources,
-  fetchReleases,
   fetchAuditLogs,
   rollbackAuditLogApi,
   fetchReviewQueue,
@@ -22,9 +21,6 @@ import {
   pauseFeedSourceApi,
   resumeFeedSourceApi,
   deleteFeedSourceApi,
-  deployReleaseApi,
-  overrideReleaseApi,
-  rollbackReleaseApi,
   resolveReviewItemApi,
   loginApi,
   logoutApi,
@@ -49,7 +45,6 @@ import { SourcesView } from './components/Sources/SourcesView';
 import { AuditLogsView } from './components/AuditLogs/AuditLogsView';
 import { AddEditDomainModal } from './components/Modals/AddEditDomainModal';
 import { CategoryManagerModal } from './components/Modals/CategoryManagerModal';
-import { DiffViewerModal } from './components/Modals/DiffViewerModal';
 import { KeyboardShortcutsModal } from './components/Modals/KeyboardShortcutsModal';
 import { ExportModal } from './components/Modals/ExportModal';
 import { LoginModal } from './components/Modals/LoginModal';
@@ -71,12 +66,6 @@ export default function App() {
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
   const userRole: 'Analyst' | 'Admin' | 'Reviewer' = currentUser?.role || 'Analyst';
-
-  // "Unreleased changes" would mean diffing the current domain set against
-  // the last release — there is no release-generation pipeline yet (see
-  // ReleasesView's empty state), so there's nothing real to compute this
-  // from. 0 (not a fake placeholder count) until that pipeline exists.
-  const unreleasedCount = 0;
 
   const handleLogin = async (email: string, password: string) => {
     const { token, user, isNewIp } = await loginApi(email, password); // lets the caller show the real error on failure
@@ -231,8 +220,6 @@ export default function App() {
   const [domainsTotal, setDomainsTotal] = useState<number>(0);
   const [isDomainsLoading, setIsDomainsLoading] = useState<boolean>(true);
   const [sources, setSources] = useState<FeedSource[]>([]);
-  const [release, setRelease] = useState<ReleaseItem | null>(null);
-  const [releasesList, setReleasesList] = useState<ReleaseItem[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [reviewItems, setReviewItems] = useState<ReviewDomainItem[]>([]);
   const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
@@ -341,7 +328,6 @@ export default function App() {
   const [isAddDomainModalOpen, setIsAddDomainModalOpen] = useState<boolean>(false);
   const [domainToEdit, setDomainToEdit] = useState<DomainItem | null>(null);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState<boolean>(false);
-  const [isDiffModalOpen, setIsDiffModalOpen] = useState<boolean>(false);
   const [isKeyboardHelpOpen, setIsKeyboardHelpOpen] = useState<boolean>(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
 
@@ -358,10 +344,9 @@ export default function App() {
   // unreachable, every section just shows its own empty/error state rather
   // than silently reverting to fake demo numbers that look real.
   const refreshAllData = useCallback(async () => {
-    const [cats, srcList, relList, logsList, revsList, stats] = await Promise.all([
+    const [cats, srcList, logsList, revsList, stats] = await Promise.all([
       fetchCategories().catch((e) => { console.warn('fetchCategories failed:', e); return null; }),
       fetchFeedSources().catch((e) => { console.warn('fetchFeedSources failed:', e); return null; }),
-      fetchReleases().catch((e) => { console.warn('fetchReleases failed:', e); return null; }),
       fetchAuditLogs().catch((e) => { console.warn('fetchAuditLogs failed:', e); return null; }),
       fetchReviewQueue().catch((e) => { console.warn('fetchReviewQueue failed:', e); return null; }),
       fetchDashboardStats().catch((e) => { console.warn('fetchDashboardStats failed:', e); return null; }),
@@ -370,10 +355,6 @@ export default function App() {
     setDashboardStats(stats);
     if (cats) setCategories(cats);
     if (srcList) setSources(srcList);
-    if (relList) {
-      setReleasesList(relList);
-      setRelease(relList[0] || null);
-    }
     if (logsList) setAuditLogs(logsList);
     if (revsList) setReviewItems(revsList);
   }, []);
@@ -873,59 +854,6 @@ export default function App() {
     }
   };
 
-  // Release Canary Actions
-  const applyReleaseUpdate = (updated: ReleaseItem) => {
-    setRelease((prev) => ({ ...prev, ...updated }));
-    setReleasesList((prev) => prev.map((r) => (r.version === updated.version ? { ...r, ...updated } : r)));
-  };
-
-  const handleDeployRemaining = async () => {
-    if (!release) return;
-    try {
-      const updated = await deployReleaseApi(release.version);
-      applyReleaseUpdate(updated);
-      showToast(`Bản phát hành đã được triển khai hoàn tất 100% đến các node Edge Anycast!`, 'success');
-      // deployRemainingRelease writes an audit log entry — not
-      // refreshAllData() here since that would also reset `release` to
-      // releasesList[0], overriding whichever release is actually being
-      // viewed (applyReleaseUpdate above already merges the real update
-      // into it correctly).
-      fetchAuditLogs().then(setAuditLogs).catch(() => {});
-    } catch (err: any) {
-      console.warn('Backend deploy release notice:', err);
-      showToast(err?.message || 'Triển khai thất bại — vui lòng thử lại.', 'warning');
-    }
-  };
-
-  const handleAdminOverride = async () => {
-    if (!release) return;
-    if (userRole !== 'Admin') {
-      showToast(`Cần quyền Admin để ghi đè cổng an toàn! Vui lòng chuyển role sang Admin ở góc trên bên phải.`, 'warning');
-      return;
-    }
-    try {
-      const updated = await overrideReleaseApi(release.version, 'Admin ghi đè cổng an toàn từ giao diện Phát hành');
-      applyReleaseUpdate(updated);
-      showToast(`Admin đã ghi đè thành công cổng an toàn! Bắt đầu cuốn chiếu toàn bộ cụm.`, 'success');
-      fetchAuditLogs().then(setAuditLogs).catch(() => {});
-    } catch (err: any) {
-      console.warn('Backend override release notice:', err);
-      showToast(err?.message || 'Ghi đè thất bại — vui lòng thử lại.', 'warning');
-    }
-  };
-
-  const handleRollbackRelease = async (version: string) => {
-    try {
-      const updated = await rollbackReleaseApi(version, 'Khôi phục thủ công từ giao diện Phát hành');
-      applyReleaseUpdate(updated);
-      showToast(`Đã hoàn tác và khôi phục về bản phát hành ${version}`, 'success');
-      fetchAuditLogs().then(setAuditLogs).catch(() => {});
-    } catch (err: any) {
-      console.warn('Backend rollback release notice:', err);
-      showToast(err?.message || 'Hoàn tác thất bại — vui lòng thử lại.', 'warning');
-    }
-  };
-
   // Shared between both the signed-out gate and the full app shell below,
   // so the toast (e.g. a failed-login message) is visible either way
   // without duplicating this markup.
@@ -979,7 +907,6 @@ export default function App() {
         currentTab={currentTab}
         setCurrentTab={setCurrentTab}
         reviewCount={reviewItems.length}
-        unreleasedCount={unreleasedCount}
         totalDomainCount={dashboardStats?.totalActive ?? 0}
         sourcesCount={sources.length}
         currentUser={currentUser}
@@ -1130,15 +1057,11 @@ export default function App() {
             />
           )}
 
-          {/* TAB 5: PHÁT HÀNH (Releases & Safety Gates) */}
+          {/* TAB 5: BLOCKLIST URL ĐÃ PHÁT HÀNH */}
           {currentTab === 'release' && (
             <ReleasesView
-              release={release}
-              releases={releasesList}
-              userRole={userRole}
-              onDeployRemaining={handleDeployRemaining}
-              onAdminOverride={handleAdminOverride}
-              onRollbackRelease={handleRollbackRelease}
+              categories={categories}
+              stats={dashboardStats}
               onViewDomainsList={(cat) => {
                 setSelectedCategory(cat);
                 setCurrentTab('domain');
@@ -1358,12 +1281,6 @@ export default function App() {
             showToast(err?.message || `Không thể xóa nhóm danh mục ${id} — vui lòng thử lại.`, 'warning');
           }
         }}
-      />
-
-      <DiffViewerModal
-        isOpen={isDiffModalOpen}
-        onClose={() => setIsDiffModalOpen(false)}
-        release={release}
       />
 
       <KeyboardShortcutsModal

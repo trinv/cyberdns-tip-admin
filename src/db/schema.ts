@@ -304,39 +304,14 @@ export const domainCategories = pgTable(
   ]
 );
 
-// 5. Release Pipeline Table
-export const releases = pgTable(
-  'releases',
-  {
-    id: serial('id').primaryKey(),
-    version: varchar('version', { length: 50 }).notNull().unique(),
-    status: varchar('status', { length: 50 }).default('ready').notNull(), // 'running' | 'staged' | 'blocked' | 'rolled_back' | 'ready'
-    categories: jsonb('categories').$type<Array<{
-      category: string;
-      current: number;
-      added: number;
-      removed: number;
-      deltaPercent: number;
-      safetyGate: 'passed' | 'warning' | 'failed' | 'unchanged';
-    }>>().default([]).notNull(),
-    diffSummary: jsonb('diff_summary').$type<{
-      added: string[];
-      removed: string[];
-      totalAdded: number;
-      totalRemoved: number;
-    }>().default({ added: [], removed: [], totalAdded: 0, totalRemoved: 0 }).notNull(),
-    blockedReason: text('blocked_reason'),
-    canaryNodes: jsonb('canary_nodes').$type<Array<{
-      nodeId: string;
-      status: 'healthy' | 'deploying' | 'error';
-      traffic: string;
-      blockRatio: string;
-    }>>().default([]).notNull(),
-    releasedBy: text('released_by'),
-    createdAt: timestamp('created_at').defaultNow().notNull(),
-    updatedAt: timestamp('updated_at').defaultNow().notNull(),
-  }
-);
+// 5. (Release Pipeline Table removed — the whole canary/diff/safety-gate
+// concept it modeled was never real: nothing in this codebase ever INSERTed
+// a row, only UPDATEd an existing one, so the table was permanently empty
+// in production and the UI it fed was 100% decorative. Replaced by the
+// public GET /v1/blocklist/:category.txt endpoint — Blocky pulls that
+// directly, no build/canary/rollback pipeline needed since it's always
+// computed live from `domains`. See ReleasesView.tsx for the real
+// "published blocklist status" page that replaced it.)
 
 // 6. Review Queue Table (Pending CTI Analyst Verification)
 export const reviewQueue = pgTable(

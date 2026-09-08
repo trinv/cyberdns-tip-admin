@@ -41,7 +41,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
     },
     {
       id: 'release',
-      label: 'Phát hành',
+      label: 'Blocklist',
       icon: Rocket,
       badge: unreleasedCount > 0 ? unreleasedCount : undefined,
       badgeColor: 'bg-rose-500',

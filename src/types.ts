@@ -55,32 +55,8 @@ export interface DomainItem {
   tags?: string[];
 }
 
-export interface ReleaseItem {
-  version: string;
-  timestamp: string;
-  status: 'running' | 'staged' | 'blocked' | 'rolled_back' | 'ready';
-  categories: {
-    category: string;
-    current: number;
-    added: number;
-    removed: number;
-    deltaPercent: number;
-    safetyGate: 'passed' | 'warning' | 'failed' | 'unchanged';
-  }[];
-  diffSummary: {
-    added: string[];
-    removed: string[];
-    totalAdded: number;
-    totalRemoved: number;
-  };
-  blockedReason?: string;
-  canaryNodes?: {
-    nodeId: string;
-    status: 'healthy' | 'deploying' | 'error';
-    traffic: string;
-    blockRatio: string;
-  }[];
-}
+// (ReleaseItem removed along with the fictional release-pipeline backend —
+// see src/db/schema.ts's note on the removed `releases` table.)
 
 export interface FeedSource {
   id: string;

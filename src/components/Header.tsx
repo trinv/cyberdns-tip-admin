@@ -68,7 +68,7 @@ export const Header: React.FC<HeaderProps> = ({
       case 'review':
         return { title: 'Hàng đợi Phê duyệt Tên miền (Review Queue)', icon: CheckSquare, category: 'Kiểm duyệt' };
       case 'release':
-        return { title: 'Quản lý Bản phát hành & Cổng an toàn (Releases)', icon: Rocket, category: 'Phát hành' };
+        return { title: 'Blocklist URL Đã Phát Hành', icon: Rocket, category: 'Phát hành' };
       case 'import':
         return { title: 'Nhập & Xử lý Tên miền Hàng loạt (Batch Import)', icon: Upload, category: 'Công cụ' };
       case 'sources':

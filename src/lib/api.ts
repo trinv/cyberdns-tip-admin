@@ -1,4 +1,4 @@
-import { DomainItem, CategoryInfo, FeedSource, ReleaseItem, AuditLog, ReviewDomainItem, DashboardStats, CategoryStatusBreakdown, AppUser, LoginLog } from '../types';
+import { DomainItem, CategoryInfo, FeedSource, AuditLog, ReviewDomainItem, DashboardStats, CategoryStatusBreakdown, AppUser, LoginLog } from '../types';
 
 export const API_BASE = '/api';
 
@@ -390,40 +390,6 @@ export async function rollbackAuditLogApi(logId: string, reason?: string): Promi
   return res.json();
 }
 
-export async function fetchReleases(): Promise<ReleaseItem[]> {
-  const res = await fetch(`${API_BASE}/releases`);
-  if (!res.ok) throw new Error('Failed to fetch releases');
-  return res.json();
-}
-
-export async function deployReleaseApi(version: string): Promise<ReleaseItem> {
-  const res = await fetch(`${API_BASE}/releases/${encodeURIComponent(version)}/deploy`, {
-    method: 'POST',
-    headers: await authHeaders(),
-  });
-  await checkResponse(res, 'Failed to deploy release');
-  const result = await res.json();
-  return result.release;
-}
-
-export async function overrideReleaseApi(version: string, reason: string): Promise<ReleaseItem> {
-  const res = await fetch(`${API_BASE}/releases/${encodeURIComponent(version)}/override`, {
-    method: 'POST',
-    headers: await authHeaders(),
-    body: JSON.stringify({ reason }),
-  });
-  await checkResponse(res, 'Failed to override release safety gate');
-  const result = await res.json();
-  return result.release;
-}
-
-export async function rollbackReleaseApi(version: string, reason: string): Promise<ReleaseItem> {
-  const res = await fetch(`${API_BASE}/releases/${encodeURIComponent(version)}/rollback`, {
-    method: 'POST',
-    headers: await authHeaders(),
-    body: JSON.stringify({ reason }),
-  });
-  await checkResponse(res, 'Failed to rollback release');
-  const result = await res.json();
-  return result.release;
-}
+// (fetchReleases/deployReleaseApi/overrideReleaseApi/rollbackReleaseApi
+// removed along with the fictional release-pipeline backend — see
+// schema.ts's note on the `releases` table.)

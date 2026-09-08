@@ -12,7 +12,6 @@ interface SidebarProps {
   currentTab: string;
   setCurrentTab: (tab: string) => void;
   reviewCount: number;
-  unreleasedCount: number;
   totalDomainCount?: number;
   sourcesCount?: number;
   currentUser?: AppUser | null;
@@ -31,7 +30,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   currentTab,
   setCurrentTab,
   reviewCount,
-  unreleasedCount,
   totalDomainCount = 0,
   sourcesCount = 0,
   currentUser = null,
@@ -70,7 +68,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       group: 'QUY TRÌNH & DUYỆT',
       items: [
         { id: 'review', label: 'Hàng đợi duyệt', icon: CheckSquare, badge: reviewCount > 0 ? `${reviewCount}` : undefined, badgeColor: 'amber' },
-        { id: 'release', label: 'Bản phát hành', icon: Rocket, badge: unreleasedCount > 0 ? `${unreleasedCount}` : undefined, badgeColor: 'rose' },
+        { id: 'release', label: 'Blocklist URL', icon: Rocket, badge: undefined, badgeColor: 'rose' },
         { id: 'import', label: 'Nhập Batch', icon: Upload, badge: undefined, badgeColor: 'slate' },
       ]
     },

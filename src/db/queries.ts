@@ -7,7 +7,6 @@ import {
   domains,
   domainCategories,
   feedSources,
-  releases,
   reviewQueue,
   auditLogs,
 } from './schema.ts';
@@ -2549,9 +2548,6 @@ export async function rollbackAuditLog(logId: number, userEmail: string, reason?
         }
       }
       summary = `Hoàn tác thao tác hàng loạt trên ${items.length} tên miền`;
-    } else if (data.type === 'release') {
-      await rollbackRelease(data.version, userEmail, reason || `Hoàn tác từ Nhật ký thao tác (giao dịch #${logId})`);
-      summary = `Hoàn tác bản phát hành ${data.version}`;
     } else {
       throw new Error('Loại giao dịch này chưa hỗ trợ hoàn tác tự động.');
     }
@@ -2581,108 +2577,7 @@ export async function rollbackAuditLog(logId: number, userEmail: string, reason?
   }
 }
 
-// 8. Releases Queries & Mutations
-export async function getReleases() {
-  try {
-    return await db.select().from(releases).orderBy(desc(releases.createdAt));
-  } catch (error) {
-    console.error('getReleases failed:', error);
-    throw new Error('Failed to retrieve releases', { cause: error });
-  }
-}
-
-export async function deployRemainingRelease(version: string, userEmail?: string) {
-  try {
-    const updated = await db
-      .update(releases)
-      .set({ status: 'running', updatedAt: new Date() })
-      .where(eq(releases.version, version))
-      .returning();
-    if (!updated[0]) throw new Error(`Release ${version} not found`);
-
-    await db.insert(auditLogs).values({
-      user: userEmail || 'SecOps Pipeline Automation',
-      role: 'Admin',
-      action: 'release',
-      targetCount: 1,
-      summary: `Triển khai hoàn tất bản phát hành ${version} đến 100% node Edge`,
-      reason: 'Deploy remaining nodes sau khi cổng an toàn được xử lý',
-      canRollback: true,
-      rollbackExpiresAt: new Date(Date.now() + 48 * 3600 * 1000),
-      rollbackData: { type: 'release', version },
-      details: [`Phiên bản: ${version}`],
-    });
-
-    return updated[0];
-  } catch (error) {
-    console.error('deployRemainingRelease failed:', error);
-    throw new Error('Failed to deploy release', { cause: error });
-  }
-}
-
-export async function overrideReleaseSafetyGate(version: string, userEmail: string, reason: string) {
-  try {
-    const existing = await db.select().from(releases).where(eq(releases.version, version)).limit(1);
-    if (!existing[0]) throw new Error(`Release ${version} not found`);
-
-    const updatedCategories = (existing[0].categories || []).map((c) =>
-      c.safetyGate === 'failed' || c.safetyGate === 'warning' ? { ...c, safetyGate: 'passed' as const } : c
-    );
-
-    const updated = await db
-      .update(releases)
-      .set({
-        categories: updatedCategories,
-        status: 'staged',
-        blockedReason: null,
-        updatedAt: new Date(),
-      })
-      .where(eq(releases.version, version))
-      .returning();
-
-    await db.insert(auditLogs).values({
-      user: userEmail || 'Admin',
-      role: 'Admin',
-      action: 'release',
-      targetCount: 1,
-      summary: `Admin ghi đè cổng an toàn cho bản phát hành ${version}`,
-      reason: reason || 'Ghi đè cổng an toàn (Admin Override)',
-      canRollback: true,
-      rollbackExpiresAt: new Date(Date.now() + 48 * 3600 * 1000),
-      rollbackData: { type: 'release', version },
-      details: [`Phiên bản: ${version}`, 'Ghi đè toàn bộ cổng an toàn chưa đạt (failed/warning) sang passed'],
-    });
-
-    return updated[0];
-  } catch (error) {
-    console.error('overrideReleaseSafetyGate failed:', error);
-    throw new Error('Failed to override release safety gate', { cause: error });
-  }
-}
-
-export async function rollbackRelease(version: string, userEmail: string, reason: string) {
-  try {
-    const updated = await db
-      .update(releases)
-      .set({ status: 'rolled_back', updatedAt: new Date() })
-      .where(eq(releases.version, version))
-      .returning();
-    if (!updated[0]) throw new Error(`Release ${version} not found`);
-
-    await db.insert(auditLogs).values({
-      user: userEmail || 'Admin',
-      role: 'Admin',
-      action: 'rollback',
-      targetCount: 1,
-      summary: `Hoàn tác (rollback) bản phát hành ${version}`,
-      reason: reason || 'Khôi phục do phát hiện bất thường sau canary',
-      canRollback: false,
-      details: [`Phiên bản: ${version}`],
-    });
-
-    return updated[0];
-  } catch (error) {
-    console.error('rollbackRelease failed:', error);
-    throw new Error('Failed to rollback release', { cause: error });
-  }
-}
+// 8. (Releases Queries & Mutations removed along with the `releases` table
+// — see schema.ts's note. The real "published blocklist" concept this app
+// actually has is served live by getBlocklistTextForCategory below /
+// GET /v1/blocklist/:category.txt in server.ts.)
