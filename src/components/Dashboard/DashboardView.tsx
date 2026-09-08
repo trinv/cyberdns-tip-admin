@@ -5,9 +5,14 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 // uses.
 import {
   Chart, DoughnutController, ArcElement, BarController, BarElement,
+  LineController, LineElement, PointElement, Filler,
   LinearScale, CategoryScale, Tooltip, type ChartConfiguration,
 } from 'chart.js';
-Chart.register(DoughnutController, ArcElement, BarController, BarElement, LinearScale, CategoryScale, Tooltip);
+Chart.register(
+  DoughnutController, ArcElement, BarController, BarElement,
+  LineController, LineElement, PointElement, Filler,
+  LinearScale, CategoryScale, Tooltip
+);
 import {
   ShieldAlert, ShieldCheck, Activity, Globe, Database,
   ArrowUpRight, ArrowDownRight, AlertTriangle, CheckCircle2,
@@ -259,15 +264,45 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       return;
     }
     const styles = getComputedStyle(document.documentElement);
+    // Solid primary for the line/points/tooltip; primary-soft (already a
+    // real translucent tint token, not a hand-rolled hex+alpha string —
+    // --color-primary is an hsl(...) value in this app, so string-
+    // concatenating an alpha suffix onto it wouldn't parse) for the area
+    // gradient fill.
     const primary = styles.getPropertyValue('--color-primary').trim() || '#2563eb';
+    const primarySoft = styles.getPropertyValue('--color-primary-soft').trim() || 'rgba(37,99,235,0.12)';
     const gridColor = styles.getPropertyValue('--border').trim() || '#e9ecef';
     const textMuted = styles.getPropertyValue('--text-muted').trim() || '#8996a4';
-    const inverse = styles.getPropertyValue('--bg-inverse').trim() || '#1d2630';
-    const inverseFg = styles.getPropertyValue('--text-inverse')?.trim() || '#ffffff';
+    const surface = styles.getPropertyValue('--bg-surface').trim() || '#ffffff';
+
+    // Vertical dashed guide line under the hovered point — Chart.js has no
+    // built-in crosshair, so this is a small custom plugin (afterDraw hook)
+    // reading the chart's own active tooltip element, same lightweight
+    // technique already used for the status chart's in-bar labels (no new
+    // npm dependency for one visual detail).
+    const hoverGuideLine = {
+      id: 'hoverGuideLine',
+      afterDraw(chart: Chart) {
+        const active = chart.getActiveElements();
+        if (!active.length) return;
+        const { x } = active[0].element as unknown as { x: number };
+        const { top, bottom } = chart.chartArea;
+        const ctx = chart.ctx;
+        ctx.save();
+        ctx.beginPath();
+        ctx.setLineDash([4, 4]);
+        ctx.moveTo(x, top);
+        ctx.lineTo(x, bottom);
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = gridColor;
+        ctx.stroke();
+        ctx.restore();
+      },
+    };
 
     growthChartRef.current?.destroy();
-    const config: ChartConfiguration<'bar'> = {
-      type: 'bar',
+    const config: ChartConfiguration<'line'> = {
+      type: 'line',
       data: {
         labels: domainGrowth.map((g) =>
           new Date(g.date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
@@ -275,9 +310,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         datasets: [
           {
             data: domainGrowth.map((g) => g.count),
-            backgroundColor: primary,
-            borderRadius: 3,
-            maxBarThickness: 14,
+            borderColor: primary,
+            backgroundColor: (context) => {
+              const { chart } = context;
+              const { chartArea } = chart;
+              if (!chartArea) return primarySoft;
+              const gradient = chart.ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+              gradient.addColorStop(0, primarySoft);
+              gradient.addColorStop(1, 'transparent');
+              return gradient;
+            },
+            fill: true,
+            tension: 0.4,
+            borderWidth: 2,
+            pointRadius: 0,
+            pointHoverRadius: 5,
+            pointHoverBackgroundColor: primary,
+            pointHoverBorderColor: surface,
+            pointHoverBorderWidth: 2,
           },
         ],
       },
@@ -285,12 +335,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         responsive: true,
         maintainAspectRatio: false,
         animation: { duration: 200 },
+        interaction: { mode: 'index', intersect: false },
         plugins: {
           legend: { display: false },
           tooltip: {
-            backgroundColor: inverse,
-            titleColor: inverseFg,
-            bodyColor: inverseFg,
+            // Same principle as the "Phân Bổ Danh Mục Nguy Cơ" donut chart:
+            // background matches the series' own real color (this line's
+            // primary blue — there's only one real series here, domain
+            // count/day, so no fabricated second line), text always white.
+            backgroundColor: primary,
+            titleColor: '#ffffff',
+            bodyColor: '#ffffff',
             padding: 8,
             cornerRadius: 8,
             displayColors: false,
@@ -310,11 +365,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           },
           y: {
             beginAtZero: true,
-            grid: { color: gridColor },
+            grid: { color: gridColor, },
             ticks: { color: textMuted, font: { size: 10 }, precision: 0 },
           },
         },
       },
+      plugins: [hoverGuideLine],
     };
     growthChartRef.current = new Chart(growthCanvasRef.current, config);
 
