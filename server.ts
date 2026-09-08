@@ -57,7 +57,7 @@ import {
   evaluateBlocklistAccess,
 } from './src/db/queries.ts';
 import { requireAuth, requireRole, AuthRequest } from './src/middleware/auth.ts';
-import { listCountries, searchCities } from './src/lib/geo.ts';
+import { listCountries, listProvincesForCountry } from './src/lib/geo.ts';
 
 // The sandbox's file-watcher restart does not reliably terminate the previous
 // "tsx server.ts" process before starting a new one (observed: a process from
@@ -331,10 +331,11 @@ async function startServer() {
     }
   });
 
-  // Country/City reference data for the DNS Node add/edit form's location
-  // dropdowns (see src/lib/geo.ts — never sends more than a bounded,
-  // per-country slice over the wire). Gated the same as the DNS Node routes
-  // above since this is currently only ever called from that Admin-only form.
+  // Country/Province reference data for the DNS Node add/edit form's
+  // location dropdowns (see src/lib/geo.ts — province lists are always
+  // small, so this sends each country's full list, never anything close to
+  // the ~8MB full dataset). Gated the same as the DNS Node routes above
+  // since this is currently only ever called from that Admin-only form.
   app.get('/api/geo/countries', requireAuth, requireRole('Admin'), (req, res) => {
     try {
       res.json(listCountries());
@@ -343,12 +344,11 @@ async function startServer() {
     }
   });
 
-  app.get('/api/geo/cities', requireAuth, requireRole('Admin'), (req, res) => {
+  app.get('/api/geo/provinces', requireAuth, requireRole('Admin'), (req, res) => {
     try {
       const country = (req.query.country as string) || '';
-      const search = (req.query.search as string) || '';
       if (!country) return res.status(400).json({ error: 'country (ISO code) is required.' });
-      res.json(searchCities(country, search));
+      res.json(listProvincesForCountry(country));
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

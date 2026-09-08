@@ -108,7 +108,8 @@ export const DnsNodesView: React.FC = () => {
     if (!mapContainerRef.current || mapRef.current) return;
     const map = L.map(mapContainerRef.current, {
       center: [16.0, 106.0], // Roughly centered on Việt Nam by default
-      zoom: 4,
+      zoom: 2, // Whole-world view by default — fitBounds below zooms in once there are real pinned nodes
+      minZoom: 2,
       scrollWheelZoom: false,
     });
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -385,7 +386,7 @@ export const DnsNodesView: React.FC = () => {
         <h2 className="text-sm font-bold text-slate-900 dark:text-white font-sans mb-3">Bản đồ vị trí & trạng thái node</h2>
         <div
           ref={mapContainerRef}
-          className="w-full h-80 isolate rounded-xl overflow-hidden border border-slate-100 dark:border-slate-800"
+          className="w-full h-[420px] sm:h-[520px] lg:h-[600px] isolate rounded-xl overflow-hidden border border-slate-100 dark:border-slate-800"
         />
         {nodes.every((n) => n.latitude == null || n.longitude == null) && nodes.length > 0 && (
           <p className="text-slate-400 dark:text-slate-500 mt-2">

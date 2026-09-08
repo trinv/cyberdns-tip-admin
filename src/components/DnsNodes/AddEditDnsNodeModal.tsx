@@ -1,10 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { X, ChevronDown, MapPin, Loader2 } from 'lucide-react';
-import { DnsNode, GeoCountry, GeoCity } from '../../types';
-import { fetchGeoCountries, fetchGeoCities } from '../../lib/api';
-import { useClickOutside } from '../../hooks/useClickOutside';
+import { X, Loader2 } from 'lucide-react';
+import { DnsNode, GeoCountry, GeoProvince } from '../../types';
+import { fetchGeoCountries, fetchGeoProvinces } from '../../lib/api';
 
 interface AddEditDnsNodeModalProps {
   isOpen: boolean;
@@ -37,15 +36,12 @@ export const AddEditDnsNodeModal: React.FC<AddEditDnsNodeModalProps> = ({
   const [notes, setNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  // ---- Country/City location picker ----
+  // ---- Country/Province location picker ----
   const [countries, setCountries] = useState<GeoCountry[]>([]);
   const [countryIso, setCountryIso] = useState('');
-  const [cityQuery, setCityQuery] = useState('');
-  const [cityOptions, setCityOptions] = useState<GeoCity[]>([]);
-  const [isCityListOpen, setIsCityListOpen] = useState(false);
-  const [isLoadingCities, setIsLoadingCities] = useState(false);
-  const cityBoxRef = useRef<HTMLDivElement>(null);
-  useClickOutside(cityBoxRef, () => setIsCityListOpen(false), isCityListOpen);
+  const [provinces, setProvinces] = useState<GeoProvince[]>([]);
+  const [selectedProvinceName, setSelectedProvinceName] = useState('');
+  const [isLoadingProvinces, setIsLoadingProvinces] = useState(false);
 
   // This component is never unmounted between uses (DnsNodesView keeps one
   // long-lived instance and just toggles `isOpen` — same pattern as
@@ -54,8 +50,8 @@ export const AddEditDnsNodeModal: React.FC<AddEditDnsNodeModalProps> = ({
   // modal actually opens, or `nodeToEdit` changes while it's open — without
   // this, reopening for a different node (or "Thêm mới" right after editing
   // one) would keep showing the PREVIOUS node's stale form values, including
-  // a Country/City selection that no longer has anything to do with what's
-  // on screen.
+  // a Country/Province selection that no longer has anything to do with
+  // what's on screen.
   useEffect(() => {
     if (!isOpen) return;
     setName(nodeToEdit?.name || '');
@@ -68,14 +64,14 @@ export const AddEditDnsNodeModal: React.FC<AddEditDnsNodeModalProps> = ({
     setLatitude(nodeToEdit?.latitude != null ? String(nodeToEdit.latitude) : '');
     setLongitude(nodeToEdit?.longitude != null ? String(nodeToEdit.longitude) : '');
     setNotes(nodeToEdit?.notes || '');
-    // Country/City always start unselected on open — an existing node's
+    // Country/Province always start unselected on open — an existing node's
     // free-text `location` (e.g. "Hà Nội - VNPT IDC", entered before this
-    // picker existed, or picked from a different dataset entry) can't be
-    // reliably reverse-matched to one exact dataset city, so this only ever
-    // OVERWRITES location/lat/lng once the admin explicitly picks one.
+    // picker existed) can't be reliably reverse-matched to one exact dataset
+    // entry, so this only ever OVERWRITES location/lat/lng once the admin
+    // explicitly picks one.
     setCountryIso('');
-    setCityQuery('');
-    setCityOptions([]);
+    setProvinces([]);
+    setSelectedProvinceName('');
   }, [isOpen, nodeToEdit]);
 
   useEffect(() => {
@@ -85,34 +81,30 @@ export const AddEditDnsNodeModal: React.FC<AddEditDnsNodeModalProps> = ({
       .catch((err) => console.warn('fetchGeoCountries failed:', err));
   }, [isOpen]);
 
-  // Debounced city search — re-queries whenever the selected country or the
-  // search text changes (empty search still returns the first 50, sorted
-  // alphabetically, so the list isn't empty before typing anything).
   useEffect(() => {
+    setSelectedProvinceName('');
     if (!isOpen || !countryIso) {
-      setCityOptions([]);
+      setProvinces([]);
       return;
     }
-    setIsLoadingCities(true);
-    const t = setTimeout(() => {
-      fetchGeoCities(countryIso, cityQuery)
-        .then(setCityOptions)
-        .catch((err) => {
-          console.warn('fetchGeoCities failed:', err);
-          setCityOptions([]);
-        })
-        .finally(() => setIsLoadingCities(false));
-    }, 250);
-    return () => clearTimeout(t);
-  }, [isOpen, countryIso, cityQuery]);
+    setIsLoadingProvinces(true);
+    fetchGeoProvinces(countryIso)
+      .then(setProvinces)
+      .catch((err) => {
+        console.warn('fetchGeoProvinces failed:', err);
+        setProvinces([]);
+      })
+      .finally(() => setIsLoadingProvinces(false));
+  }, [isOpen, countryIso]);
 
-  const handleSelectCity = (city: GeoCity) => {
+  const handleSelectProvince = (provinceName: string) => {
+    setSelectedProvinceName(provinceName);
+    const province = provinces.find((p) => p.name === provinceName);
+    if (!province) return;
     const countryName = countries.find((c) => c.isoCode === countryIso)?.name || '';
-    setLocation(countryName ? `${city.name}, ${countryName}` : city.name);
-    setLatitude(String(city.latitude));
-    setLongitude(String(city.longitude));
-    setCityQuery(city.name);
-    setIsCityListOpen(false);
+    setLocation(countryName ? `${province.name}, ${countryName}` : province.name);
+    setLatitude(String(province.latitude));
+    setLongitude(String(province.longitude));
   };
 
   // ---- Preview map (Leaflet + OpenStreetMap, free, no API key) — shows
@@ -284,19 +276,18 @@ export const AddEditDnsNodeModal: React.FC<AddEditDnsNodeModalProps> = ({
             </div>
           </div>
 
-          {/* ---- Location picker: Country -> City (dropdown), coordinates
-              auto-filled from the selection and shown live on the map below. ---- */}
+          {/* ---- Location picker: Country -> Province/City (dropdown),
+              coordinates auto-filled from the selection and shown live on
+              the map below. Province-level (Tỉnh/Thành phố), not city-level
+              — see src/lib/geo.ts's own note on why. ---- */}
           <div className="space-y-1.5">
             <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
-              VỊ TRÍ (chọn Quốc gia rồi Thành phố)
+              VỊ TRÍ (chọn Quốc gia rồi Tỉnh/Thành phố)
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <select
                 value={countryIso}
-                onChange={(e) => {
-                  setCountryIso(e.target.value);
-                  setCityQuery('');
-                }}
+                onChange={(e) => setCountryIso(e.target.value)}
                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-emerald-500 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-slate-100 focus:outline-none cursor-pointer"
               >
                 <option value="">— Quốc gia —</option>
@@ -307,42 +298,39 @@ export const AddEditDnsNodeModal: React.FC<AddEditDnsNodeModalProps> = ({
                 ))}
               </select>
 
-              <div className="relative" ref={cityBoxRef}>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={cityQuery}
-                    disabled={!countryIso}
-                    onChange={(e) => { setCityQuery(e.target.value); setIsCityListOpen(true); }}
-                    onFocus={() => setIsCityListOpen(true)}
-                    placeholder={countryIso ? 'Tìm thành phố...' : 'Chọn quốc gia trước'}
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-emerald-500 rounded-xl pl-3.5 pr-8 py-2 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                  />
-                  <div className="absolute inset-y-0 right-2.5 flex items-center pointer-events-none text-slate-400">
-                    {isLoadingCities ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                  </div>
-                </div>
-
-                {isCityListOpen && countryIso && (
-                  <div className="absolute z-20 mt-1 w-full max-h-52 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg py-1">
-                    {cityOptions.length === 0 && !isLoadingCities && (
-                      <div className="px-3.5 py-2 text-slate-400 dark:text-slate-500">Không tìm thấy thành phố phù hợp.</div>
-                    )}
-                    {cityOptions.map((city) => (
-                      <button
-                        type="button"
-                        key={`${city.name}-${city.latitude}-${city.longitude}`}
-                        onClick={() => handleSelectCity(city)}
-                        className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer flex items-center space-x-2"
-                      >
-                        <MapPin className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                        <span className="text-slate-800 dark:text-slate-200">{city.name}</span>
-                      </button>
-                    ))}
+              <div className="relative">
+                <select
+                  value={selectedProvinceName}
+                  disabled={!countryIso || isLoadingProvinces}
+                  onChange={(e) => handleSelectProvince(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-emerald-500 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-slate-100 focus:outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <option value="">
+                    {!countryIso
+                      ? 'Chọn quốc gia trước'
+                      : isLoadingProvinces
+                      ? 'Đang tải...'
+                      : provinces.length === 0
+                      ? 'Không có dữ liệu tỉnh/thành'
+                      : '— Tỉnh/Thành phố —'}
+                  </option>
+                  {provinces.map((p) => (
+                    <option key={p.name} value={p.name}>{p.name}</option>
+                  ))}
+                </select>
+                {isLoadingProvinces && (
+                  <div className="absolute inset-y-0 right-8 flex items-center pointer-events-none text-slate-400">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   </div>
                 )}
               </div>
             </div>
+
+            {countryIso && !isLoadingProvinces && provinces.length === 0 && (
+              <p className="text-amber-600 dark:text-amber-400">
+                Quốc gia này không có danh sách tỉnh/thành trong dữ liệu — vui lòng nhập toạ độ thủ công bên dưới.
+              </p>
+            )}
 
             {location && (
               <p className="text-slate-500 dark:text-slate-400">
@@ -352,7 +340,7 @@ export const AddEditDnsNodeModal: React.FC<AddEditDnsNodeModalProps> = ({
 
             <div ref={previewMapContainerRef} className="w-full h-36 rounded-xl overflow-hidden border border-slate-100 dark:border-slate-800 isolate mt-2" />
             {!hasValidPreview && (
-              <p className="text-slate-400 dark:text-slate-500">Chọn Quốc gia và Thành phố để hiển thị chính xác vị trí trên bản đồ.</p>
+              <p className="text-slate-400 dark:text-slate-500">Chọn Quốc gia và Tỉnh/Thành phố để hiển thị chính xác vị trí trên bản đồ.</p>
             )}
           </div>
 

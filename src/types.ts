@@ -205,16 +205,17 @@ export interface BlocklistUnknownRequester {
   lastCategory: string | null;
 }
 
-// Country/City reference data for the DNS Node form's location dropdowns —
-// see src/lib/geo.ts (server) / GET /api/geo/* (server.ts). Deliberately
-// tiny shapes: only what the dropdown + map preview actually need.
+// Country/Province reference data for the DNS Node form's location
+// dropdowns — see src/lib/geo.ts (server) / GET /api/geo/* (server.ts).
+// Deliberately tiny shapes: only what the dropdown + map preview actually
+// need. Province-level (not city-level — see geo.ts's own note on why).
 export interface GeoCountry {
   isoCode: string;
   name: string;
   flag: string;
 }
 
-export interface GeoCity {
+export interface GeoProvince {
   name: string;
   latitude: number;
   longitude: number;

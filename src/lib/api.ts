@@ -1,4 +1,4 @@
-import { DomainItem, CategoryInfo, FeedSource, AuditLog, ReviewDomainItem, DashboardStats, CategoryStatusBreakdown, AppUser, LoginLog, DnsNode, BlocklistAclSettings, BlocklistUnknownRequester, GeoCountry, GeoCity } from '../types';
+import { DomainItem, CategoryInfo, FeedSource, AuditLog, ReviewDomainItem, DashboardStats, CategoryStatusBreakdown, AppUser, LoginLog, DnsNode, BlocklistAclSettings, BlocklistUnknownRequester, GeoCountry, GeoProvince } from '../types';
 
 export const API_BASE = '/api';
 
@@ -451,7 +451,7 @@ export async function fetchUnknownRequesters(): Promise<BlocklistUnknownRequeste
   return res.json();
 }
 
-// ---- Country/City reference data (DNS Node form location dropdowns) ----
+// ---- Country/Province reference data (DNS Node form location dropdowns) ----
 // Countries barely ever change and are tiny (~250 rows) — cache the promise
 // at module scope so re-opening the Add/Edit modal within the same session
 // doesn't refetch it every time.
@@ -470,10 +470,12 @@ export function fetchGeoCountries(): Promise<GeoCountry[]> {
   return countriesPromise;
 }
 
-export async function fetchGeoCities(countryIsoCode: string, search: string = ''): Promise<GeoCity[]> {
-  const query = new URLSearchParams({ country: countryIsoCode });
-  if (search) query.set('search', search);
-  const res = await fetch(`${API_BASE}/geo/cities?${query.toString()}`, { headers: await authHeaders() });
-  await checkResponse(res, 'Failed to fetch cities');
+// Every country's province list is small (largest is France at ~123) — the
+// whole list comes back in one call, no search/pagination needed.
+export async function fetchGeoProvinces(countryIsoCode: string): Promise<GeoProvince[]> {
+  const res = await fetch(`${API_BASE}/geo/provinces?country=${encodeURIComponent(countryIsoCode)}`, {
+    headers: await authHeaders(),
+  });
+  await checkResponse(res, 'Failed to fetch provinces');
   return res.json();
 }
