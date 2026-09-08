@@ -11,9 +11,6 @@ import { AppUser } from '../types';
 interface SidebarProps {
   currentTab: string;
   setCurrentTab: (tab: string) => void;
-  reviewCount: number;
-  totalDomainCount?: number;
-  sourcesCount?: number;
   currentUser?: AppUser | null;
   userRole?: 'Analyst' | 'Admin' | 'Reviewer';
   isDarkMode?: boolean;
@@ -29,9 +26,6 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({
   currentTab,
   setCurrentTab,
-  reviewCount,
-  totalDomainCount = 0,
-  sourcesCount = 0,
   currentUser = null,
   userRole = 'Analyst',
   isDarkMode = false,
@@ -54,39 +48,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       group: 'TỔNG QUAN',
       items: [
-        { id: 'dashboard', label: 'SOC Dashboard', icon: LayoutDashboard, badge: 'Live', badgeColor: 'emerald' },
-        {
-          id: 'domain',
-          label: 'Domain Explorer',
-          icon: Globe,
-          badge: totalDomainCount > 0 ? totalDomainCount.toLocaleString('vi-VN') : undefined,
-          badgeColor: 'slate' as const,
-        },
+        { id: 'dashboard', label: 'SOC Dashboard', icon: LayoutDashboard },
+        { id: 'domain', label: 'Domain Explorer', icon: Globe },
       ]
     },
     {
       group: 'QUY TRÌNH & DUYỆT',
       items: [
-        { id: 'review', label: 'Hàng đợi duyệt', icon: CheckSquare, badge: reviewCount > 0 ? `${reviewCount}` : undefined, badgeColor: 'amber' },
-        { id: 'release', label: 'Blocklist URL', icon: Rocket, badge: undefined, badgeColor: 'rose' },
-        { id: 'import', label: 'Nhập Batch', icon: Upload, badge: undefined, badgeColor: 'slate' },
+        { id: 'review', label: 'Hàng đợi duyệt', icon: CheckSquare },
+        { id: 'release', label: 'Blocklist URL', icon: Rocket },
+        { id: 'import', label: 'Nhập Batch', icon: Upload },
       ]
     },
     {
       group: 'TÌNH BÁO & KIỂM TOÁN',
       items: [
-        {
-          id: 'sources',
-          label: 'Nguồn Threat Feeds',
-          icon: Rss,
-          badge: sourcesCount > 0 ? `${sourcesCount}` : undefined,
-          badgeColor: 'blue' as const,
-        },
-        { id: 'logs', label: 'Nhật ký Audit Logs', icon: History, badge: undefined, badgeColor: 'slate' },
+        { id: 'sources', label: 'Nguồn Threat Feeds', icon: Rss },
+        { id: 'logs', label: 'Nhật ký Audit Logs', icon: History },
         ...(userRole === 'Admin'
           ? [
-              { id: 'login-logs', label: 'Nhật ký đăng nhập', icon: ShieldCheck, badge: undefined, badgeColor: 'slate' as const },
-              { id: 'users', label: 'Người dùng & Phân quyền', icon: Users, badge: undefined, badgeColor: 'slate' as const },
+              { id: 'login-logs', label: 'Nhật ký đăng nhập', icon: ShieldCheck },
+              { id: 'users', label: 'Người dùng & Phân quyền', icon: Users },
             ]
           : []),
       ]
@@ -202,35 +184,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           <span className="truncate text-xs">{item.label}</span>
                         )}
                       </div>
-
-                      {!isCollapsed && item.badge && (
-                        <span className={`text-xs px-2 py-0.5 rounded-md font-mono font-bold flex-shrink-0 ${
-                          isActive
-                            ? 'bg-primary/15 text-primary'
-                            : item.badgeColor === 'emerald'
-                            // 'Live' status badge — kept genuinely green (not
-                            // the new primary blue) for the same "positive
-                            // status, not a brand action" reasoning as
-                            // DomainTable's status dots.
-                            ? 'bg-green-50 dark:bg-green-950/60 text-green-600 dark:text-green-400 border border-green-200/60 dark:border-green-800/60'
-                            : item.badgeColor === 'amber'
-                            ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800/60 animate-pulse'
-                            : item.badgeColor === 'rose'
-                            ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200/60 dark:border-rose-800/60'
-                            : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
-                        }`}>
-                          {item.badge}
-                        </span>
-                      )}
-
-                      {/* Small badge dot if collapsed */}
-                      {isCollapsed && item.badge && (
-                        <span className={`absolute top-1.5 right-1.5 w-2 h-2 rounded-full ring-2 ring-white dark:ring-slate-900 ${
-                          item.badgeColor === 'amber' ? 'bg-amber-500' :
-                          item.badgeColor === 'rose' ? 'bg-rose-500' :
-                          item.badgeColor === 'emerald' ? 'bg-green-500' : 'bg-slate-400'
-                        }`} />
-                      )}
                     </button>
                   );
                 })}

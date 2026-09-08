@@ -906,9 +906,6 @@ export default function App() {
       <Sidebar
         currentTab={currentTab}
         setCurrentTab={setCurrentTab}
-        reviewCount={reviewItems.length}
-        totalDomainCount={dashboardStats?.totalActive ?? 0}
-        sourcesCount={sources.length}
         currentUser={currentUser}
         userRole={userRole}
         isDarkMode={isDarkMode}
@@ -1028,7 +1025,6 @@ export default function App() {
               categories={categories}
               reviewItems={reviewItems}
               stats={dashboardStats}
-              currentUser={currentUser}
               onOpenReleaseAlert={() => setCurrentTab('release')}
               onOpenCrawlerAlert={() => setCurrentTab('sources')}
               onOpenAllowlistAlert={() => {

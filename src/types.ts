@@ -141,6 +141,12 @@ export interface DashboardStats {
   tldBreakdown: { tld: string; count: number; percent: number }[];
   statusBreakdown: { status: string; count: number; percent: number }[];
   recentActive: DomainItem[];
+  // Real daily count of newly-detected domains (grouped by domains.firstSeen)
+  // for the last 30 days, oldest first — every day in the window is present
+  // (even ones with 0), never sparse, so a trend chart never has to guess
+  // whether a missing day means "zero" or "not loaded yet". See
+  // getDashboardStats in queries.ts.
+  domainGrowth: { date: string; count: number }[];
 }
 
 // Response shape of GET /api/domains/status-breakdown — the "TRẠNG THÁI

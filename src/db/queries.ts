@@ -438,7 +438,7 @@ export async function getDashboardStats() {
   try {
     const activeFilter = eq(domains.status, 'active');
 
-    const [totalActiveRows, totalAllRows, categoryResult, tldRows, statusRows, recentActive] = await Promise.all([
+    const [totalActiveRows, totalAllRows, categoryResult, tldRows, statusRows, recentActive, growthRows] = await Promise.all([
       db.select({ count: sql<number>`count(*)` }).from(domains).where(activeFilter),
       db.select({ count: sql<number>`count(*)` }).from(domains),
       // Unnests the jsonb `categories` array rather than grouping by
@@ -480,10 +480,35 @@ export async function getDashboardStats() {
         .where(activeFilter)
         .orderBy(desc(domains.lastSeen))
         .limit(6),
+      // Real daily count of newly-detected domains for the Dashboard's
+      // growth trend chart — grouped by firstSeen's own calendar day (server
+      // timezone; this app has no per-user timezone setting, same simplicity
+      // already used elsewhere for timestamp display). Every domain carries
+      // its own firstSeen forever, so this needs no new history table.
+      db.execute<{ day: string; count: number }>(sql`
+        SELECT first_seen::date AS day, count(*)::int AS count
+        FROM domains
+        WHERE first_seen >= now() - interval '30 days'
+        GROUP BY first_seen::date
+        ORDER BY day
+      `),
     ]);
 
     const totalActive = Number(totalActiveRows[0]?.count || 0);
     const totalAll = Number(totalAllRows[0]?.count || 0);
+
+    // Fill in every day of the 30-day window explicitly (defaulting to 0) —
+    // same "don't let GROUP BY silently omit a real zero" fix as
+    // statusBreakdown below: a day with no new domains must render as a real
+    // 0 bar on the trend chart, not be missing from the x-axis entirely.
+    const growthByDay = new Map(growthRows.rows.map((r) => [String(r.day).slice(0, 10), Number(r.count)]));
+    const domainGrowth: { date: string; count: number }[] = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      domainGrowth.push({ date: key, count: growthByDay.get(key) || 0 });
+    }
 
     return {
       totalActive,
@@ -515,6 +540,7 @@ export async function getDashboardStats() {
         return { status, count, percent: totalAll > 0 ? (count / totalAll) * 100 : 0 };
       }),
       recentActive,
+      domainGrowth,
     };
   } catch (error) {
     console.error('getDashboardStats failed:', error);
