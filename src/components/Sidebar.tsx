@@ -193,7 +193,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         ${isCollapsed ? 'justify-center p-2.5' : 'justify-between px-3 py-2.5'}
                         ${
                           isActive
-                            ? 'bg-primary-soft text-primary font-semibold'
+                            ? 'bg-primary-soft text-primary font-semibold shadow-[inset_3px_0_0_var(--color-primary)]'
                             : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/80 dark:hover:bg-slate-800/80'
                         }
                       `}

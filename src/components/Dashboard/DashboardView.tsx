@@ -15,7 +15,7 @@ import {
   Crosshair, Flame, Share2, Search, ArrowRight, PlayCircle,
   Link2, Copy, Files
 } from 'lucide-react';
-import { FeedSource, CategoryInfo, DashboardStats, ReviewDomainItem } from '../../types';
+import { FeedSource, CategoryInfo, DashboardStats, ReviewDomainItem, AppUser } from '../../types';
 import { MetricDetailModal, MetricType } from './MetricDetailModal';
 import { copyToClipboard } from '../../lib/clipboard';
 
@@ -50,6 +50,9 @@ interface DashboardViewProps {
   onOpenReleaseAlert: () => void;
   onOpenCrawlerAlert: () => void;
   onOpenAllowlistAlert: () => void;
+  // For the hero banner's greeting only — real logged-in user, never a
+  // fabricated name.
+  currentUser: AppUser | null;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -61,6 +64,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenReleaseAlert,
   onOpenCrawlerAlert,
   onOpenAllowlistAlert,
+  currentUser,
 }) => {
   const reviewCount = reviewItems.length;
   const [activeDonutIndex, setActiveDonutIndex] = useState<number | null>(null);
@@ -96,6 +100,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   const categoryBreakdownSource = liveCategoryBreakdown || [];
   const totalActiveDisplay = stats ? stats.totalActive.toLocaleString('vi-VN') : '—';
+
+  // Hero banner greeting — real logged-in user's name, real current date,
+  // and a one-line summary built entirely from real numbers already in
+  // props (no fabricated week-over-week trend % — the system has no
+  // historical time-series to compute a real delta from yet).
+  const heroUserName = currentUser?.displayName || currentUser?.email || 'bạn';
+  const heroDateLabel = new Date().toLocaleDateString('vi-VN', {
+    weekday: 'long',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+  const heroSummaryLine = stats
+    ? `Đang chặn ${totalActiveDisplay} tên miền trên ${sources.length} nguồn feed, ${categories.length} nhóm danh mục.`
+    : 'Đang tải dữ liệu từ CyberDNSTIP-DB...';
 
   // Processing-status breakdown (active / allowlist / unblocked /
   // protected — 'grace_period' removed per explicit request) — real
@@ -241,16 +260,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   return (
     <div className="flex-1 bg-[#f8fafc] dark:bg-[#0B1120] overflow-y-auto h-full p-4 sm:p-6 transition-colors">
       <div className="space-y-6 max-w-7xl mx-auto w-full">
-        {/* Top Banner: Real-time SOC Status Bar */}
+        {/* Hero banner: real greeting (logged-in user) + real date + a
+            one-line summary built from real numbers already in props — the
+            reference template's own "Welcome back" pattern, but with zero
+            fabricated data (no week-over-week % — no historical time-series
+            exists yet to compute a real delta from). Replaces the former
+            static "SOC Status Bar" title with a personalized one; keeps the
+            same live-monitoring badge and radar icon. */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 p-4 sm:p-5 rounded-2xl shadow-xs transition-colors">
           <div className="flex items-center space-x-3.5">
             <div className="w-11 h-11 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200/70 dark:border-emerald-800/70 flex items-center justify-center text-emerald-600 dark:text-emerald-400 flex-shrink-0">
               <Radar className="w-5 h-5 animate-spin" style={{ animationDuration: '6s' }} />
             </div>
             <div>
+              <span className="block text-[11px] font-bold uppercase tracking-[.14em] text-slate-400 dark:text-slate-500 font-mono mb-0.5">
+                {heroDateLabel}
+              </span>
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
-                  Bảng Giám Sát Đe Dọa DNS SOC (Threat Intelligence Operations)
+                  Chào, {heroUserName}
                 </h2>
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200/70 dark:border-emerald-800">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse mr-1.5"></span>
@@ -258,7 +286,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </span>
               </div>
               <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                Hệ thống quản lý danh sách chặn DNS · Đồng bộ từ nguồn feed threat intel và nhập liệu thủ công
+                {heroSummaryLine}
               </p>
             </div>
           </div>
@@ -369,7 +397,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="text-[28px] leading-9 font-extrabold font-mono text-slate-900 dark:text-white tracking-tight">
               {stats ? totalActiveDisplay : '—'}
             </div>
-            <div className="flex items-center space-x-1.5 mt-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+            <div className="flex items-center space-x-1.5 mt-3 pt-3 border-t border-dashed border-[var(--color-border-soft)] text-xs font-semibold text-emerald-600 dark:text-emerald-400">
               <CheckCircle2 className="w-4 h-4" />
               <span>{stats ? 'Cập nhật trực tiếp từ CyberDNSTIP-DB' : 'Đang tải...'}</span>
             </div>
@@ -401,7 +429,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="text-[28px] leading-9 font-extrabold font-mono text-rose-600 dark:text-rose-400 tracking-tight">
               {reviewCount} Tên miền
             </div>
-            <div className="flex items-center space-x-1.5 mt-2 text-xs font-semibold text-rose-600 dark:text-rose-400">
+            <div className="flex items-center space-x-1.5 mt-3 pt-3 border-t border-dashed border-[var(--color-border-soft)] text-xs font-semibold text-rose-600 dark:text-rose-400">
               <AlertOctagon className="w-4 h-4" />
               <span>Chờ phê duyệt thủ công</span>
             </div>
@@ -433,7 +461,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="text-[28px] leading-9 font-extrabold font-mono text-slate-900 dark:text-white tracking-tight">
               {sources.length} Feeds / {categories.length} Nhóm
             </div>
-            <div className="flex items-center space-x-1.5 mt-2 text-xs font-semibold text-indigo-600 dark:text-indigo-400">
+            <div className="flex items-center space-x-1.5 mt-3 pt-3 border-t border-dashed border-[var(--color-border-soft)] text-xs font-semibold text-indigo-600 dark:text-indigo-400">
               <CheckCircle2 className="w-4 h-4" />
               <span>
                 {sources.filter((s) => s.status === 'healthy').length}/{sources.length || 0} nguồn hoạt động tốt
@@ -695,13 +723,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse min-w-[600px]">
             <thead>
-              <tr className="bg-slate-50/80 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 font-bold border-b border-slate-100 dark:border-slate-800">
-                <th className="px-4 py-3">TÊN MIỀN</th>
-                <th className="px-4 py-3">NHÓM DANH MỤC</th>
-                <th className="px-4 py-3">NGUỒN PHÁT HIỆN</th>
-                <th className="px-4 py-3">PHÁT HIỆN LÚC</th>
-                <th className="px-4 py-3">TRẠNG THÁI</th>
-                <th className="px-4 py-3 text-right">THAO TÁC</th>
+              {/* Header style matches the reference template's .table thead
+                  th exactly: mono, uppercase, wide letter-spacing, muted —
+                  not just a bold sans label. */}
+              <tr className="bg-slate-50/80 dark:bg-slate-800/60 text-slate-400 dark:text-slate-500 font-mono font-medium text-[10px] tracking-[.14em] uppercase border-b border-slate-100 dark:border-slate-800">
+                <th className="px-4 py-3">Tên miền</th>
+                <th className="px-4 py-3">Nhóm danh mục</th>
+                <th className="px-4 py-3">Nguồn phát hiện</th>
+                <th className="px-4 py-3">Phát hiện lúc</th>
+                <th className="px-4 py-3">Trạng thái</th>
+                <th className="px-4 py-3 text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">

@@ -110,6 +110,17 @@
   --color-info: var(--color-info);
   --color-info-soft: var(--color-info-soft);
 
+  --color-purple: var(--color-purple);
+  --color-purple-soft: var(--color-purple-soft);
+  --color-pink: var(--color-pink);
+  --color-pink-soft: var(--color-pink-soft);
+  --color-teal: var(--color-teal);
+  --color-teal-soft: var(--color-teal-soft);
+  --color-orange: var(--color-orange);
+  --color-orange-soft: var(--color-orange-soft);
+
+  --color-border-soft: var(--border-soft);
+
   --radius-sm: var(--radius-sm);
   --radius-md: var(--radius-md);
   --radius-lg: var(--radius-lg);
@@ -136,15 +147,34 @@
     --color-primary-soft: hsl(var(--brand-h) var(--brand-s) var(--brand-l) / 0.10);
     --color-primary-fg: #ffffff;
 
-    /* semantic — do NOT vary by tenant/brand */
-    --color-success: #21c17a;
-    --color-success-soft: #21c17a1f;
-    --color-warning: #f5a524;
-    --color-warning-soft: #f5a5241f;
-    --color-danger: #e5484d;
-    --color-danger-soft: #e5484d1f;
-    --color-info: #12b3a8;
-    --color-info-soft: #12b3a81f;
+    /* semantic — do NOT vary by tenant/brand. Values match the exact
+       compiled CSS of preview.colorlib.com/theme/adminator (fetched and
+       inspected directly, not guessed from a screenshot) — this is a
+       one-time baseline choice, not a per-tenant override, so it doesn't
+       conflict with admin-portal-style §3.2's "semantic colors don't vary
+       by brand" rule. */
+    --color-success: #10b981;
+    --color-success-soft: #ecfdf5;
+    --color-warning: #f59e0b;
+    --color-warning-soft: #fffbeb;
+    --color-danger: #ef4444;
+    --color-danger-soft: #fef2f2;
+    --color-info: #0ea5e9;
+    --color-info-soft: #f0f9ff;
+
+    /* Accent palette beyond the 4 semantic colors — same reference
+       template, used for KPI/chart variety (e.g. a 4th/5th stat-card
+       accent) where success/warning/danger/info don't fit the meaning. */
+    --color-purple: #8b5cf6;
+    --color-purple-soft: #f5f3ff;
+    --color-pink: #ec4899;
+    --color-pink-soft: #fdf2f8;
+    --color-teal: #14b8a6;
+    --color-teal-soft: #f0fdfa;
+    --color-orange: #f97316;
+    --color-orange-soft: #fff7ed;
+
+    --color-primary-ring: rgba(37, 99, 235, 0.18);
 
     /* surfaces */
     --bg-canvas: #f8f9fa;
@@ -162,23 +192,44 @@
     --border-strong: #d8dee4;
     --border-subtle: var(--border);
     --border-highlight: var(--border-strong);
+    /* Lighter than --border — reference template's own separate token,
+       used for card-head dividers and dashed compare-line footers where
+       a full-strength border reads as too heavy. */
+    --border-soft: #eef1f5;
 
     --text-primary: #1d2630;
     --text-secondary: #5b6b79;
     --text-muted: #8996a4;
 
-    --shadow-sm: 0 1px 2px rgb(27 46 94 / .06);
-    --shadow-md: 0 4px 16px rgb(27 46 94 / .08);
-    --shadow-lg: 0 12px 32px rgb(27 46 94 / .12);
+    /* rgba coefficients matched to the reference template's own
+       --shadow-card/--shadow-lg. */
+    --shadow-sm: 0 1px 3px rgb(15 23 42 / .06), 0 1px 2px -1px rgb(15 23 42 / .04);
+    --shadow-md: 0 4px 16px rgb(15 23 42 / .08);
+    --shadow-lg: 0 10px 15px -3px rgb(15 23 42 / .08), 0 4px 6px -4px rgb(15 23 42 / .05);
   }
 
   .dark {
     --brand-l: 59%; /* +6% lightness in dark mode for contrast, per skill §2.3 */
 
-    --color-success-soft: #21c17a29;
-    --color-warning-soft: #f5a52429;
-    --color-danger-soft: #e5484d29;
-    --color-info-soft: #12b3a829;
+    /* Dark-mode semantic colors bump lightness for contrast against a dark
+       surface — reference template's own dark-theme values, not a guess. */
+    --color-success: #34d399;
+    --color-success-soft: #0f2a20;
+    --color-warning: #fbbf24;
+    --color-warning-soft: #2b1f08;
+    --color-danger: #f87171;
+    --color-danger-soft: #2b1414;
+    --color-info: #38bdf8;
+    --color-info-soft: #0d2232;
+
+    --color-purple: #a78bfa;
+    --color-purple-soft: #1e1a2c;
+    --color-pink: #f472b6;
+    --color-pink-soft: #2a1424;
+    --color-teal: #2dd4bf;
+    --color-teal-soft: #0e2826;
+    --color-orange: #fb923c;
+    --color-orange-soft: #2a1810;
 
     --bg-canvas: #131920;
     --bg-surface: #1b232d;
@@ -187,16 +238,18 @@
 
     --border: #2a3542;
     --border-strong: #3a4756;
+    --border-soft: #1a2237;
 
     --text-primary: #e7ecf1;
     --text-secondary: #a3b1bf;
     --text-muted: #7a8896;
 
     --color-primary-soft: hsl(var(--brand-h) var(--brand-s) var(--brand-l) / 0.16);
+    --color-primary-ring: rgba(96, 165, 250, 0.24);
 
     --shadow-sm: 0 1px 2px rgb(0 0 0 / .30);
     --shadow-md: 0 4px 16px rgb(0 0 0 / .40);
-    --shadow-lg: 0 12px 32px rgb(0 0 0 / .55);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / .5), 0 4px 6px -4px rgb(0 0 0 / .4);
   }
 
   /* Typography / spacing / radius / motion scale — admin-portal-style §2.4.
@@ -214,7 +267,10 @@
     --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
     --sp-5: 20px; --sp-6: 24px; --sp-8: 32px; --sp-10: 40px;
 
-    --radius-sm: 6px; --radius-md: 8px; --radius-lg: 12px; --radius-xl: 16px;
+    /* --radius-lg matches the reference template's own card radius (14px,
+       inspected in its compiled CSS) — was 12px per admin-portal-style's
+       generic default; the concrete reference takes precedence here. */
+    --radius-sm: 6px; --radius-md: 8px; --radius-lg: 14px; --radius-xl: 16px;
     --radius-pill: 999px;
 
     --layout-sidebar: 260px;
@@ -350,6 +406,39 @@
 /* Native-like active button feedback */
 .active-press:active {
   transform: scale(0.97);
+}
+
+/* Small status/category pill badge — matches the reference template's own
+   `.tag`/`.t-*` classes exactly (name and variants kept verbatim since
+   nothing in this codebase already used these class names). Only added now
+   because Dashboard's new blocklist/table rows consume it this round; the
+   other 20 files still using bespoke inline badge classes will migrate to
+   this in a later pass instead of duplicating the ruleset early. */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-pill);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  padding: 3px 9px;
+}
+.tag.t-new { background: var(--color-purple-soft); color: var(--color-purple); }
+.tag.t-used { background: var(--color-orange-soft); color: var(--color-orange); }
+.tag.t-old { background: var(--color-warning-soft); color: var(--color-warning); }
+.tag.t-unavail { background: var(--color-danger-soft); color: var(--color-danger); }
+.tag.t-active { background: var(--color-success-soft); color: var(--color-success); }
+.tag.t-info { background: var(--color-info-soft); color: var(--color-info); }
+
+/* Card header divider — border-bottom in --border-soft with the reference
+   template's own spacing (16px bottom padding, 20px margin before the
+   card body). Applied as a class rather than inline utilities since every
+   card's header uses the exact same rhythm. */
+.card-head-underline {
+  border-bottom: 1px solid var(--border-soft);
+  padding-bottom: var(--sp-4);
+  margin-bottom: var(--sp-5);
 }
 
 @media (prefers-reduced-motion: reduce) {

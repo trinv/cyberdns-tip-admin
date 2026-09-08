@@ -1101,6 +1101,7 @@ export default function App() {
               categories={categories}
               reviewItems={reviewItems}
               stats={dashboardStats}
+              currentUser={currentUser}
               onOpenReleaseAlert={() => setCurrentTab('release')}
               onOpenCrawlerAlert={() => setCurrentTab('sources')}
               onOpenAllowlistAlert={() => {
