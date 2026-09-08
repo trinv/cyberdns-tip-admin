@@ -24,6 +24,7 @@ import {
   proposeDomain,
   proposeDomainsBulk,
   getCategories,
+  getBlocklistTextForCategory,
   createCategory,
   updateCategory,
   deleteCategory,
@@ -432,6 +433,35 @@ async function startServer() {
     } catch (error: any) {
       console.error('API DELETE /api/categories/:id error:', error);
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Public blocklist distribution — one plain-text domain list per category,
+  // meant to be pasted straight into an external DNS blocker's (Blocky,
+  // pfBlockerNG, AdGuard Home, ...) own blocklist-source URL config, which
+  // periodically re-fetches it on its own. Deliberately NOT under /api and
+  // NOT behind requireAuth: a blocklist is public data by nature (the same
+  // way OISD/Hagezi/StevenBlack publish theirs), and the consuming resolver
+  // has no session/token to present anyway. `:category.txt` — Express
+  // treats the `.` as a literal here, so `/v1/blocklist/malware.txt` gives
+  // req.params.category === 'malware'.
+  app.get('/v1/blocklist/:category.txt', async (req, res) => {
+    try {
+      const text = await getBlocklistTextForCategory(req.params.category);
+      if (text === null) {
+        return res.status(404).type('text/plain').send(`# Category not found: ${req.params.category}\n`);
+      }
+      res
+        .type('text/plain; charset=utf-8')
+        // Cheap bandwidth saver for a resolver that re-polls on a schedule
+        // (Blocky's own default is hourly) — nothing here is so time-
+        // sensitive that a client caching it for a few minutes matters, and
+        // this never claims to be immutable/long-lived.
+        .set('Cache-Control', 'public, max-age=300')
+        .send(text);
+    } catch (error: any) {
+      console.error('API GET /v1/blocklist/:category.txt error:', error);
+      res.status(500).type('text/plain').send('# Internal error generating blocklist\n');
     }
   });
 

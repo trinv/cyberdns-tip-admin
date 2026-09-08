@@ -1107,9 +1107,6 @@ export default function App() {
                 setCurrentTab('domain');
                 setSelectedStatus('allowlist');
               }}
-              unreleasedCount={unreleasedCount}
-              onOpenDiff={() => setIsDiffModalOpen(true)}
-              onOpenRelease={() => setCurrentTab('release')}
             />
           )}
 

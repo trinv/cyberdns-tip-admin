@@ -12,10 +12,12 @@ import {
   Radio, PieChart as PieIcon, ChevronRight, ExternalLink,
   Shield, Server, Eye, FileText, Check, MoreVertical,
   Zap, Lock, AlertOctagon, Terminal, Radar, Filter,
-  Crosshair, Flame, Share2, Search, ArrowRight, PlayCircle
+  Crosshair, Flame, Share2, Search, ArrowRight, PlayCircle,
+  Link2, Copy, Files
 } from 'lucide-react';
 import { FeedSource, CategoryInfo, DashboardStats, ReviewDomainItem } from '../../types';
 import { MetricDetailModal, MetricType } from './MetricDetailModal';
+import { copyToClipboard } from '../../lib/clipboard';
 
 // Chart.js draws onto a <canvas> once, at creation time — unlike CSS, it
 // has no way to react to a CSS variable changing on its own, so a chart
@@ -48,9 +50,6 @@ interface DashboardViewProps {
   onOpenReleaseAlert: () => void;
   onOpenCrawlerAlert: () => void;
   onOpenAllowlistAlert: () => void;
-  unreleasedCount?: number;
-  onOpenDiff?: () => void;
-  onOpenRelease?: () => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -62,15 +61,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenReleaseAlert,
   onOpenCrawlerAlert,
   onOpenAllowlistAlert,
-  unreleasedCount,
-  onOpenDiff,
-  onOpenRelease,
 }) => {
   const reviewCount = reviewItems.length;
   const [activeDonutIndex, setActiveDonutIndex] = useState<number | null>(null);
   const [selectedIncident, setSelectedIncident] = useState<string | null>(null);
-  const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [selectedMetricModal, setSelectedMetricModal] = useState<MetricType | null>(null);
+  // Which category's blocklist URL was just copied (for the per-row
+  // checkmark below) — 'all' means the "copy all URLs" button.
+  const [copiedBlocklistId, setCopiedBlocklistId] = useState<string | null>(null);
 
   // Category breakdown: real counts from GET /api/dashboard/stats, mapped
   // onto each category's display name/color. null while stats haven't
@@ -215,11 +213,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   // pipeline, just an honest-default placeholder or a fixed constant).
   const recentActiveDomains = stats?.recentActive || [];
 
-  const handleTriggerEdgeSync = () => {
-    setIsSyncing(true);
-    setTimeout(() => {
-      setIsSyncing(false);
-    }, 1200);
+  // Base blocklist URL that Blocky (or any other DNS-level blocker) polls —
+  // one plain-text file per category, e.g. {origin}/v1/blocklist/ads.txt.
+  // Computed from window.location so it's correct in every environment
+  // (local dev, staging, tip.cyberdns.vn) without a hardcoded host.
+  const blocklistBaseUrl = `${window.location.origin}/v1/blocklist/`;
+
+  const buildBlocklistUrl = (categoryId: string) => `${blocklistBaseUrl}${categoryId}.txt`;
+
+  const handleCopyBlocklistUrl = async (categoryId: string) => {
+    const ok = await copyToClipboard(buildBlocklistUrl(categoryId));
+    if (ok) {
+      setCopiedBlocklistId(categoryId);
+      setTimeout(() => setCopiedBlocklistId((cur) => (cur === categoryId ? null : cur)), 1500);
+    }
+  };
+
+  const handleCopyAllBlocklistUrls = async () => {
+    const allUrls = categories.map((c) => buildBlocklistUrl(c.id)).join('\n');
+    const ok = await copyToClipboard(allUrls);
+    if (ok) {
+      setCopiedBlocklistId('all');
+      setTimeout(() => setCopiedBlocklistId((cur) => (cur === 'all' ? null : cur)), 1500);
+    }
   };
 
   return (
@@ -248,72 +264,81 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Dedicated Scientific Cluster: Cụm Điều Phối & Phát Hành Edge DNS */}
+        {/* Blocklist URL cho Blocky DNS — mỗi Category có 1 URL text thuần,
+            công khai không cần xác thực (Blocky tự động tải lại định kỳ,
+            không có cách nào truyền credential), dạng
+            {origin}/v1/blocklist/{category}.txt, khớp cách các nhà cung
+            cấp blocklist thật (OISD, Hagezi...) công bố danh sách của họ. */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xs transition-all">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            {/* Left Compartment: Edge Cluster Status, Release state & Metadata */}
-            <div className="flex items-start sm:items-center space-x-3.5 min-w-0">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/80 dark:to-teal-950/60 border border-emerald-200/70 dark:border-emerald-800/70 flex items-center justify-center text-emerald-600 dark:text-emerald-400 flex-shrink-0">
-                <Radio className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3.5">
+            <div className="flex items-center space-x-3.5 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-primary-soft border border-primary/20 flex items-center justify-center text-primary flex-shrink-0">
+                <Link2 className="w-5 h-5" />
               </div>
+              <div className="space-y-0.5 min-w-0">
+                <span className="block text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                  Blocklist URL cho Blocky DNS
+                </span>
+                <span className="block text-xs text-slate-500 dark:text-slate-400">
+                  Mỗi Category có 1 URL text thuần để Blocky (hoặc bộ chặn DNS khác) tải định kỳ
+                </span>
+              </div>
+            </div>
 
-              <div className="space-y-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-                    ĐIỀU PHỐI ĐỒNG BỘ &amp; PHÁT HÀNH EDGE DNS
+            <button
+              onClick={handleCopyAllBlocklistUrls}
+              title="Sao chép toàn bộ URL của mọi Category, mỗi dòng một URL"
+              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-200/90 dark:border-slate-700 text-xs font-bold rounded-xl transition-all shadow-xs flex items-center space-x-2 cursor-pointer active-press flex-shrink-0"
+            >
+              {copiedBlocklistId === 'all' ? (
+                <Check className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
+              ) : (
+                <Files className="w-3.5 h-3.5" />
+              )}
+              <span>{copiedBlocklistId === 'all' ? 'Đã sao chép' : 'Sao chép tất cả'}</span>
+            </button>
+          </div>
+
+          <div className="divide-y divide-slate-100 dark:divide-slate-800 border-t border-slate-100 dark:border-slate-800">
+            {categories.map((cat) => {
+              const url = buildBlocklistUrl(cat.id);
+              const isCopied = copiedBlocklistId === cat.id;
+              return (
+                <div key={cat.id} className="flex items-center gap-3 py-2.5">
+                  <span
+                    className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: cat.color || '#64748b' }}
+                  />
+                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 w-32 sm:w-40 flex-shrink-0 truncate">
+                    {cat.name}
                   </span>
-                  {unreleasedCount && unreleasedCount > 0 ? (
-                    <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/80">
-                      <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-                      <span>{unreleasedCount} thay đổi chờ phát hành</span>
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border border-emerald-200/70 dark:border-emerald-800/70">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                      <span>Edge Anycast đã đồng bộ toàn mạng</span>
-                    </span>
-                  )}
+                  <code className="flex-1 min-w-0 truncate text-xs font-mono text-slate-500 dark:text-slate-400" title={url}>
+                    {url}
+                  </code>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <button
+                      onClick={() => handleCopyBlocklistUrl(cat.id)}
+                      title="Sao chép URL"
+                      className="w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                    >
+                      {isCopied ? <Check className="w-3.5 h-3.5 text-green-600 dark:text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noreferrer"
+                      title="Mở URL trong tab mới"
+                      className="w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
                 </div>
-              </div>
-            </div>
-
-            {/* Right Compartment: Scientific Action Cluster */}
-            <div className="flex flex-wrap items-center gap-2.5 flex-shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100 dark:border-slate-800">
-              {/* Button 1: Trigger Edge DNS Sync */}
-              <button
-                onClick={handleTriggerEdgeSync}
-                disabled={isSyncing}
-                title="Kích hoạt phát tán chính sách RPZ tới các Edge Resolver"
-                className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-200/90 dark:border-slate-700 text-xs font-bold rounded-xl transition-all shadow-xs flex items-center space-x-2 cursor-pointer disabled:opacity-50 active-press"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 ${isSyncing ? 'animate-spin' : ''}`} />
-                <span>{isSyncing ? 'Đang đồng bộ...' : 'Đồng bộ Edge DNS'}</span>
-              </button>
-
-              {/* Button 2: Inspect Diff */}
-              {unreleasedCount && unreleasedCount > 0 && onOpenDiff && (
-                <button
-                  onClick={onOpenDiff}
-                  title="Kiểm tra chi tiết danh sách thay đổi và phân loại rủi ro"
-                  className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100/90 dark:bg-amber-950/50 dark:hover:bg-amber-900/60 text-amber-900 dark:text-amber-200 border border-amber-200/90 dark:border-amber-800 text-xs font-bold rounded-xl transition-all shadow-xs flex items-center space-x-2 cursor-pointer active-press"
-                >
-                  <Layers className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                  <span>So sánh Diff ({unreleasedCount})</span>
-                </button>
-              )}
-
-              {/* Button 3: Release Pipeline */}
-              {onOpenRelease && (
-                <button
-                  onClick={onOpenRelease}
-                  title="Chuyển đến màn hình phát hành chính sách bảo vệ"
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition-all shadow-sm shadow-emerald-600/20 flex items-center space-x-2 cursor-pointer active-press"
-                >
-                  <Radio className="w-3.5 h-3.5" />
-                  <span>Phát hành Staging / Live</span>
-                </button>
-              )}
-            </div>
+              );
+            })}
+            {categories.length === 0 && (
+              <p className="py-3 text-xs text-slate-400 dark:text-slate-600">Chưa có Category nào.</p>
+            )}
           </div>
         </div>
 

@@ -1327,6 +1327,37 @@ export async function getCategories() {
   }
 }
 
+// Plain-text domain list for ONE category, meant to be served directly as
+// an external DNS blocker's (Blocky, pfBlockerNG, etc.) source URL — see
+// GET /v1/blocklist/:category.txt in server.ts. Returns null when the
+// category id doesn't exist at all (lets the route 404 instead of serving
+// an empty-but-200 list, which would look like "this category legitimately
+// has zero domains" instead of "you mistyped the category id").
+//
+// Only status='active' domains — the same "currently, actually blocked"
+// meaning used everywhere else in this app (allowlisted/unblocked/
+// protected domains must NOT appear in a list an external resolver is
+// about to start blocking). jsonb containment (not primaryCategory), same
+// reasoning as getDomains' own category filter: a domain can belong to
+// several categories at once, so this must check the whole array.
+export async function getBlocklistTextForCategory(categoryId: string): Promise<string | null> {
+  try {
+    const cat = await db.select({ id: categories.id }).from(categories).where(eq(categories.id, categoryId)).limit(1);
+    if (!cat[0]) return null;
+
+    const rows = await db
+      .select({ domain: domains.domain })
+      .from(domains)
+      .where(and(eq(domains.status, 'active'), sql`${domains.categories} @> ${JSON.stringify([categoryId])}::jsonb`))
+      .orderBy(domains.domain);
+
+    return rows.map((r) => r.domain).join('\n') + (rows.length > 0 ? '\n' : '');
+  } catch (error) {
+    console.error('getBlocklistTextForCategory failed:', error);
+    throw new Error('Failed to build blocklist text', { cause: error });
+  }
+}
+
 // Quy chuẩn đặt id: slug ASCII sạch từ tên (vd. "Cờ bạc trực tuyến" ->
 // "co-bac-truc-tuyen"), KHÔNG có hậu tố ngẫu nhiên — chỉ khi trùng slug
 // với một category đã có mới thêm hậu tố số thứ tự (co-bac-truc-tuyen-2,
