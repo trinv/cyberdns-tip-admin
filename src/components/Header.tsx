@@ -5,7 +5,7 @@ import {
   GitBranch, CheckCircle2, Shield, ArrowUpRight,
   Sun, Moon, ShieldCheck, Keyboard, HelpCircle,
   LayoutDashboard, Globe, CheckSquare, Rocket, Upload, Rss, History,
-  LogIn, LogOut, UserCircle2, Users
+  LogIn, LogOut, UserCircle2, Users, Server
 } from 'lucide-react';
 import { CyberDNSLogo } from './CyberDNSLogo';
 import { AppUser } from '../types';
@@ -77,6 +77,8 @@ export const Header: React.FC<HeaderProps> = ({
         return { title: 'Nhật ký Kiểm toán & Khôi phục Giao dịch (Audit Logs)', icon: History, category: 'Kiểm toán' };
       case 'users':
         return { title: 'Quản lý Người dùng & Phân quyền', icon: Users, category: 'Hệ thống' };
+      case 'dns-nodes':
+        return { title: 'Quản lý DNS Node & ACL Blocklist URL', icon: Server, category: 'Hạ tầng' };
       default:
         return { title: 'CyberDNS Console', icon: Globe, category: 'Hệ thống' };
     }

@@ -160,6 +160,47 @@ export interface CategoryStatusBreakdown {
   statusBreakdown: { status: string; count: number }[];
 }
 
+// A real CyberDNS-operated DNS resolver — see src/db/schema.ts's dnsNodes
+// note. Distinct from FeedSource: this is CyberDNS's own infrastructure
+// inventory, not a threat-intel feed.
+export interface DnsNode {
+  id: number;
+  name: string;
+  hostname: string | null;
+  ipAddress: string;
+  tier: 'LITE' | 'PRO' | 'FAMILY' | string;
+  location: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  provider: string | null;
+  status: 'active' | 'inactive';
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// The single-row Blocklist-URL ACL switch — see blocklistAclSettings in
+// schema.ts. enforceEnabled=false (the default) means every request is
+// still served as before; only flipping it true actually starts rejecting
+// IPs that don't match an active DnsNode.
+export interface BlocklistAclSettings {
+  enforceEnabled: boolean;
+  updatedBy: string | null;
+  updatedAt: string;
+}
+
+// One row per distinct IP that has called a Blocklist URL without matching
+// an active DnsNode — see blocklistUnknownRequesters in schema.ts. Surfaced
+// in the DNS Nodes screen so an Admin can review real traffic before
+// switching enforcement on.
+export interface BlocklistUnknownRequester {
+  ipAddress: string;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  requestCount: number;
+  lastCategory: string | null;
+}
+
 export interface SavedFilter {
   id: string;
   name: string;

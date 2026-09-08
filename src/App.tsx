@@ -50,6 +50,7 @@ import { ExportModal } from './components/Modals/ExportModal';
 import { LoginModal } from './components/Modals/LoginModal';
 import { UserManagementView } from './components/Users/UserManagementView';
 import { LoginHistoryView } from './components/LoginHistory/LoginHistoryView';
+import { DnsNodesView } from './components/DnsNodes/DnsNodesView';
 import { LoginPage } from './components/LoginPage';
 import { CyberDNSLogo } from './components/CyberDNSLogo';
 import { CheckCircle2, AlertTriangle, Info, X } from 'lucide-react';
@@ -1199,6 +1200,17 @@ export default function App() {
             ) : (
               <div className="flex-1 flex items-center justify-center text-sm text-slate-500 dark:text-slate-400">
                 Chỉ tài khoản Admin mới có quyền truy cập nhật ký đăng nhập.
+              </div>
+            )
+          )}
+
+          {/* TAB 9b: DNS NODES (CyberDNS resolver fleet + Blocklist ACL — Admin only) */}
+          {currentTab === 'dns-nodes' && (
+            userRole === 'Admin' ? (
+              <DnsNodesView />
+            ) : (
+              <div className="flex-1 flex items-center justify-center text-sm text-slate-500 dark:text-slate-400">
+                Chỉ tài khoản Admin mới có quyền truy cập trang quản lý DNS Node.
               </div>
             )
           )}

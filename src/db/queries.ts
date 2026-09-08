@@ -9,6 +9,9 @@ import {
   feedSources,
   reviewQueue,
   auditLogs,
+  dnsNodes,
+  blocklistAclSettings,
+  blocklistUnknownRequesters,
 } from './schema.ts';
 import { eq, desc, asc, sql, ilike, and, inArray } from 'drizzle-orm';
 import { parseFeedText } from './feedParser.ts';
@@ -2607,3 +2610,269 @@ export async function rollbackAuditLog(logId: number, userEmail: string, reason?
 // — see schema.ts's note. The real "published blocklist" concept this app
 // actually has is served live by getBlocklistTextForCategory below /
 // GET /v1/blocklist/:category.txt in server.ts.)
+
+// 9. DNS Nodes Queries — CyberDNS's own resolver-fleet inventory + the
+// Blocklist-URL ACL it backs. See schema.ts's dnsNodes/blocklistAclSettings/
+// blocklistUnknownRequesters notes for the overall design.
+
+export async function getDnsNodes() {
+  try {
+    return await db.select().from(dnsNodes).orderBy(asc(dnsNodes.name));
+  } catch (error) {
+    console.error('getDnsNodes failed:', error);
+    throw new Error('Failed to list DNS nodes', { cause: error });
+  }
+}
+
+export async function createDnsNode(
+  data: {
+    name: string;
+    hostname?: string | null;
+    ipAddress: string;
+    tier?: string;
+    location?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    provider?: string | null;
+    status?: string;
+    notes?: string | null;
+  },
+  actingUser: { email?: string; role?: string } = {}
+) {
+  try {
+    return await db.transaction(async (tx) => {
+      const created = await tx
+        .insert(dnsNodes)
+        .values({
+          name: data.name.trim(),
+          hostname: data.hostname?.trim() || null,
+          ipAddress: data.ipAddress.trim(),
+          tier: data.tier || 'LITE',
+          location: data.location?.trim() || null,
+          latitude: data.latitude ?? null,
+          longitude: data.longitude ?? null,
+          provider: data.provider?.trim() || null,
+          status: data.status || 'active',
+          notes: data.notes?.trim() || null,
+        })
+        .returning();
+
+      await tx.insert(auditLogs).values({
+        user: actingUser.email || 'Admin',
+        role: actingUser.role || 'Admin',
+        action: 'dns_node_add',
+        targetCount: 1,
+        summary: `Thêm DNS node "${created[0].name}" (${created[0].ipAddress})`,
+        reason: `Thêm mới node hạ tầng DNS — tier ${created[0].tier}`,
+        canRollback: false,
+      });
+
+      return created[0];
+    });
+  } catch (error: any) {
+    if (error?.code === '23505' || error?.cause?.code === '23505') {
+      throw new Error(`Địa chỉ IP "${data.ipAddress}" đã được đăng ký cho một node khác.`);
+    }
+    console.error('createDnsNode failed:', error);
+    throw error instanceof Error && !error.cause ? error : new Error('Failed to create DNS node', { cause: error });
+  }
+}
+
+export async function updateDnsNode(
+  id: number,
+  patch: {
+    name?: string;
+    hostname?: string | null;
+    ipAddress?: string;
+    tier?: string;
+    location?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    provider?: string | null;
+    status?: string;
+    notes?: string | null;
+  },
+  actingUser: { email?: string; role?: string } = {}
+) {
+  try {
+    return await db.transaction(async (tx) => {
+      const setValues: Record<string, any> = { updatedAt: new Date() };
+      if (patch.name !== undefined) setValues.name = patch.name.trim();
+      if (patch.hostname !== undefined) setValues.hostname = patch.hostname?.trim() || null;
+      if (patch.ipAddress !== undefined) setValues.ipAddress = patch.ipAddress.trim();
+      if (patch.tier !== undefined) setValues.tier = patch.tier;
+      if (patch.location !== undefined) setValues.location = patch.location?.trim() || null;
+      if (patch.latitude !== undefined) setValues.latitude = patch.latitude;
+      if (patch.longitude !== undefined) setValues.longitude = patch.longitude;
+      if (patch.provider !== undefined) setValues.provider = patch.provider?.trim() || null;
+      if (patch.status !== undefined) setValues.status = patch.status;
+      if (patch.notes !== undefined) setValues.notes = patch.notes?.trim() || null;
+
+      const updated = await tx.update(dnsNodes).set(setValues).where(eq(dnsNodes.id, id)).returning();
+      if (!updated[0]) throw new Error(`DNS node id ${id} not found`);
+
+      await tx.insert(auditLogs).values({
+        user: actingUser.email || 'Admin',
+        role: actingUser.role || 'Admin',
+        action: 'dns_node_update',
+        targetCount: 1,
+        summary: `Cập nhật DNS node "${updated[0].name}" (${updated[0].ipAddress})`,
+        reason:
+          patch.status !== undefined
+            ? `Đổi trạng thái node sang ${patch.status === 'active' ? 'Active' : 'Inactive'}`
+            : 'Cập nhật thông tin node',
+        canRollback: false,
+      });
+
+      return updated[0];
+    });
+  } catch (error: any) {
+    if (error?.code === '23505' || error?.cause?.code === '23505') {
+      throw new Error(`Địa chỉ IP "${patch.ipAddress}" đã được đăng ký cho một node khác.`);
+    }
+    console.error('updateDnsNode failed:', error);
+    throw error instanceof Error && !error.cause ? error : new Error('Failed to update DNS node', { cause: error });
+  }
+}
+
+export async function deleteDnsNode(id: number, actingUser: { email?: string; role?: string } = {}) {
+  try {
+    return await db.transaction(async (tx) => {
+      const existing = await tx.select().from(dnsNodes).where(eq(dnsNodes.id, id)).limit(1);
+      if (!existing[0]) throw new Error(`DNS node id ${id} not found`);
+
+      await tx.delete(dnsNodes).where(eq(dnsNodes.id, id));
+
+      await tx.insert(auditLogs).values({
+        user: actingUser.email || 'Admin',
+        role: actingUser.role || 'Admin',
+        action: 'dns_node_delete',
+        targetCount: 1,
+        summary: `Xoá DNS node "${existing[0].name}" (${existing[0].ipAddress})`,
+        reason: 'Xoá node khỏi danh sách hạ tầng DNS',
+        canRollback: false,
+      });
+
+      return { success: true };
+    });
+  } catch (error) {
+    console.error('deleteDnsNode failed:', error);
+    throw error instanceof Error && !error.cause ? error : new Error('Failed to delete DNS node', { cause: error });
+  }
+}
+
+// Reads the single-row ACL switch, creating the default (off) row on first
+// access — lets every fresh install work without a manual seed/migration
+// step beyond `db:push` creating the table itself.
+export async function getAclSettings() {
+  try {
+    const existing = await db.select().from(blocklistAclSettings).where(eq(blocklistAclSettings.id, 1)).limit(1);
+    if (existing[0]) return existing[0];
+    const created = await db
+      .insert(blocklistAclSettings)
+      .values({ id: 1, enforceEnabled: false })
+      .onConflictDoNothing()
+      .returning();
+    return created[0] || (await db.select().from(blocklistAclSettings).where(eq(blocklistAclSettings.id, 1)).limit(1))[0];
+  } catch (error) {
+    console.error('getAclSettings failed:', error);
+    throw new Error('Failed to read ACL settings', { cause: error });
+  }
+}
+
+export async function setAclEnforceEnabled(enabled: boolean, userEmail: string) {
+  try {
+    return await db.transaction(async (tx) => {
+      const updated = await tx
+        .insert(blocklistAclSettings)
+        .values({ id: 1, enforceEnabled: enabled, updatedBy: userEmail, updatedAt: new Date() })
+        .onConflictDoUpdate({
+          target: blocklistAclSettings.id,
+          set: { enforceEnabled: enabled, updatedBy: userEmail, updatedAt: new Date() },
+        })
+        .returning();
+
+      await tx.insert(auditLogs).values({
+        user: userEmail || 'Admin',
+        role: 'Admin',
+        action: 'acl_toggle',
+        targetCount: 0,
+        summary: enabled
+          ? 'Bật chặn ACL theo IP cho Blocklist URL'
+          : 'Tắt chặn ACL theo IP cho Blocklist URL (chỉ ghi log)',
+        reason: enabled
+          ? 'Chỉ các DNS node đã đăng ký (active) mới được phép gọi Blocklist URL từ nay.'
+          : 'Blocklist URL vẫn phục vụ mọi request như trước — chỉ ghi nhận IP lạ để rà soát.',
+        canRollback: false,
+      });
+
+      return updated[0];
+    });
+  } catch (error) {
+    console.error('setAclEnforceEnabled failed:', error);
+    throw new Error('Failed to update ACL settings', { cause: error });
+  }
+}
+
+// Recent unrecognized callers of the Blocklist URLs — see
+// blocklistUnknownRequesters's note in schema.ts. Ordered most-recent-first
+// so the admin sees currently-active unknown traffic at the top.
+export async function getUnknownRequesters(limit: number = 100) {
+  try {
+    return await db
+      .select()
+      .from(blocklistUnknownRequesters)
+      .orderBy(desc(blocklistUnknownRequesters.lastSeenAt))
+      .limit(limit);
+  } catch (error) {
+    console.error('getUnknownRequesters failed:', error);
+    throw new Error('Failed to list unknown blocklist requesters', { cause: error });
+  }
+}
+
+// The actual ACL decision for one incoming GET /v1/blocklist/:category.txt
+// request — called directly from the route handler in server.ts.
+//
+// - IP matches an active node: always allowed, nothing logged (known
+//   traffic isn't "interesting" — see blocklistUnknownRequesters's note).
+// - IP matches no active node: always upserted into
+//   blocklistUnknownRequesters (so the admin has visibility regardless of
+//   the switch's position), and allowed only when enforcement is off.
+export async function evaluateBlocklistAccess(
+  ipAddress: string,
+  category: string
+): Promise<{ allowed: boolean; isKnownNode: boolean }> {
+  try {
+    const match = await db
+      .select({ id: dnsNodes.id })
+      .from(dnsNodes)
+      .where(and(eq(dnsNodes.ipAddress, ipAddress), eq(dnsNodes.status, 'active')))
+      .limit(1);
+    if (match[0]) return { allowed: true, isKnownNode: true };
+
+    const settings = await getAclSettings();
+
+    // Best-effort: a logging failure must never itself block/500 a real
+    // blocklist request — the ACL decision below doesn't depend on it.
+    await db
+      .insert(blocklistUnknownRequesters)
+      .values({ ipAddress, lastCategory: category, requestCount: 1 })
+      .onConflictDoUpdate({
+        target: blocklistUnknownRequesters.ipAddress,
+        set: {
+          lastSeenAt: new Date(),
+          lastCategory: category,
+          requestCount: sql`${blocklistUnknownRequesters.requestCount} + 1`,
+        },
+      })
+      .catch((err) => console.warn('evaluateBlocklistAccess: failed to log unknown requester:', err));
+
+    return { allowed: !settings.enforceEnabled, isKnownNode: false };
+  } catch (error) {
+    console.error('evaluateBlocklistAccess failed:', error);
+    // Fail OPEN, not closed: a transient DB hiccup on this check must never
+    // take down every Blocky resolver's blocklist fetch — the same
+    // reasoning as the ACL defaulting to off in the first place.
+    return { allowed: true, isKnownNode: false };
+  }
+}

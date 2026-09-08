@@ -10,6 +10,7 @@ Threat Intelligence & Domain Blocklist management platform — sync domain block
 - **Domain Explorer**: lọc/sắp xếp/phân trang phía server, xuất toàn bộ danh mục (không giới hạn theo trang) ra .txt/.csv/.hosts/.rpz/AdBlock/dnsmasq.
 - **Quản lý người dùng & phân quyền** tự host (email/mật khẩu, không phụ thuộc Google/Firebase), tài khoản Super Admin tự tạo khi khởi động lần đầu nếu chưa có Admin nào. Toàn bộ ứng dụng yêu cầu đăng nhập — chưa xác thực chỉ thấy trang đăng nhập, không vào thẳng được Dashboard.
 - **Nhật ký đăng nhập & cảnh báo IP mới**: mọi lượt đăng nhập (thành công lẫn thất bại) đều ghi lại IP thật + trình duyệt (qua Nginx `X-Forwarded-For`); đăng nhập từ IP chưa từng dùng sẽ hiện cảnh báo ngay trong ứng dụng, và Admin xem được toàn bộ lịch sử ở mục "Nhật ký đăng nhập".
+- **Quản lý DNS Node & ACL cho Blocklist URL** (Admin): danh mục hạ tầng DNS resolver thật của CyberDNS (IP/hostname, tier LITE/PRO/FAMILY, vị trí trên bản đồ, nhà cung cấp, trạng thái Active/Inactive) — đồng thời là danh sách IP được phép gọi Blocklist URL. Công tắc chặn ACL mặc định TẮT (chỉ ghi log IP lạ để rà soát), Admin tự bật chặn thật khi đã sẵn sàng. Có nút "DNS Map Monitoring" liên kết ra trang giám sát Uptime Kuma tự triển khai riêng (xem `VITE_UPTIME_KUMA_URL` bên dưới).
 - Dashboard, Audit Logs, Bulk actions — toàn bộ số liệu lấy trực tiếp từ PostgreSQL, không có dữ liệu giả lập.
 
 ## Yêu cầu
@@ -92,6 +93,7 @@ Xem đầy đủ chú thích trong [`.env.example`](.env.example). Tóm tắt:
 | `SUPERADMIN_EMAIL` / `SUPERADMIN_PASSWORD` | Khuyến nghị | Tài khoản Admin đầu tiên, tự tạo nếu chưa có Admin nào |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_SECURE` / `SMTP_FROM` | Không | Máy chủ SMTP để gửi email cảnh báo đăng nhập IP mới — để trống `SMTP_HOST` để tắt tính năng này (cảnh báo trong ứng dụng vẫn hoạt động) |
 | `SECURITY_ALERT_EMAIL` | Không | Địa chỉ nhận email cảnh báo đăng nhập từ IP mới |
+| `VITE_UPTIME_KUMA_URL` | Không | URL trang Uptime Kuma tự triển khai riêng (đọc lúc **build**, không phải lúc chạy) — để trống thì nút "DNS Map Monitoring" hiện disabled thay vì trỏ tới đường dẫn không tồn tại |
 | `PG_MAX_WAL_SIZE` / `PG_CHECKPOINT_TIMEOUT` / `PG_SHARED_BUFFERS` / `PG_EFFECTIVE_CACHE_SIZE` | Không (chỉ Docker Compose) | Tinh chỉnh hiệu năng PostgreSQL — mặc định an toàn cho VPS nhỏ, tăng thêm nếu VPS có nhiều RAM hơn (xem `.env.example`) |
 
 ## Kiến trúc & cấu trúc thư mục
@@ -100,7 +102,7 @@ Xem đầy đủ chú thích trong [`.env.example`](.env.example). Tóm tắt:
 - `src/db/schema.ts` — Drizzle schema, nguồn sự thật cho cấu trúc database.
 - `src/db/queries.ts` — toàn bộ logic đọc/ghi database.
 - `src/db/triggers.ts` — trigger PostgreSQL (đồng bộ cache danh mục/domain, chạy theo lô ở cấp câu lệnh để xử lý tốt lượng lớn dữ liệu).
-- `src/components/` — giao diện React theo từng tab (Dashboard, Domain Explorer, Import, Review Queue, Releases, Sources, Audit Logs, User Management).
+- `src/components/` — giao diện React theo từng tab (Dashboard, Domain Explorer, Import, Review Queue, Releases, Sources, Audit Logs, User Management, DNS Nodes).
 - `deploy/` — script cài đặt & cấu hình tham khảo cho VPS Ubuntu (`install-ubuntu.sh`, `setup-domain-ssl.sh`, `nginx.conf.example`, `cyberdns-tip.service.example`).
 
 ## Giới hạn đã biết (đang hoàn thiện)

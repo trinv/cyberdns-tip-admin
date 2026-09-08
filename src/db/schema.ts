@@ -387,3 +387,81 @@ export const savedFilters = pgTable(
     createdAt: timestamp('created_at').defaultNow().notNull(),
   }
 );
+
+// 9. DNS Nodes Table — CyberDNS's own real DNS resolver fleet (NOT a threat
+// feed source). Purpose: (a) an operational inventory of the physical/
+// virtual servers running Blocky, with location/provider/tier for map +
+// reporting, and (b) the allowlist backing the Blocklist-URL ACL below —
+// only the ipAddress of a `status = 'active'` row here is ever allowed to
+// bypass that ACL. See getBlocklistTextForCategory's call site in server.ts.
+export const dnsNodes = pgTable(
+  'dns_nodes',
+  {
+    id: serial('id').primaryKey(),
+    name: text('name').notNull(),
+    // Display-only — NEVER used to decide ACL access. Matching by hostname
+    // would mean trusting reverse/forward DNS, which is trivially spoofable
+    // by anyone who controls the requesting host's own resolver; the real
+    // ACL key is always ipAddress below.
+    hostname: text('hostname'),
+    ipAddress: varchar('ip_address', { length: 64 }).notNull().unique(),
+    // 'LITE' | 'PRO' | 'FAMILY' — which CyberDNS product tier this resolver
+    // serves; free-form varchar (not a DB enum) so a new tier never needs a
+    // migration, same reasoning as domains.status/feedSources.status above.
+    tier: varchar('tier', { length: 20 }).default('LITE').notNull(),
+    location: text('location'),
+    // Optional map pin coordinates — admin-entered by hand, no geocoding
+    // pipeline. A node with either left null simply has no pin (still shows
+    // in the table) rather than defaulting to (0,0) or another fake value.
+    latitude: doublePrecision('latitude'),
+    longitude: doublePrecision('longitude'),
+    provider: text('provider'),
+    // 'active' | 'inactive' — only 'active' nodes ever pass the Blocklist
+    // ACL check; toggling this off is the fast way to revoke one node's
+    // access without deleting its record.
+    status: varchar('status', { length: 20 }).default('active').notNull(),
+    notes: text('notes'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  }
+);
+
+// 10. Blocklist ACL Settings — a single-row (id fixed at 1) switch, not a
+// per-deployment env var, specifically so an Admin can flip it live from
+// "Quản lý DNS Node" without a redeploy/restart. Defaults to false (log-only
+// — see blocklistUnknownRequesters below) precisely so adding this feature
+// can never itself cut off a Blocky instance that hasn't been registered as
+// a node yet; an Admin opts into real enforcement only once they've
+// confirmed the recent-unknown-IP panel is clean.
+export const blocklistAclSettings = pgTable(
+  'blocklist_acl_settings',
+  {
+    id: integer('id').primaryKey(),
+    enforceEnabled: boolean('enforce_enabled').default(false).notNull(),
+    updatedBy: text('updated_by'),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  }
+);
+
+// 11. Blocklist Unknown Requesters — upserted once per distinct IP that
+// calls GET /v1/blocklist/:category.txt WITHOUT matching an active DNS node
+// (see the route handler in server.ts), regardless of whether enforcement
+// is currently on or off. This is what makes the log-only default mode
+// actually useful: before switching blocklistAclSettings.enforceEnabled on,
+// an Admin can see exactly which real IPs are polling and register any
+// legitimate ones as nodes first, instead of flipping the switch blind.
+// Known/active node IPs are deliberately never written here — only the
+// "interesting" (unrecognized) case, so this table stays small.
+export const blocklistUnknownRequesters = pgTable(
+  'blocklist_unknown_requesters',
+  {
+    ipAddress: varchar('ip_address', { length: 64 }).primaryKey(),
+    firstSeenAt: timestamp('first_seen_at').defaultNow().notNull(),
+    lastSeenAt: timestamp('last_seen_at').defaultNow().notNull(),
+    requestCount: integer('request_count').default(1).notNull(),
+    lastCategory: varchar('last_category', { length: 100 }),
+  },
+  (table) => [
+    index('blocklist_unknown_requesters_last_seen_idx').on(table.lastSeenAt),
+  ]
+);

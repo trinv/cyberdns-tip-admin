@@ -67,6 +67,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { id: 'logs', label: 'Nhật ký Audit Logs', icon: History },
         ...(userRole === 'Admin'
           ? [
+              { id: 'dns-nodes', label: 'Quản lý DNS Node', icon: Server },
               { id: 'login-logs', label: 'Nhật ký đăng nhập', icon: ShieldCheck },
               { id: 'users', label: 'Người dùng & Phân quyền', icon: Users },
             ]

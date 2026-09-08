@@ -1,4 +1,4 @@
-import { DomainItem, CategoryInfo, FeedSource, AuditLog, ReviewDomainItem, DashboardStats, CategoryStatusBreakdown, AppUser, LoginLog } from '../types';
+import { DomainItem, CategoryInfo, FeedSource, AuditLog, ReviewDomainItem, DashboardStats, CategoryStatusBreakdown, AppUser, LoginLog, DnsNode, BlocklistAclSettings, BlocklistUnknownRequester } from '../types';
 
 export const API_BASE = '/api';
 
@@ -393,3 +393,60 @@ export async function rollbackAuditLogApi(logId: string, reason?: string): Promi
 // (fetchReleases/deployReleaseApi/overrideReleaseApi/rollbackReleaseApi
 // removed along with the fictional release-pipeline backend — see
 // schema.ts's note on the `releases` table.)
+
+// ---- DNS Node management + Blocklist-URL ACL (Admin-only) ----
+export async function fetchDnsNodes(): Promise<DnsNode[]> {
+  const res = await fetch(`${API_BASE}/dns-nodes`, { headers: await authHeaders() });
+  await checkResponse(res, 'Failed to fetch DNS nodes');
+  return res.json();
+}
+
+export async function createDnsNodeApi(data: Partial<DnsNode>): Promise<DnsNode> {
+  const res = await fetch(`${API_BASE}/dns-nodes`, {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify(data),
+  });
+  await checkResponse(res, 'Failed to create DNS node');
+  const result = await res.json();
+  return result.node;
+}
+
+export async function updateDnsNodeApi(id: number, patch: Partial<DnsNode>): Promise<DnsNode> {
+  const res = await fetch(`${API_BASE}/dns-nodes/${id}`, {
+    method: 'PATCH',
+    headers: await authHeaders(),
+    body: JSON.stringify(patch),
+  });
+  await checkResponse(res, 'Failed to update DNS node');
+  const result = await res.json();
+  return result.node;
+}
+
+export async function deleteDnsNodeApi(id: number): Promise<void> {
+  const res = await fetch(`${API_BASE}/dns-nodes/${id}`, { method: 'DELETE', headers: await authHeaders() });
+  await checkResponse(res, 'Failed to delete DNS node');
+}
+
+export async function fetchBlocklistAclSettings(): Promise<BlocklistAclSettings> {
+  const res = await fetch(`${API_BASE}/blocklist-acl`, { headers: await authHeaders() });
+  await checkResponse(res, 'Failed to fetch ACL settings');
+  return res.json();
+}
+
+export async function setBlocklistAclEnforceApi(enforceEnabled: boolean): Promise<BlocklistAclSettings> {
+  const res = await fetch(`${API_BASE}/blocklist-acl`, {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify({ enforceEnabled }),
+  });
+  await checkResponse(res, 'Failed to update ACL settings');
+  const result = await res.json();
+  return result.settings;
+}
+
+export async function fetchUnknownRequesters(): Promise<BlocklistUnknownRequester[]> {
+  const res = await fetch(`${API_BASE}/blocklist-acl/unknown-requesters`, { headers: await authHeaders() });
+  await checkResponse(res, 'Failed to fetch unknown requesters');
+  return res.json();
+}

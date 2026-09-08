@@ -47,6 +47,14 @@ import {
   recordLoginAttempt,
   findUserIdByEmail,
   getLoginLogs,
+  getDnsNodes,
+  createDnsNode,
+  updateDnsNode,
+  deleteDnsNode,
+  getAclSettings,
+  setAclEnforceEnabled,
+  getUnknownRequesters,
+  evaluateBlocklistAccess,
 } from './src/db/queries.ts';
 import { requireAuth, requireRole, AuthRequest } from './src/middleware/auth.ts';
 
@@ -237,6 +245,86 @@ async function startServer() {
       const userId = req.query.userId ? parseInt(req.query.userId as string, 10) : undefined;
       const logs = await getLoginLogs({ userId: Number.isNaN(userId as number) ? undefined : userId });
       res.json(logs);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ---- DNS Node management (Admin-only: this is real infrastructure
+  // inventory AND the source of truth for the Blocklist-URL ACL below) ----
+  app.get('/api/dns-nodes', requireAuth, requireRole('Admin'), async (req, res) => {
+    try {
+      const list = await getDnsNodes();
+      res.json(list);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/dns-nodes', requireAuth, requireRole('Admin'), async (req: AuthRequest, res) => {
+    try {
+      const { name, ipAddress } = req.body;
+      if (!name || !ipAddress) {
+        return res.status(400).json({ error: 'name và ipAddress là bắt buộc.' });
+      }
+      const created = await createDnsNode(req.body, { email: req.user?.email, role: req.user?.role });
+      res.status(201).json({ success: true, node: created });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.patch('/api/dns-nodes/:id', requireAuth, requireRole('Admin'), async (req: AuthRequest, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid node id' });
+      const updated = await updateDnsNode(id, req.body, { email: req.user?.email, role: req.user?.role });
+      res.json({ success: true, node: updated });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.delete('/api/dns-nodes/:id', requireAuth, requireRole('Admin'), async (req: AuthRequest, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid node id' });
+      await deleteDnsNode(id, { email: req.user?.email, role: req.user?.role });
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Blocklist-URL ACL switch + the recent-unknown-caller log that makes its
+  // default log-only mode actually reviewable (Admin-only — same reasoning
+  // as the node routes above).
+  app.get('/api/blocklist-acl', requireAuth, requireRole('Admin'), async (req, res) => {
+    try {
+      const settings = await getAclSettings();
+      res.json(settings);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/blocklist-acl', requireAuth, requireRole('Admin'), async (req: AuthRequest, res) => {
+    try {
+      const { enforceEnabled } = req.body;
+      if (typeof enforceEnabled !== 'boolean') {
+        return res.status(400).json({ error: 'enforceEnabled (boolean) is required.' });
+      }
+      const updated = await setAclEnforceEnabled(enforceEnabled, req.user?.email || 'Admin');
+      res.json({ success: true, settings: updated });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/blocklist-acl/unknown-requesters', requireAuth, requireRole('Admin'), async (req, res) => {
+    try {
+      const list = await getUnknownRequesters();
+      res.json(list);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -443,6 +531,18 @@ async function startServer() {
   // req.params.category === 'malware'.
   app.get('/v1/blocklist/:category.txt', async (req, res) => {
     try {
+      // ACL check (see evaluateBlocklistAccess in queries.ts): a real client
+      // IP unrecognized by the DNS Node inventory is ALWAYS logged for later
+      // review, but only actually rejected once an Admin has explicitly
+      // switched blocklistAclSettings.enforceEnabled on — default is
+      // log-only, so adding this never breaks an already-running Blocky
+      // instance that hasn't been registered as a node yet.
+      const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
+      const { allowed } = await evaluateBlocklistAccess(ipAddress, req.params.category);
+      if (!allowed) {
+        return res.status(403).type('text/plain').send('# Forbidden: this IP is not a registered CyberDNS node\n');
+      }
+
       const text = await getBlocklistTextForCategory(req.params.category);
       if (text === null) {
         return res.status(404).type('text/plain').send(`# Category not found: ${req.params.category}\n`);
