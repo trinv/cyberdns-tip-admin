@@ -47,24 +47,6 @@ function useThemeVersion(): number {
   return version;
 }
 
-// Dashed, faint gridlines on every chart in this file — Chart.js v4's
-// GridLineOptions has no borderDash for the grid line itself (only
-// tickBorderDash, for the small tick marks), so the actual dashing is done
-// by temporarily setting the canvas context's line dash right before the
-// scale draws its gridlines (beforeDraw, the very first draw phase) and
-// restoring it before datasets/bars/points are drawn on top (so the dash
-// never bleeds into a bar's border or the line chart's own stroke).
-const dashedGridPlugin = {
-  id: 'dashedGridPlugin',
-  beforeDraw(chart: Chart) {
-    chart.ctx.save();
-    chart.ctx.setLineDash([4, 4]);
-  },
-  beforeDatasetsDraw(chart: Chart) {
-    chart.ctx.restore();
-  },
-};
-
 interface DashboardViewProps {
   onNavigateToTab: (tab: string) => void;
   sources: FeedSource[];
@@ -244,11 +226,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         scales: {
           x: {
             beginAtZero: true,
-            // Faint gridline color — actual dashing is done by the shared
-            // dashedGridPlugin below (Chart.js v4's GridLineOptions has no
-            // borderDash for the grid line itself, only tickBorderDash for
-            // the tick marks — confirmed by reading its real .d.ts).
-            grid: { color: `${gridColor}80` },
+            grid: { color: gridColor },
             ticks: { color: textMuted, font: { size: 10 }, precision: 0 },
           },
           y: {
@@ -257,7 +235,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           },
         },
       },
-      plugins: [inBarValueLabels, dashedGridPlugin],
+      plugins: [inBarValueLabels],
     };
     statusChartRef.current = new Chart(statusCanvasRef.current, config);
 
@@ -398,7 +376,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           },
         },
       },
-      plugins: [hoverGuideLine, dashedGridPlugin],
+      plugins: [hoverGuideLine],
     };
     growthChartRef.current = new Chart(growthCanvasRef.current, config);
 
@@ -422,7 +400,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     // own note on why Chart.js can't just pick these up from CSS on its own.
     const styles = getComputedStyle(document.documentElement);
     const surface = styles.getPropertyValue('--bg-surface').trim() || '#ffffff';
-    const inverse = styles.getPropertyValue('--bg-inverse').trim() || '#1d2630';
 
     donutChartRef.current?.destroy();
     const config: ChartConfiguration<'doughnut'> = {
@@ -446,32 +423,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         animation: { duration: 200 },
         plugins: {
           legend: { display: false },
-          tooltip: {
-            // Background matches the hovered slice's OWN real color (the
-            // same categories.color used for the slice itself and the 2x2
-            // cards below) instead of a fixed dark box — text stays white
-            // regardless of light/dark mode, per explicit request, since
-            // it must stay readable against whichever slice color is
-            // showing. Chart.js tooltip colors are scriptable (accept a
-            // function of the tooltip context), so this reads the real
-            // hovered dataIndex on every show rather than a static color.
-            backgroundColor: (ctx) => {
-              const dp = ctx.tooltip?.dataPoints?.[0];
-              const slice = dp ? donutSlices[dp.dataIndex] : null;
-              return slice?.color || inverse;
-            },
-            titleColor: '#ffffff',
-            bodyColor: '#ffffff',
-            padding: 8,
-            cornerRadius: 8,
-            displayColors: false,
-            callbacks: {
-              label: (ctx) => {
-                const slice = donutSlices[ctx.dataIndex];
-                return `${slice.shortName}: ${slice.count} (${slice.percent})`;
-              },
-            },
-          },
+          // Turned off per explicit request — the floating tooltip box
+          // duplicated exactly what the center readout (name/count/percent,
+          // driven by the same onHover→activeDonutIndex below) already
+          // shows in the middle of the donut, so hovering a slice still
+          // surfaces the real numbers, just without the extra popup.
+          tooltip: { enabled: false },
         },
         onHover: (_evt, elements) => {
           if (elements[0]) setActiveDonutIndex(elements[0].index);
@@ -575,15 +532,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           },
           y: {
             beginAtZero: true,
-            // Faint gridline color — actual dashing is done by the shared
-            // dashedGridPlugin below (see its own note on why Chart.js
-            // needs a plugin for this rather than a config option).
-            grid: { color: `${gridColor}80` },
+            grid: { color: gridColor },
             ticks: { color: textMuted, font: { size: 10 }, precision: 0 },
           },
         },
       },
-      plugins: [dashedGridPlugin],
     };
     tldChartRef.current = new Chart(tldCanvasRef.current, config);
 
