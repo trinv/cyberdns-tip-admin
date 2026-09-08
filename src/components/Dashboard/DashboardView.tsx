@@ -47,6 +47,24 @@ function useThemeVersion(): number {
   return version;
 }
 
+// Dashed, faint gridlines on every chart in this file — Chart.js v4's
+// GridLineOptions has no borderDash for the grid line itself (only
+// tickBorderDash, for the small tick marks), so the actual dashing is done
+// by temporarily setting the canvas context's line dash right before the
+// scale draws its gridlines (beforeDraw, the very first draw phase) and
+// restoring it before datasets/bars/points are drawn on top (so the dash
+// never bleeds into a bar's border or the line chart's own stroke).
+const dashedGridPlugin = {
+  id: 'dashedGridPlugin',
+  beforeDraw(chart: Chart) {
+    chart.ctx.save();
+    chart.ctx.setLineDash([4, 4]);
+  },
+  beforeDatasetsDraw(chart: Chart) {
+    chart.ctx.restore();
+  },
+};
+
 interface DashboardViewProps {
   onNavigateToTab: (tab: string) => void;
   sources: FeedSource[];
@@ -148,7 +166,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const gridColor = styles.getPropertyValue('--border').trim() || '#e9ecef';
     const textMuted = styles.getPropertyValue('--text-muted').trim() || '#8996a4';
     const inverse = styles.getPropertyValue('--bg-inverse').trim() || '#1d2630';
-    const inverseFg = styles.getPropertyValue('--text-inverse')?.trim() || '#ffffff';
 
     // Draws each bar's real count as white bold text near its right edge,
     // INSIDE the bar (matching the reference style) — falls back to muted
@@ -203,9 +220,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         plugins: {
           legend: { display: false },
           tooltip: {
-            backgroundColor: inverse,
-            titleColor: inverseFg,
-            bodyColor: inverseFg,
+            // Same principle as the "Phân Bổ Danh Mục Nguy Cơ" donut chart:
+            // background matches the hovered bar's OWN real color (the
+            // exact same shade its bar is drawn with, by rank), text
+            // always white.
+            backgroundColor: (ctx) => {
+              const dp = ctx.tooltip?.dataPoints?.[0];
+              return dp ? STATUS_BAR_SHADES[dp.dataIndex % STATUS_BAR_SHADES.length] : inverse;
+            },
+            titleColor: '#ffffff',
+            bodyColor: '#ffffff',
             padding: 8,
             cornerRadius: 8,
             displayColors: false,
@@ -220,7 +244,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         scales: {
           x: {
             beginAtZero: true,
-            grid: { color: gridColor },
+            // Faint gridline color — actual dashing is done by the shared
+            // dashedGridPlugin below (Chart.js v4's GridLineOptions has no
+            // borderDash for the grid line itself, only tickBorderDash for
+            // the tick marks — confirmed by reading its real .d.ts).
+            grid: { color: `${gridColor}80` },
             ticks: { color: textMuted, font: { size: 10 }, precision: 0 },
           },
           y: {
@@ -229,7 +257,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           },
         },
       },
-      plugins: [inBarValueLabels],
+      plugins: [inBarValueLabels, dashedGridPlugin],
     };
     statusChartRef.current = new Chart(statusCanvasRef.current, config);
 
@@ -370,7 +398,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           },
         },
       },
-      plugins: [hoverGuideLine],
+      plugins: [hoverGuideLine, dashedGridPlugin],
     };
     growthChartRef.current = new Chart(growthCanvasRef.current, config);
 
@@ -498,7 +526,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const gridColor = styles.getPropertyValue('--border').trim() || '#e9ecef';
     const textMuted = styles.getPropertyValue('--text-muted').trim() || '#8996a4';
     const inverse = styles.getPropertyValue('--bg-inverse').trim() || '#1d2630';
-    const inverseFg = styles.getPropertyValue('--text-inverse')?.trim() || '#ffffff';
 
     tldChartRef.current?.destroy();
     const config: ChartConfiguration<'bar'> = {
@@ -521,9 +548,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         plugins: {
           legend: { display: false },
           tooltip: {
-            backgroundColor: inverse,
-            titleColor: inverseFg,
-            bodyColor: inverseFg,
+            // Same principle as the "Phân Bổ Danh Mục Nguy Cơ" donut chart:
+            // background matches the hovered bar's OWN real color (the
+            // exact same shade its bar is drawn with), text always white.
+            backgroundColor: (ctx) => {
+              const dp = ctx.tooltip?.dataPoints?.[0];
+              return dp ? TLD_BAR_COLORS[dp.dataIndex % TLD_BAR_COLORS.length] : inverse;
+            },
+            titleColor: '#ffffff',
+            bodyColor: '#ffffff',
             padding: 8,
             cornerRadius: 8,
             displayColors: false,
@@ -542,11 +575,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           },
           y: {
             beginAtZero: true,
-            grid: { color: gridColor },
+            // Faint gridline color — actual dashing is done by the shared
+            // dashedGridPlugin below (see its own note on why Chart.js
+            // needs a plugin for this rather than a config option).
+            grid: { color: `${gridColor}80` },
             ticks: { color: textMuted, font: { size: 10 }, precision: 0 },
           },
         },
       },
+      plugins: [dashedGridPlugin],
     };
     tldChartRef.current = new Chart(tldCanvasRef.current, config);
 
