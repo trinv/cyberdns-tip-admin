@@ -57,6 +57,7 @@ import {
   evaluateBlocklistAccess,
 } from './src/db/queries.ts';
 import { requireAuth, requireRole, AuthRequest } from './src/middleware/auth.ts';
+import { listCountries, searchCities } from './src/lib/geo.ts';
 
 // The sandbox's file-watcher restart does not reliably terminate the previous
 // "tsx server.ts" process before starting a new one (observed: a process from
@@ -325,6 +326,29 @@ async function startServer() {
     try {
       const list = await getUnknownRequesters();
       res.json(list);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Country/City reference data for the DNS Node add/edit form's location
+  // dropdowns (see src/lib/geo.ts — never sends more than a bounded,
+  // per-country slice over the wire). Gated the same as the DNS Node routes
+  // above since this is currently only ever called from that Admin-only form.
+  app.get('/api/geo/countries', requireAuth, requireRole('Admin'), (req, res) => {
+    try {
+      res.json(listCountries());
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/geo/cities', requireAuth, requireRole('Admin'), (req, res) => {
+    try {
+      const country = (req.query.country as string) || '';
+      const search = (req.query.search as string) || '';
+      if (!country) return res.status(400).json({ error: 'country (ISO code) is required.' });
+      res.json(searchCities(country, search));
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

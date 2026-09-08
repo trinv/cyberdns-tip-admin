@@ -201,6 +201,21 @@ export interface BlocklistUnknownRequester {
   lastCategory: string | null;
 }
 
+// Country/City reference data for the DNS Node form's location dropdowns —
+// see src/lib/geo.ts (server) / GET /api/geo/* (server.ts). Deliberately
+// tiny shapes: only what the dropdown + map preview actually need.
+export interface GeoCountry {
+  isoCode: string;
+  name: string;
+  flag: string;
+}
+
+export interface GeoCity {
+  name: string;
+  latitude: number;
+  longitude: number;
+}
+
 export interface SavedFilter {
   id: string;
   name: string;

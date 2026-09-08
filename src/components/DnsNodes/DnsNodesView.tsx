@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import DottedMap from 'dotted-map/without-countries';
-import worldDotMap from './worldDotMap';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import * as L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import { DnsNode, BlocklistAclSettings, BlocklistUnknownRequester } from '../../types';
 import {
   fetchDnsNodes,
@@ -36,6 +36,14 @@ const TIER_BADGE: Record<string, string> = {
 // Build-time only (see .env.example) — Uptime Kuma isn't run by this app,
 // this just links out to wherever the operator has deployed it.
 const UPTIME_KUMA_URL: string = (import.meta as any).env?.VITE_UPTIME_KUMA_URL || '';
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
 
 // Admin-only screen (see the 'dns-nodes' Sidebar item's Admin gate) for
 // CyberDNS's own real DNS resolver fleet — an operational inventory PLUS
@@ -83,45 +91,75 @@ export const DnsNodesView: React.FC = () => {
     load();
   }, [load]);
 
-  // ---- Dotted world map (https://github.com/NTag/dotted-map) ----
-  // Built from a precomputed grid (see scripts/generate-dotted-map.mjs —
-  // computing this grid live in the browser can take up to ~30s per the
-  // library's own docs, so it's generated once offline instead) — only the
-  // cheap per-pin lookups below run at runtime. Replaces the earlier
-  // Leaflet+OpenStreetMap map: besides matching this app's flatter,
-  // dot-grid admin aesthetic better than literal map tiles, it also sidesteps
-  // a real bug Leaflet had here — its internal control/tile panes set their
-  // own z-index up to 1000, which isn't contained in a local stacking
-  // context, so they rendered on TOP of the Add/Edit modal (z-50) despite
-  // being earlier in the DOM. A plain inline SVG has no such competing
-  // z-index of its own, so that class of bug can't recur.
-  const dottedMap = useMemo(() => new DottedMap({ map: worldDotMap }), []);
+  // ---- Leaflet + OpenStreetMap (free, no API key) ----
+  // The container below is wrapped in Tailwind's `isolate` (CSS
+  // `isolation: isolate`), which makes it the root of its own stacking
+  // context — this is what actually fixes a real bug this map previously
+  // had: Leaflet's internal control/tile panes set their own z-index up to
+  // 1000 with no stacking context of their own, so without `isolate` they
+  // could paint on TOP of the Add/Edit modal (z-50) despite being earlier
+  // in the DOM. `isolate` caps every descendant z-index (however high) to
+  // never escape this container, so that class of bug can't recur.
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const markersLayerRef = useRef<L.LayerGroup | null>(null);
 
-  // Static (doesn't depend on `nodes`) — dots use `fill="currentColor"`
-  // (universally well-supported in inline SVG, unlike a raw CSS var()
-  // reference inside a presentation attribute) so their actual color comes
-  // from the wrapping element's `text-*` Tailwind class below and adapts to
-  // light/dark automatically, with no need to regenerate this on theme
-  // toggle.
-  const baseMapSvg = useMemo(
-    () =>
-      dottedMap
-        .getSVG({ shape: 'circle', color: 'currentColor', backgroundColor: 'transparent', radius: 0.32 })
-        .replace('<svg viewBox', '<svg width="100%" height="100%" viewBox'),
-    [dottedMap]
-  );
+  useEffect(() => {
+    if (!mapContainerRef.current || mapRef.current) return;
+    const map = L.map(mapContainerRef.current, {
+      center: [16.0, 106.0], // Roughly centered on Việt Nam by default
+      zoom: 4,
+      scrollWheelZoom: false,
+    });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>',
+      maxZoom: 19,
+    }).addTo(map);
+    markersLayerRef.current = L.layerGroup().addTo(map);
+    mapRef.current = map;
 
-  const mapWidth = dottedMap.image.width;
-  const mapHeight = dottedMap.image.height;
+    return () => {
+      map.remove();
+      mapRef.current = null;
+      markersLayerRef.current = null;
+    };
+  }, []);
 
-  const pinnedNodes = useMemo(
-    () =>
-      nodes
-        .filter((n): n is DnsNode & { latitude: number; longitude: number } => n.latitude != null && n.longitude != null)
-        .map((n) => ({ node: n, point: dottedMap.getPin({ lat: n.latitude, lng: n.longitude }) }))
-        .filter((p): p is { node: typeof p.node; point: NonNullable<typeof p.point> } => !!p.point),
-    [dottedMap, nodes]
-  );
+  useEffect(() => {
+    const layer = markersLayerRef.current;
+    const map = mapRef.current;
+    if (!layer || !map) return;
+    layer.clearLayers();
+
+    const pinned = nodes.filter(
+      (n): n is DnsNode & { latitude: number; longitude: number } => n.latitude != null && n.longitude != null
+    );
+
+    pinned.forEach((n) => {
+      const color = n.status === 'active' ? '#10b981' : '#94a3b8'; // emerald-500 / slate-400
+      const icon = L.divIcon({
+        className: '',
+        html: `<div style="width:14px;height:14px;border-radius:9999px;background:${color};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45)"></div>`,
+        iconSize: [14, 14],
+        iconAnchor: [7, 7],
+      });
+      L.marker([n.latitude, n.longitude], { icon })
+        .bindPopup(
+          `<div style="font-size:12px;line-height:1.5">
+             <div style="font-weight:700">${escapeHtml(n.name)}</div>
+             <div>${escapeHtml(n.tier)} · ${n.status === 'active' ? 'Active' : 'Inactive'}</div>
+             <div style="font-family:monospace">${escapeHtml(n.ipAddress)}</div>
+             ${n.location ? `<div style="color:#64748b">${escapeHtml(n.location)}</div>` : ''}
+           </div>`
+        )
+        .addTo(layer);
+    });
+
+    if (pinned.length > 0) {
+      const bounds = L.latLngBounds(pinned.map((n) => [n.latitude, n.longitude] as [number, number]));
+      map.fitBounds(bounds, { padding: [28, 28], maxZoom: 10 });
+    }
+  }, [nodes]);
 
   // ---- Mutations ----
   const handleSaveNode = async (data: Partial<DnsNode>) => {
@@ -346,36 +384,9 @@ export const DnsNodesView: React.FC = () => {
       <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-5 shadow-xs transition-colors">
         <h2 className="text-sm font-bold text-slate-900 dark:text-white font-sans mb-3">Bản đồ vị trí & trạng thái node</h2>
         <div
-          className="relative w-full isolate rounded-xl overflow-hidden border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/40"
-          style={{ aspectRatio: `${mapWidth} / ${mapHeight}` }}
-        >
-          <div
-            className="absolute inset-0 text-slate-300 dark:text-slate-700"
-            dangerouslySetInnerHTML={{ __html: baseMapSvg }}
-          />
-          {pinnedNodes.map(({ node, point }) => (
-            <div
-              key={node.id}
-              tabIndex={0}
-              className="group absolute -translate-x-1/2 -translate-y-1/2 outline-none"
-              style={{ left: `${(point.x / mapWidth) * 100}%`, top: `${(point.y / mapHeight) * 100}%` }}
-            >
-              <span
-                className={`block w-2.5 h-2.5 rounded-full ring-2 ring-white dark:ring-slate-900 shadow-sm cursor-pointer ${
-                  node.status === 'active' ? 'bg-emerald-500' : 'bg-slate-400'
-                }`}
-              />
-              <div className="pointer-events-none absolute left-1/2 bottom-full mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900 dark:bg-slate-700 text-white px-2.5 py-1.5 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity z-10 shadow-lg font-sans">
-                <div className="font-bold">{node.name}</div>
-                <div className="text-slate-300">
-                  {node.tier} · {node.status === 'active' ? 'Active' : 'Inactive'}
-                </div>
-                <div className="font-mono text-slate-300">{node.ipAddress}</div>
-                {node.location && <div className="text-slate-400">{node.location}</div>}
-              </div>
-            </div>
-          ))}
-        </div>
+          ref={mapContainerRef}
+          className="w-full h-80 isolate rounded-xl overflow-hidden border border-slate-100 dark:border-slate-800"
+        />
         {nodes.every((n) => n.latitude == null || n.longitude == null) && nodes.length > 0 && (
           <p className="text-slate-400 dark:text-slate-500 mt-2">
             Chưa có node nào được nhập toạ độ — thêm vĩ độ/kinh độ khi sửa node để ghim lên bản đồ.

@@ -1,4 +1,4 @@
-import { DomainItem, CategoryInfo, FeedSource, AuditLog, ReviewDomainItem, DashboardStats, CategoryStatusBreakdown, AppUser, LoginLog, DnsNode, BlocklistAclSettings, BlocklistUnknownRequester } from '../types';
+import { DomainItem, CategoryInfo, FeedSource, AuditLog, ReviewDomainItem, DashboardStats, CategoryStatusBreakdown, AppUser, LoginLog, DnsNode, BlocklistAclSettings, BlocklistUnknownRequester, GeoCountry, GeoCity } from '../types';
 
 export const API_BASE = '/api';
 
@@ -448,5 +448,32 @@ export async function setBlocklistAclEnforceApi(enforceEnabled: boolean): Promis
 export async function fetchUnknownRequesters(): Promise<BlocklistUnknownRequester[]> {
   const res = await fetch(`${API_BASE}/blocklist-acl/unknown-requesters`, { headers: await authHeaders() });
   await checkResponse(res, 'Failed to fetch unknown requesters');
+  return res.json();
+}
+
+// ---- Country/City reference data (DNS Node form location dropdowns) ----
+// Countries barely ever change and are tiny (~250 rows) — cache the promise
+// at module scope so re-opening the Add/Edit modal within the same session
+// doesn't refetch it every time.
+let countriesPromise: Promise<GeoCountry[]> | null = null;
+export function fetchGeoCountries(): Promise<GeoCountry[]> {
+  if (!countriesPromise) {
+    countriesPromise = (async () => {
+      const res = await fetch(`${API_BASE}/geo/countries`, { headers: await authHeaders() });
+      await checkResponse(res, 'Failed to fetch countries');
+      return res.json();
+    })().catch((err) => {
+      countriesPromise = null; // don't cache a failure — allow retry next open
+      throw err;
+    });
+  }
+  return countriesPromise;
+}
+
+export async function fetchGeoCities(countryIsoCode: string, search: string = ''): Promise<GeoCity[]> {
+  const query = new URLSearchParams({ country: countryIsoCode });
+  if (search) query.set('search', search);
+  const res = await fetch(`${API_BASE}/geo/cities?${query.toString()}`, { headers: await authHeaders() });
+  await checkResponse(res, 'Failed to fetch cities');
   return res.json();
 }

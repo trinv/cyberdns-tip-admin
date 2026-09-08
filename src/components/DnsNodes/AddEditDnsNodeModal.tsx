@@ -1,6 +1,10 @@
-import React, { useState } from 'react';
-import { X } from 'lucide-react';
-import { DnsNode } from '../../types';
+import React, { useEffect, useRef, useState } from 'react';
+import * as L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import { X, ChevronDown, MapPin, Loader2 } from 'lucide-react';
+import { DnsNode, GeoCountry, GeoCity } from '../../types';
+import { fetchGeoCountries, fetchGeoCities } from '../../lib/api';
+import { useClickOutside } from '../../hooks/useClickOutside';
 
 interface AddEditDnsNodeModalProps {
   isOpen: boolean;
@@ -21,17 +25,149 @@ export const AddEditDnsNodeModal: React.FC<AddEditDnsNodeModalProps> = ({
   onSave,
 }) => {
   const isEditing = !!nodeToEdit;
-  const [name, setName] = useState(nodeToEdit?.name || '');
-  const [ipAddress, setIpAddress] = useState(nodeToEdit?.ipAddress || '');
-  const [hostname, setHostname] = useState(nodeToEdit?.hostname || '');
-  const [tier, setTier] = useState<(typeof TIERS)[number]>((nodeToEdit?.tier as any) || 'LITE');
-  const [status, setStatus] = useState<'active' | 'inactive'>(nodeToEdit?.status || 'active');
-  const [location, setLocation] = useState(nodeToEdit?.location || '');
-  const [provider, setProvider] = useState(nodeToEdit?.provider || '');
-  const [latitude, setLatitude] = useState(nodeToEdit?.latitude != null ? String(nodeToEdit.latitude) : '');
-  const [longitude, setLongitude] = useState(nodeToEdit?.longitude != null ? String(nodeToEdit.longitude) : '');
-  const [notes, setNotes] = useState(nodeToEdit?.notes || '');
+  const [name, setName] = useState('');
+  const [ipAddress, setIpAddress] = useState('');
+  const [hostname, setHostname] = useState('');
+  const [tier, setTier] = useState<(typeof TIERS)[number]>('LITE');
+  const [status, setStatus] = useState<'active' | 'inactive'>('active');
+  const [location, setLocation] = useState('');
+  const [provider, setProvider] = useState('');
+  const [latitude, setLatitude] = useState('');
+  const [longitude, setLongitude] = useState('');
+  const [notes, setNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+
+  // ---- Country/City location picker ----
+  const [countries, setCountries] = useState<GeoCountry[]>([]);
+  const [countryIso, setCountryIso] = useState('');
+  const [cityQuery, setCityQuery] = useState('');
+  const [cityOptions, setCityOptions] = useState<GeoCity[]>([]);
+  const [isCityListOpen, setIsCityListOpen] = useState(false);
+  const [isLoadingCities, setIsLoadingCities] = useState(false);
+  const cityBoxRef = useRef<HTMLDivElement>(null);
+  useClickOutside(cityBoxRef, () => setIsCityListOpen(false), isCityListOpen);
+
+  // This component is never unmounted between uses (DnsNodesView keeps one
+  // long-lived instance and just toggles `isOpen` — same pattern as
+  // AddEditDomainModal.tsx), so every field is synced from props HERE
+  // (rather than only via useState's one-time initializer) every time the
+  // modal actually opens, or `nodeToEdit` changes while it's open — without
+  // this, reopening for a different node (or "Thêm mới" right after editing
+  // one) would keep showing the PREVIOUS node's stale form values, including
+  // a Country/City selection that no longer has anything to do with what's
+  // on screen.
+  useEffect(() => {
+    if (!isOpen) return;
+    setName(nodeToEdit?.name || '');
+    setIpAddress(nodeToEdit?.ipAddress || '');
+    setHostname(nodeToEdit?.hostname || '');
+    setTier((nodeToEdit?.tier as (typeof TIERS)[number]) || 'LITE');
+    setStatus(nodeToEdit?.status || 'active');
+    setLocation(nodeToEdit?.location || '');
+    setProvider(nodeToEdit?.provider || '');
+    setLatitude(nodeToEdit?.latitude != null ? String(nodeToEdit.latitude) : '');
+    setLongitude(nodeToEdit?.longitude != null ? String(nodeToEdit.longitude) : '');
+    setNotes(nodeToEdit?.notes || '');
+    // Country/City always start unselected on open — an existing node's
+    // free-text `location` (e.g. "Hà Nội - VNPT IDC", entered before this
+    // picker existed, or picked from a different dataset entry) can't be
+    // reliably reverse-matched to one exact dataset city, so this only ever
+    // OVERWRITES location/lat/lng once the admin explicitly picks one.
+    setCountryIso('');
+    setCityQuery('');
+    setCityOptions([]);
+  }, [isOpen, nodeToEdit]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    fetchGeoCountries()
+      .then(setCountries)
+      .catch((err) => console.warn('fetchGeoCountries failed:', err));
+  }, [isOpen]);
+
+  // Debounced city search — re-queries whenever the selected country or the
+  // search text changes (empty search still returns the first 50, sorted
+  // alphabetically, so the list isn't empty before typing anything).
+  useEffect(() => {
+    if (!isOpen || !countryIso) {
+      setCityOptions([]);
+      return;
+    }
+    setIsLoadingCities(true);
+    const t = setTimeout(() => {
+      fetchGeoCities(countryIso, cityQuery)
+        .then(setCityOptions)
+        .catch((err) => {
+          console.warn('fetchGeoCities failed:', err);
+          setCityOptions([]);
+        })
+        .finally(() => setIsLoadingCities(false));
+    }, 250);
+    return () => clearTimeout(t);
+  }, [isOpen, countryIso, cityQuery]);
+
+  const handleSelectCity = (city: GeoCity) => {
+    const countryName = countries.find((c) => c.isoCode === countryIso)?.name || '';
+    setLocation(countryName ? `${city.name}, ${countryName}` : city.name);
+    setLatitude(String(city.latitude));
+    setLongitude(String(city.longitude));
+    setCityQuery(city.name);
+    setIsCityListOpen(false);
+  };
+
+  // ---- Preview map (Leaflet + OpenStreetMap, free, no API key) — shows
+  // exactly where the currently entered lat/lng points to, live. ----
+  const previewMapContainerRef = useRef<HTMLDivElement>(null);
+  const previewMapRef = useRef<L.Map | null>(null);
+  const previewMarkerRef = useRef<L.Marker | null>(null);
+
+  const previewLat = latitude.trim() ? Number(latitude) : null;
+  const previewLng = longitude.trim() ? Number(longitude) : null;
+  const hasValidPreview =
+    previewLat != null && previewLng != null && Number.isFinite(previewLat) && Number.isFinite(previewLng);
+
+  // Tied to `isOpen` (not `[]`) and always returns its own cleanup — since
+  // this component never truly unmounts between opens (see the sync effect
+  // above), a mount-once effect would create the map on the FIRST open, but
+  // `map.remove()` would never run on close (the container div itself gets
+  // removed from the DOM when this returns null below, without React ever
+  // unmounting the component to trigger effect cleanup) — leaving `mapRef`
+  // pointing at a dead map and the container empty on every reopen after
+  // the first. Re-running per `isOpen` toggle creates a fresh map bound to
+  // the freshly-mounted container on every open, and cleanly tears it down
+  // on every close.
+  useEffect(() => {
+    if (!isOpen || !previewMapContainerRef.current) return;
+    const map = L.map(previewMapContainerRef.current, {
+      center: [16.0, 106.0],
+      zoom: 3,
+      zoomControl: false,
+      scrollWheelZoom: false,
+      attributionControl: false,
+    });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+    previewMapRef.current = map;
+    return () => {
+      map.remove();
+      previewMapRef.current = null;
+      previewMarkerRef.current = null;
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    const map = previewMapRef.current;
+    if (!map) return;
+    if (previewMarkerRef.current) {
+      previewMarkerRef.current.remove();
+      previewMarkerRef.current = null;
+    }
+    if (hasValidPreview) {
+      previewMarkerRef.current = L.marker([previewLat!, previewLng!]).addTo(map);
+      map.setView([previewLat!, previewLng!], 9);
+    } else {
+      map.setView([16.0, 106.0], 3);
+    }
+  }, [hasValidPreview, previewLat, previewLng]);
 
   if (!isOpen) return null;
 
@@ -148,17 +284,79 @@ export const AddEditDnsNodeModal: React.FC<AddEditDnsNodeModalProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">VỊ TRÍ</label>
-              <input
-                type="text"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="ví dụ: Hà Nội - VNPT IDC"
-                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-emerald-500 rounded-xl px-3.5 py-2 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none"
-              />
+          {/* ---- Location picker: Country -> City (dropdown), coordinates
+              auto-filled from the selection and shown live on the map below. ---- */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
+              VỊ TRÍ (chọn Quốc gia rồi Thành phố)
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <select
+                value={countryIso}
+                onChange={(e) => {
+                  setCountryIso(e.target.value);
+                  setCityQuery('');
+                }}
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-emerald-500 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-slate-100 focus:outline-none cursor-pointer"
+              >
+                <option value="">— Quốc gia —</option>
+                {countries.map((c) => (
+                  <option key={c.isoCode} value={c.isoCode}>
+                    {c.flag} {c.name}
+                  </option>
+                ))}
+              </select>
+
+              <div className="relative" ref={cityBoxRef}>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={cityQuery}
+                    disabled={!countryIso}
+                    onChange={(e) => { setCityQuery(e.target.value); setIsCityListOpen(true); }}
+                    onFocus={() => setIsCityListOpen(true)}
+                    placeholder={countryIso ? 'Tìm thành phố...' : 'Chọn quốc gia trước'}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-emerald-500 rounded-xl pl-3.5 pr-8 py-2 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                  <div className="absolute inset-y-0 right-2.5 flex items-center pointer-events-none text-slate-400">
+                    {isLoadingCities ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                  </div>
+                </div>
+
+                {isCityListOpen && countryIso && (
+                  <div className="absolute z-20 mt-1 w-full max-h-52 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg py-1">
+                    {cityOptions.length === 0 && !isLoadingCities && (
+                      <div className="px-3.5 py-2 text-slate-400 dark:text-slate-500">Không tìm thấy thành phố phù hợp.</div>
+                    )}
+                    {cityOptions.map((city) => (
+                      <button
+                        type="button"
+                        key={`${city.name}-${city.latitude}-${city.longitude}`}
+                        onClick={() => handleSelectCity(city)}
+                        className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer flex items-center space-x-2"
+                      >
+                        <MapPin className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                        <span className="text-slate-800 dark:text-slate-200">{city.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
+
+            {location && (
+              <p className="text-slate-500 dark:text-slate-400">
+                Vị trí đã chọn: <span className="font-semibold text-slate-700 dark:text-slate-300">{location}</span>
+              </p>
+            )}
+
+            <div ref={previewMapContainerRef} className="w-full h-36 rounded-xl overflow-hidden border border-slate-100 dark:border-slate-800 isolate mt-2" />
+            {!hasValidPreview && (
+              <p className="text-slate-400 dark:text-slate-500">Chọn Quốc gia và Thành phố để hiển thị chính xác vị trí trên bản đồ.</p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div className="space-y-1.5">
               <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">NHÀ CUNG CẤP</label>
               <input
@@ -169,32 +367,28 @@ export const AddEditDnsNodeModal: React.FC<AddEditDnsNodeModalProps> = ({
                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-emerald-500 rounded-xl px-3.5 py-2 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none"
               />
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div className="space-y-1.5">
               <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
-                VĨ ĐỘ (LATITUDE) — tuỳ chọn, để ghim lên bản đồ
+                TOẠ ĐỘ (tự động điền, có thể chỉnh tay)
               </label>
-              <input
-                type="number"
-                step="any"
-                value={latitude}
-                onChange={(e) => setLatitude(e.target.value)}
-                placeholder="ví dụ: 21.0278"
-                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-emerald-500 rounded-xl px-3.5 py-2 font-mono text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">KINH ĐỘ (LONGITUDE)</label>
-              <input
-                type="number"
-                step="any"
-                value={longitude}
-                onChange={(e) => setLongitude(e.target.value)}
-                placeholder="ví dụ: 105.8342"
-                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-emerald-500 rounded-xl px-3.5 py-2 font-mono text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none"
-              />
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="number"
+                  step="any"
+                  value={latitude}
+                  onChange={(e) => setLatitude(e.target.value)}
+                  placeholder="Vĩ độ"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-emerald-500 rounded-xl px-3 py-2 font-mono text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none"
+                />
+                <input
+                  type="number"
+                  step="any"
+                  value={longitude}
+                  onChange={(e) => setLongitude(e.target.value)}
+                  placeholder="Kinh độ"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-emerald-500 rounded-xl px-3 py-2 font-mono text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none"
+                />
+              </div>
             </div>
           </div>
 
