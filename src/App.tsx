@@ -204,11 +204,19 @@ export default function App() {
   };
 
   useEffect(() => {
+    // `.dark` class: still read by the 20+ files not yet migrated off
+    // Tailwind (see the Bootstrap migration plan's Phase 1 scope).
+    // `data-bs-theme`: Bootstrap 5.3's own native color-mode attribute,
+    // read by the 4 files now on real Bootstrap (Sidebar/Header/LoginPage/
+    // Dashboard) and by DashboardView's useThemeVersion() chart-rebuild
+    // hook. Both are set together so every file reads the theme correctly
+    // regardless of which framework it's still on.
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
     }
+    document.documentElement.setAttribute('data-bs-theme', isDarkMode ? 'dark' : 'light');
   }, [isDarkMode]);
 
   // Main Data States — all start empty; real content only ever comes from

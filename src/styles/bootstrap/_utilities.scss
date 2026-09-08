@@ -1,0 +1,11 @@
+// A couple of layout primitives Bootstrap's own utility set doesn't ship
+// (unlike Tailwind's `min-w-0`/`overflow-y-auto`) that the 4 converted
+// files need — kept here instead of relying on Tailwind still being loaded
+// as this phase's safety net, so these 4 files have zero real dependency
+// on Tailwind and won't break once it's fully removed in a later phase.
+.min-w-0 {
+  min-width: 0;
+}
+.overflow-y-auto {
+  overflow-y: auto;
+}
