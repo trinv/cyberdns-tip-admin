@@ -86,15 +86,15 @@ export const Header: React.FC<HeaderProps> = ({
   const TabIcon = activeTabInfo.icon;
 
   return (
-    <header className="w-full bg-card border-b border-border text-foreground sticky top-0 z-30 shadow-sm transition-colors duration-200">
-      <div className="px-3 sm:px-5 py-2.5 flex items-center justify-between gap-2 sm:gap-4">
+    <header className="w-full h-[72px] bg-card border-b border-border text-foreground sticky top-0 z-30 shadow-sm transition-colors duration-200">
+      <div className="h-full px-3 sm:px-5 flex items-center justify-between gap-2 sm:gap-4">
         {/* Left Section: Sidebar toggle + Breadcrumbs & View Title */}
         <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
           {/* Hamburger / Sidebar Toggle */}
-          <button 
+          <button
             onClick={onToggleSidebar}
             id="btn-toggle-sidebar"
-            className="p-2 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer active-press flex-shrink-0"
+            className="w-9 h-9 flex items-center justify-center bg-muted text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md transition-colors cursor-pointer active-press flex-shrink-0"
             title="Mở / Đóng thanh điều hướng"
           >
             <Menu className="w-5 h-5" />
@@ -141,13 +141,13 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Right Section: Release status, Quick Add, Theme, Shortcuts, Notifications, User Profile */}
-        <div className="flex items-center space-x-1.5 sm:space-x-2.5 flex-shrink-0">
+        <div className="flex items-center space-x-2 flex-shrink-0">
           {/* Theme Toggle Button (Light / Dark) */}
           <button
             onClick={toggleTheme}
             id="btn-toggle-theme"
             title={isDarkMode ? "Chuyển sang giao diện Sáng" : "Chuyển sang giao diện Tối"}
-            className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors cursor-pointer active-press"
+            className="w-9 h-9 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-muted rounded-full transition-colors cursor-pointer active-press"
           >
             {isDarkMode ? (
               <Sun className="w-4 h-4 text-amber-400" />
@@ -160,12 +160,12 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="relative" ref={notificationsRef}>
             <button
               onClick={() => setNotificationsOpen(!notificationsOpen)}
-              className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors relative cursor-pointer active-press"
+              className="w-9 h-9 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-muted rounded-full transition-colors relative cursor-pointer active-press"
               title="Thông báo"
             >
               <Bell className="w-4 h-4" />
               {notifications.length > 0 && (
-                <span className="absolute top-0 right-0 w-3.5 h-3.5 rounded-full bg-rose-500 text-white text-xs font-bold flex items-center justify-center border-2 border-white dark:border-slate-900">
+                <span className="absolute top-1 right-1 min-w-[16px] h-4 px-0.5 rounded-full bg-danger text-white text-[10px] font-bold flex items-center justify-center border-2 border-card">
                   {notifications.length}
                 </span>
               )}
@@ -220,7 +220,7 @@ export const Header: React.FC<HeaderProps> = ({
                 onClick={() => setRoleDropdownOpen(!roleDropdownOpen)}
                 className="flex items-center space-x-2 pl-1.5 pr-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700/80 border border-slate-200/60 dark:border-slate-700/60 transition-colors cursor-pointer"
               >
-                <div className="w-6 h-6 rounded-full overflow-hidden border border-emerald-500/40 bg-slate-200 dark:bg-slate-700 flex items-center justify-center flex-shrink-0">
+                <div className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-card bg-slate-200 dark:bg-slate-700 flex items-center justify-center flex-shrink-0">
                   {currentUser.avatarUrl ? (
                     <img
                       src={currentUser.avatarUrl}
@@ -228,7 +228,7 @@ export const Header: React.FC<HeaderProps> = ({
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <UserCircle2 className="w-5 h-5 text-slate-500 dark:text-slate-400" />
+                    <UserCircle2 className="w-6 h-6 text-slate-500 dark:text-slate-400" />
                   )}
                 </div>
                 <div className="hidden sm:flex flex-col items-start">

@@ -1,4 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+// Only the pieces this file's doughnut chart actually needs — 'chart.js/auto'
+// registers every controller/scale/element Chart.js ships (bar, line, radar,
+// scales, etc.), which would bloat the bundle for a chart type this Dashboard
+// never uses.
+import { Chart, DoughnutController, ArcElement, Tooltip, type ChartConfiguration } from 'chart.js';
+Chart.register(DoughnutController, ArcElement, Tooltip);
 import {
   ShieldAlert, ShieldCheck, Activity, Globe, Database,
   ArrowUpRight, ArrowDownRight, AlertTriangle, CheckCircle2,
@@ -10,6 +16,25 @@ import {
 } from 'lucide-react';
 import { FeedSource, CategoryInfo, DashboardStats, ReviewDomainItem } from '../../types';
 import { MetricDetailModal, MetricType } from './MetricDetailModal';
+
+// Chart.js draws onto a <canvas> once, at creation time — unlike CSS, it
+// has no way to react to a CSS variable changing on its own, so a chart
+// built under light mode keeps its light colors baked in even after the
+// user flips to dark mode (the exact bug admin-portal-style's chart spec
+// calls out). This hook bumps a counter whenever <html>'s `dark` class
+// toggles (see App.tsx's theme effect), so a chart-building useEffect can
+// list it as a dependency and rebuild with freshly-read
+// getComputedStyle(...) colors on every theme change — no prop threading
+// through App.tsx needed for this.
+function useThemeVersion(): number {
+  const [version, setVersion] = useState(0);
+  useEffect(() => {
+    const observer = new MutationObserver(() => setVersion((v) => v + 1));
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+  return version;
+}
 
 interface DashboardViewProps {
   onNavigateToTab: (tab: string) => void;
@@ -85,23 +110,88 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     protected: 'Được bảo vệ',
   };
   const STATUS_COLORS: Record<string, string> = {
-    active: 'bg-emerald-500',
+    active: 'bg-green-500', // status color, not the app's primary blue — see DomainTable's renderStatus for the same reasoning
     allowlist: 'bg-blue-500',
     unblocked: 'bg-slate-400',
     protected: 'bg-slate-300',
   };
   const statusBreakdown = stats?.statusBreakdown || [];
 
-  // Calculate Donut Slices
-  const totalCategoryVal = categoryBreakdownSource.reduce((acc, c) => acc + c.value, 0);
-  let currentAngle = 0;
-  const donutSlices = categoryBreakdownSource.map((cat) => {
-    const angle = totalCategoryVal > 0 ? (cat.value / totalCategoryVal) * 360 : 0;
-    const startAngle = currentAngle;
-    const endAngle = currentAngle + angle;
-    currentAngle += angle;
-    return { ...cat, startAngle, endAngle, angle };
-  });
+  // Donut slices — Chart.js (see the canvas effect below) computes its own
+  // arc geometry now, so this no longer needs to hand-compute start/end
+  // angles the way the old SVG version did.
+  const donutSlices = categoryBreakdownSource;
+
+  const donutCanvasRef = useRef<HTMLCanvasElement>(null);
+  const donutChartRef = useRef<Chart | null>(null);
+  const themeVersion = useThemeVersion();
+
+  useEffect(() => {
+    if (!donutCanvasRef.current || donutSlices.length === 0) {
+      donutChartRef.current?.destroy();
+      donutChartRef.current = null;
+      return;
+    }
+    // Read real theme colors fresh on every (re)build — see useThemeVersion's
+    // own note on why Chart.js can't just pick these up from CSS on its own.
+    const styles = getComputedStyle(document.documentElement);
+    const surface = styles.getPropertyValue('--bg-surface').trim() || '#ffffff';
+    const inverse = styles.getPropertyValue('--bg-inverse').trim() || '#1d2630';
+    const inverseFg = styles.getPropertyValue('--text-inverse')?.trim() || '#ffffff';
+
+    donutChartRef.current?.destroy();
+    const config: ChartConfiguration<'doughnut'> = {
+      type: 'doughnut',
+      data: {
+        labels: donutSlices.map((s) => s.shortName),
+        datasets: [
+          {
+            data: donutSlices.map((s) => s.value),
+            backgroundColor: donutSlices.map((s) => s.color),
+            borderColor: surface,
+            borderWidth: 3,
+            hoverOffset: 6,
+          },
+        ],
+      },
+      options: {
+        cutout: '68%',
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 200 },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: inverse,
+            titleColor: inverseFg,
+            bodyColor: inverseFg,
+            padding: 8,
+            cornerRadius: 8,
+            displayColors: false,
+            callbacks: {
+              label: (ctx) => {
+                const slice = donutSlices[ctx.dataIndex];
+                return `${slice.shortName}: ${slice.count} (${slice.percent})`;
+              },
+            },
+          },
+        },
+        onHover: (_evt, elements) => {
+          if (elements[0]) setActiveDonutIndex(elements[0].index);
+        },
+      },
+    };
+    donutChartRef.current = new Chart(donutCanvasRef.current, config);
+
+    return () => {
+      donutChartRef.current?.destroy();
+      donutChartRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- donutSlices is
+    // a derived array (new reference every render); comparing its actual
+    // values (JSON) here is unnecessary since the effect is cheap and only
+    // ever fires on a genuine stats/category refresh or theme change.
+  }, [JSON.stringify(donutSlices), themeVersion]);
 
   // TLD breakdown: real counts from GET /api/dashboard/stats. The bar width
   // reflects each TLD's share of the current blocklist volume — NOT a
@@ -251,7 +341,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           <div className="mt-4">
-            <div className="text-3xl font-extrabold font-mono text-slate-900 dark:text-white tracking-tight">
+            <div className="text-[28px] leading-9 font-extrabold font-mono text-slate-900 dark:text-white tracking-tight">
               {stats ? totalActiveDisplay : '—'}
             </div>
             <div className="flex items-center space-x-1.5 mt-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
@@ -283,7 +373,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           <div className="mt-4">
-            <div className="text-3xl font-extrabold font-mono text-rose-600 dark:text-rose-400 tracking-tight">
+            <div className="text-[28px] leading-9 font-extrabold font-mono text-rose-600 dark:text-rose-400 tracking-tight">
               {reviewCount} Tên miền
             </div>
             <div className="flex items-center space-x-1.5 mt-2 text-xs font-semibold text-rose-600 dark:text-rose-400">
@@ -315,7 +405,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           <div className="mt-4">
-            <div className="text-3xl font-extrabold font-mono text-slate-900 dark:text-white tracking-tight">
+            <div className="text-[28px] leading-9 font-extrabold font-mono text-slate-900 dark:text-white tracking-tight">
               {sources.length} Feeds / {categories.length} Nhóm
             </div>
             <div className="flex items-center space-x-1.5 mt-2 text-xs font-semibold text-indigo-600 dark:text-indigo-400">
@@ -406,61 +496,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
             ) : (
             <>
-            {/* SVG Donut Chart */}
+            {/* Real Chart.js doughnut (was a hand-drawn SVG arc-math donut).
+                Hover is driven by Chart.js's own onHover callback into the
+                SAME activeDonutIndex state the center readout and the 2x2
+                cards below already used — their JSX is unchanged. Chart.js
+                also supplies its own native tooltip now, so the old
+                hand-positioned "floating pill" (computed from the SVG's own
+                angle math, which no longer exists) was removed rather than
+                reimplemented against canvas coordinates. */}
             <div className="relative w-full h-64 flex items-center justify-center my-3">
-              <svg viewBox="0 0 200 200" className="w-56 h-56 overflow-visible">
-                {donutSlices.map((slice, i) => {
-                  const outerR = 82;
-                  const innerR = 56;
-                  const cx = 100;
-                  const cy = 100;
-
-                  const toRad = (deg: number) => ((deg - 90) * Math.PI) / 180;
-                  const startRad = toRad(slice.startAngle);
-                  const endRad = toRad(slice.endAngle);
-
-                  const x1 = cx + outerR * Math.cos(startRad);
-                  const y1 = cy + outerR * Math.sin(startRad);
-                  const x2 = cx + outerR * Math.cos(endRad);
-                  const y2 = cy + outerR * Math.sin(endRad);
-
-                  const x3 = cx + innerR * Math.cos(endRad);
-                  const y3 = cy + innerR * Math.sin(endRad);
-                  const x4 = cx + innerR * Math.cos(startRad);
-                  const y4 = cy + innerR * Math.sin(startRad);
-
-                  const largeArc = slice.angle > 180 ? 1 : 0;
-                  const pathData = `M ${x1} ${y1} A ${outerR} ${outerR} 0 ${largeArc} 1 ${x2} ${y2} L ${x3} ${y3} A ${innerR} ${innerR} 0 ${largeArc} 0 ${x4} ${y4} Z`;
-
-                  const isHovered = (activeDonutIndex !== null && activeDonutIndex < donutSlices.length ? activeDonutIndex : 0) === i;
-
-                  return (
-                    <path
-                      key={slice.id}
-                      d={pathData}
-                      fill={slice.color}
-                      className="transition-all duration-200 cursor-pointer"
-                      stroke="currentColor"
-                      strokeWidth="3.5"
-                      style={{
-                        color: 'var(--bg-card, #ffffff)',
-                        opacity: isHovered ? 1 : 0.9,
-                        filter: isHovered ? 'drop-shadow(0 2px 6px rgba(0,0,0,0.15))' : 'none',
-                        transformOrigin: '100px 100px',
-                        transform: isHovered ? 'scale(1.02)' : 'scale(1)',
-                      }}
-                      onMouseEnter={() => setActiveDonutIndex(i)}
-                    />
-                  );
-                })}
-              </svg>
+              <div className="w-56 h-56">
+                <canvas ref={donutCanvasRef} role="img" aria-label="Phân bổ danh mục nguy cơ" />
+              </div>
 
               {/* Center Donut Readout */}
               {(() => {
                 const activeItem = donutSlices[activeDonutIndex !== null && activeDonutIndex < donutSlices.length ? activeDonutIndex : 0];
                 return (
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center px-4">
-                    <span 
+                    <span
                       className="text-xs font-bold font-sans transition-colors duration-200"
                       style={{ color: activeItem.color }}
                     >
@@ -472,28 +526,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     <span className="text-xs font-mono text-slate-400 dark:text-slate-500 font-medium">
                       {activeItem.percent} tỷ trọng
                     </span>
-                  </div>
-                );
-              })()}
-
-              {/* Floating segment tooltip pill */}
-              {(() => {
-                const activeItem = donutSlices[activeDonutIndex !== null && activeDonutIndex < donutSlices.length ? activeDonutIndex : 0];
-                const midAngle = (activeItem.startAngle + activeItem.endAngle) / 2;
-                const midRad = ((midAngle - 90) * Math.PI) / 180;
-                const px = 100 + 72 * Math.cos(midRad);
-                const py = 100 + 72 * Math.sin(midRad);
-
-                return (
-                  <div 
-                    className="absolute z-10 px-2.5 py-1 rounded-md text-xs font-bold font-mono text-white shadow-md pointer-events-none transform -translate-x-1/2 -translate-y-1/2 transition-all duration-300"
-                    style={{
-                      left: `${(px / 200) * 100}%`,
-                      top: `${(py / 200) * 100}%`,
-                      backgroundColor: activeItem.color,
-                    }}
-                  >
-                    {activeItem.shortName.split('/')[0].trim()}: {activeItem.percent}
                   </div>
                 );
               })()}

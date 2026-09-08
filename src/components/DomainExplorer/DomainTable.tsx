@@ -149,9 +149,12 @@ export const DomainTable: React.FC<DomainTableProps> = ({
   const renderStatus = (status: DomainStatus) => {
     switch (status) {
       case 'active':
+        // Green, not the app's new primary blue (see index.css's file-level
+        // note): this dot means "blocking is actively working" — a status
+        // signal, distinct from primary/brand actions like buttons and nav.
         return (
           <div className="flex items-center space-x-1.5 text-xs text-slate-700 dark:text-slate-300 font-medium">
-            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+            <span className="w-2 h-2 rounded-full bg-green-500"></span>
             <span>đang chặn</span>
           </div>
         );
@@ -163,9 +166,11 @@ export const DomainTable: React.FC<DomainTableProps> = ({
           </div>
         );
       case 'allowlist':
+        // Same reasoning as 'active' above — a positive/allowed STATUS, kept
+        // green rather than the new primary blue.
         return (
-          <div className="flex items-center space-x-1.5 text-xs text-emerald-700 dark:text-emerald-300 font-semibold bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800 inline-flex">
-            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+          <div className="flex items-center space-x-1.5 text-xs text-green-700 dark:text-green-300 font-semibold bg-green-50 dark:bg-green-950/60 px-2 py-0.5 rounded-full border border-green-200 dark:border-green-800 inline-flex">
+            <span className="w-2 h-2 rounded-full bg-green-500"></span>
             <span>trong allowlist</span>
           </div>
         );

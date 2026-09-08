@@ -113,7 +113,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           transition-all duration-300 ease-in-out
           fixed md:relative top-0 bottom-0 left-0
           ${isMobileOpen ? 'translate-x-0 w-64 shadow-2xl' : '-translate-x-full md:translate-x-0'}
-          ${isCollapsed ? 'md:w-20' : 'md:w-64'}
+          ${isCollapsed ? 'md:w-[72px]' : 'md:w-[260px]'}
         `}
       >
         {/* Brand Header with CyberDNS Logo */}
@@ -144,7 +144,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-600 flex items-center justify-center text-white shadow-sm overflow-hidden ring-2 ring-emerald-500/20 group-hover:ring-emerald-500">
                 <UserCircle2 className="w-7 h-7" />
               </div>
-              {currentUser && <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-900"></span>}
+              {currentUser && <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-green-500 ring-2 ring-white dark:ring-slate-900"></span>}
             </div>
           ) : (
             <div className="bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100/80 dark:hover:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60 rounded-2xl p-2.5 flex items-center justify-between transition-colors">
@@ -153,14 +153,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-600 flex items-center justify-center text-white shadow-sm overflow-hidden ring-2 ring-emerald-500/20">
                     <UserCircle2 className="w-5 h-5" />
                   </div>
-                  {currentUser && <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-800"></span>}
+                  {currentUser && <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green-500 ring-2 ring-white dark:ring-slate-800"></span>}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
                     {currentUser ? currentUser.displayName || currentUser.email : 'Chưa đăng nhập'}
                   </div>
                   <div className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate flex items-center space-x-1.5 mt-0.5">
-                    <span className={`w-1.5 h-1.5 rounded-full ${currentUser ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
+                    <span className={`w-1.5 h-1.5 rounded-full ${currentUser ? 'bg-green-500' : 'bg-slate-400'}`}></span>
                     <span>{currentUser ? userRole : 'Chỉ xem'}</span>
                   </div>
                 </div>
@@ -174,7 +174,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {navItems.map((sec, secIdx) => (
             <div key={secIdx}>
               {!isCollapsed && (
-                <div className="px-3 mb-1.5 text-xs font-bold text-slate-400 dark:text-slate-500 tracking-wider uppercase">
+                <div className="px-3 mb-1.5 mt-6 first:mt-0 text-[11px] font-bold text-slate-400 dark:text-slate-500 tracking-[.06em] uppercase">
                   {sec.group}
                 </div>
               )}
@@ -189,17 +189,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       onClick={() => handleNavClick(item.id)}
                       title={isCollapsed ? item.label : undefined}
                       className={`
-                        w-full flex items-center rounded-xl transition-all cursor-pointer group relative
-                        ${isCollapsed ? 'justify-center p-2.5' : 'justify-between px-3 py-2'}
+                        w-full flex items-center rounded-md transition-all cursor-pointer group relative min-h-11
+                        ${isCollapsed ? 'justify-center p-2.5' : 'justify-between px-3 py-2.5'}
                         ${
                           isActive
-                            ? 'bg-emerald-600 dark:bg-emerald-500 text-white font-semibold shadow-sm shadow-emerald-500/20'
+                            ? 'bg-primary-soft text-primary font-semibold'
                             : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/80 dark:hover:bg-slate-800/80'
                         }
                       `}
                     >
                       <div className="flex items-center space-x-2.5 min-w-0">
-                        <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-white' : 'text-slate-400 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200'}`} />
+                        <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-primary' : 'text-slate-400 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200'}`} />
                         {!isCollapsed && (
                           <span className="truncate text-xs">{item.label}</span>
                         )}
@@ -207,10 +207,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                       {!isCollapsed && item.badge && (
                         <span className={`text-xs px-2 py-0.5 rounded-md font-mono font-bold flex-shrink-0 ${
-                          isActive 
-                            ? 'bg-white/20 text-white' 
+                          isActive
+                            ? 'bg-primary/15 text-primary'
                             : item.badgeColor === 'emerald'
-                            ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60'
+                            // 'Live' status badge — kept genuinely green (not
+                            // the new primary blue) for the same "positive
+                            // status, not a brand action" reasoning as
+                            // DomainTable's status dots.
+                            ? 'bg-green-50 dark:bg-green-950/60 text-green-600 dark:text-green-400 border border-green-200/60 dark:border-green-800/60'
                             : item.badgeColor === 'amber'
                             ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800/60 animate-pulse'
                             : item.badgeColor === 'rose'
@@ -226,7 +230,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <span className={`absolute top-1.5 right-1.5 w-2 h-2 rounded-full ring-2 ring-white dark:ring-slate-900 ${
                           item.badgeColor === 'amber' ? 'bg-amber-500' :
                           item.badgeColor === 'rose' ? 'bg-rose-500' :
-                          item.badgeColor === 'emerald' ? 'bg-emerald-500' : 'bg-slate-400'
+                          item.badgeColor === 'emerald' ? 'bg-green-500' : 'bg-slate-400'
                         }`} />
                       )}
                     </button>

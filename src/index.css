@@ -1,6 +1,76 @@
 @import "tailwindcss";
 @custom-variant dark (&:is(.dark, .dark *));
 
+/* ============================================================================
+   RE-SKIN STRATEGY (Adminator v4 / admin-portal-style skill redesign)
+   ----------------------------------------------------------------------------
+   25 component files use Tailwind's built-in `emerald-*`/`rose-*`/`blue-*`
+   color families directly (~2,600 occurrences total) — editing every file to
+   swap class names would be enormous and easy to get wrong/incomplete.
+
+   Instead: Tailwind v4 generates every `bg-emerald-600`/`text-emerald-400/60`/
+   `dark:border-emerald-800` utility (including every opacity and dark:
+   variant) FROM the `--color-emerald-{shade}` variables below. Redefining
+   those variables in @theme makes EVERY existing use of `emerald-*` in the
+   whole app resolve to the new palette automatically — no per-file edits,
+   and nothing can be missed since it's driven by the same source Tailwind
+   itself reads, not a guess at which exact classes exist.
+
+   - `emerald-*` (was the app's one accent color, both "primary action" AND
+     "success status" meanings mixed) → redefined to a BLUE scale (Adminator/
+     skill's primary, ~#2563EB at emerald-600 — the shade most buttons use).
+     A handful of genuine "success status" spots (see DomainTable.tsx's
+     renderStatus, and success toasts) were switched to Tailwind's SEPARATE,
+     un-redefined `green-*` family instead, so they stay authentically green
+     without needing per-opacity CSS overrides.
+   - `blue-*` (previously used for "info"-flavored badges, e.g. Allowlist) →
+     redefined to a TEAL scale (skill's --color-info, ~#12b3a8), so it stays
+     visually distinct from the new primary blue instead of colliding with it.
+   - `rose-*` core shades (danger) nudged toward the skill's exact danger red
+     (#e5484d) at the 500/600/700 shades actually used; lighter/darker shades
+     left at Tailwind's own rose (already reads as "danger" fine).
+   - `slate-*` (neutral) is NOT redefined — Tailwind's default gray scale is
+     already a reasonable neutral; only specific semantic USES of it (page/
+     card backgrounds, borders, text) are bridged to the new surface tokens
+     below, same technique the file already had before this redesign.
+   ============================================================================ */
+
+@theme {
+  /* --- Primary (blue) — replaces Tailwind's built-in emerald-* scale --- */
+  --color-emerald-50:  #eff6ff;
+  --color-emerald-100: #dbeafe;
+  --color-emerald-200: #bfdbfe;
+  --color-emerald-300: #93c5fd;
+  --color-emerald-400: #60a5fa;
+  --color-emerald-500: #3b82f6;
+  --color-emerald-600: #2563eb;
+  --color-emerald-700: #1d4ed8;
+  --color-emerald-800: #1e40af;
+  --color-emerald-900: #1e3a8a;
+  --color-emerald-950: #172554;
+
+  /* --- Info (teal) — replaces Tailwind's built-in blue-* scale, so it
+     never collides visually with the new primary blue above --- */
+  --color-blue-50:  #f0fdfa;
+  --color-blue-100: #ccfbf1;
+  --color-blue-200: #99f6e4;
+  --color-blue-300: #5eead4;
+  --color-blue-400: #2dd4bf;
+  --color-blue-500: #14b8a6;
+  --color-blue-600: #0d9488;
+  --color-blue-700: #0f766e;
+  --color-blue-800: #115e59;
+  --color-blue-900: #134e4a;
+  --color-blue-950: #042f2e;
+
+  /* --- Danger (rose) — only the mid shades actually carrying the color
+     signal are nudged to the skill's exact danger red; lighter/darker
+     tints are left at Tailwind's own rose, already close enough --- */
+  --color-rose-500: #ef5a5f;
+  --color-rose-600: #e5484d;
+  --color-rose-700: #c9383d;
+}
+
 @theme inline {
   /* The app uses exactly ONE font stack everywhere — declared once on
      `body` below and inherited by every element via `* { font-family:
@@ -9,7 +79,7 @@
      but a Tailwind utility class always wins over that base-layer `*`
      rule regardless of selector specificity (utilities is a later cascade
      layer than base) — so those classes would otherwise still render
-     their OWN typeface (Inter vs. IBM Plex Mono) instead of truly
+     their OWN typeface (Inter vs. JetBrains Mono) instead of truly
      inheriting. Pointing both theme tokens at `inherit` itself makes
      Tailwind generate `.font-sans`/`.font-mono` as `font-family: inherit`
      directly, so every existing (and future) use of those classes is a
@@ -17,47 +87,147 @@
      having to hunt down and edit every className that mentions them. */
   --font-sans: inherit;
   --font-mono: inherit;
-  --color-background: var(--bg-main);
+
+  --color-background: var(--bg-canvas);
   --color-foreground: var(--text-primary);
-  --color-card: var(--bg-card);
+  --color-card: var(--bg-surface);
   --color-card-foreground: var(--text-primary);
-  --color-muted: var(--bg-surface);
+  --color-muted: var(--bg-subtle);
   --color-muted-foreground: var(--text-secondary);
-  --color-border: var(--border-subtle);
-  --color-primary: var(--primary-emerald);
-  --color-primary-foreground: #ffffff;
-  --radius-sm: 0.375rem;
-  --radius-md: 0.625rem;
-  --radius-lg: 0.875rem;
+  --color-border: var(--border);
+
+  --color-primary: var(--color-primary);
+  --color-primary-hover: var(--color-primary-hover);
+  --color-primary-soft: var(--color-primary-soft);
+  --color-primary-foreground: var(--color-primary-fg);
+
+  --color-success: var(--color-success);
+  --color-success-soft: var(--color-success-soft);
+  --color-warning: var(--color-warning);
+  --color-warning-soft: var(--color-warning-soft);
+  --color-danger: var(--color-danger);
+  --color-danger-soft: var(--color-danger-soft);
+  --color-info: var(--color-info);
+  --color-info-soft: var(--color-info-soft);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  /* The app's 25 component files overwhelmingly use `rounded-2xl` for card
+     surfaces (not `rounded-lg`) — aliasing it to the SAME value as
+     --radius-lg (12px, admin-portal-style's card radius) retroactively
+     fixes every existing card's radius app-wide through this one mapping,
+     the same "redefine the palette/scale, not every call site" technique
+     used for colors above. */
+  --radius-2xl: var(--radius-lg);
 }
 
 @layer base {
   :root {
-    --bg-main: #f6f8fb;
-    --bg-card: #ffffff;
-    --bg-card-hover: #f8fafc;
-    --bg-surface: #eef2f6;
-    --border-subtle: #dfe5ec;
-    --border-highlight: #c5d0dc;
-    --text-primary: #14202b;
-    --text-secondary: #526273;
-    --text-muted: #8795a5;
-    --primary-emerald: #087f68;
-    --primary-blue: #2f6fed;
+    /* --- Brand seed: the only 3 variables a future white-label tenant
+       needs to override (per admin-portal-style skill §3.1) --- */
+    --brand-h: 221;
+    --brand-s: 83%;
+    --brand-l: 53%; /* ≈ #2563EB at this hue/sat, matching Adminator's primary */
+
+    --color-primary: hsl(var(--brand-h) var(--brand-s) var(--brand-l));
+    --color-primary-hover: hsl(var(--brand-h) var(--brand-s) calc(var(--brand-l) - 8%));
+    --color-primary-soft: hsl(var(--brand-h) var(--brand-s) var(--brand-l) / 0.10);
+    --color-primary-fg: #ffffff;
+
+    /* semantic — do NOT vary by tenant/brand */
+    --color-success: #21c17a;
+    --color-success-soft: #21c17a1f;
+    --color-warning: #f5a524;
+    --color-warning-soft: #f5a5241f;
+    --color-danger: #e5484d;
+    --color-danger-soft: #e5484d1f;
+    --color-info: #12b3a8;
+    --color-info-soft: #12b3a81f;
+
+    /* surfaces */
+    --bg-canvas: #f8f9fa;
+    --bg-surface: #ffffff;
+    --bg-subtle: #f3f5f7;
+    --bg-inverse: #1d2630;
+    /* legacy aliases some already-written components still reference
+       directly (bg-card/bg-card-hover) — kept equal to the new surface
+       tokens so nothing silently goes transparent mid-migration. */
+    --bg-main: var(--bg-canvas);
+    --bg-card: var(--bg-surface);
+    --bg-card-hover: var(--bg-subtle);
+
+    --border: #e9ecef;
+    --border-strong: #d8dee4;
+    --border-subtle: var(--border);
+    --border-highlight: var(--border-strong);
+
+    --text-primary: #1d2630;
+    --text-secondary: #5b6b79;
+    --text-muted: #8996a4;
+
+    --shadow-sm: 0 1px 2px rgb(27 46 94 / .06);
+    --shadow-md: 0 4px 16px rgb(27 46 94 / .08);
+    --shadow-lg: 0 12px 32px rgb(27 46 94 / .12);
   }
 
   .dark {
-    --bg-main: #0b121a;
-    --bg-card: #111c26;
-    --bg-card-hover: #172632;
-    --bg-surface: #16232e;
-    --border-subtle: #263847;
-    --border-highlight: #3a5162;
-    --text-primary: #edf4f7;
-    --text-secondary: #9cafbb;
-    --text-muted: #6f8491;
-    --primary-emerald: #21b58f;
-    --primary-blue: #5d91f5;
+    --brand-l: 59%; /* +6% lightness in dark mode for contrast, per skill §2.3 */
+
+    --color-success-soft: #21c17a29;
+    --color-warning-soft: #f5a52429;
+    --color-danger-soft: #e5484d29;
+    --color-info-soft: #12b3a829;
+
+    --bg-canvas: #131920;
+    --bg-surface: #1b232d;
+    --bg-subtle: #232d39;
+    --bg-inverse: #f8f9fa;
+
+    --border: #2a3542;
+    --border-strong: #3a4756;
+
+    --text-primary: #e7ecf1;
+    --text-secondary: #a3b1bf;
+    --text-muted: #7a8896;
+
+    --color-primary-soft: hsl(var(--brand-h) var(--brand-s) var(--brand-l) / 0.16);
+
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / .30);
+    --shadow-md: 0 4px 16px rgb(0 0 0 / .40);
+    --shadow-lg: 0 12px 32px rgb(0 0 0 / .55);
+  }
+
+  /* Typography / spacing / radius / motion scale — admin-portal-style §2.4.
+     Not every one of these has a matching Tailwind utility generated (only
+     the ones re-exposed via @theme inline above do); the rest are consumed
+     directly as var(...) by new/rewritten components (Sidebar, Header,
+     Dashboard, etc.) instead of hardcoding pixel values inline. */
+  :root {
+    --fs-display: 28px; --lh-display: 36px;
+    --fs-h1: 24px; --fs-h2: 20px; --fs-h3: 16px;
+    --fs-body: 14px; --lh-body: 22px;
+    --fs-sm: 13px; --fs-xs: 12px; --fs-eyebrow: 11px;
+    --fw-regular: 400; --fw-medium: 500; --fw-semibold: 600; --fw-bold: 700;
+
+    --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
+    --sp-5: 20px; --sp-6: 24px; --sp-8: 32px; --sp-10: 40px;
+
+    --radius-sm: 6px; --radius-md: 8px; --radius-lg: 12px; --radius-xl: 16px;
+    --radius-pill: 999px;
+
+    --layout-sidebar: 260px;
+    --layout-sidebar-collapsed: 72px;
+    --layout-header: 72px;
+    --layout-content-pad: var(--sp-6);
+
+    --dur-fast: 120ms; --dur-base: 220ms; --dur-slow: 320ms;
+    --ease-out: cubic-bezier(.22,1,.36,1);
+    --ease-spring: cubic-bezier(.34,1.4,.64,1);
+
+    --z-header: 100; --z-sidebar: 200; --z-tabbar: 300;
+    --z-sheet: 400; --z-modal: 500; --z-toast: 600;
   }
 
   /* `body` below is the ONLY place the concrete font stack is declared —
@@ -72,7 +242,7 @@
   }
 
   body {
-    background-color: var(--bg-main);
+    background-color: var(--bg-canvas);
     color: var(--text-primary);
     font-family: "Inter", "Arial", "Segoe UI", sans-serif;
     font-size: 15px;
@@ -87,7 +257,7 @@
   }
 
   :focus-visible {
-    outline: 2px solid var(--primary-emerald);
+    outline: 2px solid var(--color-primary);
     outline-offset: 2px;
   }
 
@@ -130,18 +300,22 @@
 }
 
 .card-shadow {
-  box-shadow: 0 1px 2px rgba(20, 35, 50, 0.04), 0 8px 24px rgba(20, 35, 50, 0.035);
+  box-shadow: var(--shadow-sm);
 }
 .dark .card-shadow {
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25), 0 12px 28px rgba(0, 0, 0, 0.22);
+  box-shadow: var(--shadow-sm);
 }
 
-/* Shared enterprise console surfaces */
+/* Shared enterprise console surfaces — bridges the FEW slate/white classes
+   used for page/card backgrounds, borders, and text onto the new surface
+   tokens (see the file-level note above for why the color-family redefinition
+   technique above doesn't apply here: slate itself isn't being recolored,
+   only specific semantic uses of a couple of its shades are). */
 .bg-white, .bg-slate-50, .bg-slate-100\/90 {
-  background-color: var(--bg-card);
+  background-color: var(--bg-surface);
 }
 .border-slate-200, .border-slate-200\/80, .border-slate-200\/60 {
-  border-color: var(--border-subtle);
+  border-color: var(--border);
 }
 .text-slate-900, .text-slate-800 {
   color: var(--text-primary);
@@ -154,14 +328,14 @@
 }
 
 .card-hover-shadow {
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all var(--dur-base) var(--ease-out);
 }
 .card-hover-shadow:hover {
-  box-shadow: 0 8px 24px 0 rgba(20, 30, 50, 0.08);
+  box-shadow: var(--shadow-md);
   transform: translateY(-1px);
 }
 .dark .card-hover-shadow:hover {
-  box-shadow: 0 8px 28px 0 rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-md);
   transform: translateY(-1px);
 }
 
@@ -178,3 +352,9 @@
   transform: scale(0.97);
 }
 
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

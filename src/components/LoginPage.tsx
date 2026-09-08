@@ -36,7 +36,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, isDarkMode, toggl
   };
 
   return (
-    <div className="h-screen w-screen overflow-y-auto bg-white dark:bg-[#0B1120] flex flex-col lg:flex-row transition-colors">
+    <div className="h-screen w-screen overflow-y-auto bg-background flex flex-col lg:flex-row transition-colors">
       {/* Left: brand panel */}
       <div className="relative lg:w-1/2 xl:w-[55%] flex-shrink-0 bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950 dark:from-[#060a14] dark:via-[#060a14] dark:to-emerald-950 text-white flex flex-col justify-between p-8 sm:p-12 lg:p-16 min-h-[280px] lg:min-h-0">
         <div className="absolute inset-0 opacity-[0.07] pointer-events-none" style={{
@@ -129,7 +129,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, isDarkMode, toggl
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@cyberdns.vn"
-                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-100 dark:focus:ring-emerald-950/60 transition-all"
+                className="w-full h-10 bg-muted border border-border focus:border-primary focus:bg-card rounded-md px-3.5 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-3 focus:ring-primary-soft transition-all"
               />
             </div>
 
@@ -142,7 +142,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, isDarkMode, toggl
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-800 rounded-xl px-3.5 py-2 pr-10 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-100 dark:focus:ring-emerald-950/60 transition-all"
+                  className="w-full h-10 bg-muted border border-border focus:border-primary focus:bg-card rounded-md px-3.5 pr-10 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-3 focus:ring-primary-soft transition-all"
                 />
                 <button
                   type="button"
@@ -158,7 +158,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, isDarkMode, toggl
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center space-x-2 cursor-pointer shadow-sm shadow-emerald-600/20 active-press disabled:opacity-60"
+              className="w-full h-10 bg-primary hover:bg-primary-hover text-white font-bold text-xs rounded-md transition-all flex items-center justify-center space-x-2 cursor-pointer shadow-sm active-press disabled:opacity-60"
             >
               <LogIn className="w-4 h-4" />
               <span>{isSubmitting ? 'Đang đăng nhập...' : 'Đăng nhập'}</span>
