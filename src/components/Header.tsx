@@ -1,11 +1,13 @@
 import React from 'react';
 import {
-  Search, Bell, ChevronDown,
-  Menu,
-  CheckSquare, Rocket, Upload, Rss, History,
-  Sun, Moon,
-  LayoutDashboard, Globe, LogIn, LogOut, UserCircle2, Users
+  Search, Plus, Bell, ChevronDown,
+  Menu, Settings, Zap, Grid, Sparkles,
+  GitBranch, CheckCircle2, Shield, ArrowUpRight,
+  Sun, Moon, ShieldCheck, Keyboard, HelpCircle,
+  LayoutDashboard, Globe, CheckSquare, Rocket, Upload, Rss, History,
+  LogIn, LogOut, UserCircle2, Users
 } from 'lucide-react';
+import { CyberDNSLogo } from './CyberDNSLogo';
 import { AppUser } from '../types';
 import { useClickOutside } from '../hooks/useClickOutside';
 
@@ -84,105 +86,113 @@ export const Header: React.FC<HeaderProps> = ({
   const TabIcon = activeTabInfo.icon;
 
   return (
-    <header className="app-header sticky-top d-flex align-items-center">
-      <div className="w-100 h-100 px-3 px-sm-4 d-flex align-items-center justify-content-between gap-2 gap-sm-3">
+    <header className="w-full h-[72px] bg-card border-b border-border text-foreground sticky top-0 z-30 shadow-sm transition-colors duration-200">
+      <div className="h-full px-3 sm:px-5 flex items-center justify-between gap-2 sm:gap-4">
         {/* Left Section: Sidebar toggle + Breadcrumbs & View Title */}
-        <div className="d-flex align-items-center gap-2 gap-sm-3 flex-grow-1 min-w-0">
+        <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
           {/* Hamburger / Sidebar Toggle */}
           <button
             onClick={onToggleSidebar}
             id="btn-toggle-sidebar"
-            className="app-header-icon-btn rounded-2 bg-body-tertiary flex-shrink-0"
+            className="w-9 h-9 flex items-center justify-center bg-muted text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md transition-colors cursor-pointer active-press flex-shrink-0"
             title="Mở / Đóng thanh điều hướng"
           >
-            <Menu size={18} />
+            <Menu className="w-5 h-5" />
           </button>
 
           {/* Breadcrumb Title */}
-          <div className="d-none d-sm-flex align-items-center gap-2 min-w-0">
-            <div className="d-flex align-items-center gap-1 text-body-secondary small fw-medium">
+          <div className="hidden sm:flex items-center space-x-2 min-w-0">
+            <div className="flex items-center space-x-1.5 text-xs text-slate-400 dark:text-slate-500 font-medium">
               <span>CyberDNS</span>
               <span>/</span>
-              <span className="fw-semibold">{activeTabInfo.category}</span>
+              <span className="text-slate-600 dark:text-slate-400 font-semibold">{activeTabInfo.category}</span>
               <span>/</span>
             </div>
-            <div className="d-flex align-items-center gap-1 small fw-bold text-truncate">
-              <TabIcon size={14} className="text-primary flex-shrink-0" />
-              <span className="text-truncate">{activeTabInfo.title}</span>
+            <div className="flex items-center space-x-1.5 text-xs font-bold text-slate-900 dark:text-white truncate">
+              <TabIcon className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+              <span className="truncate">{activeTabInfo.title}</span>
             </div>
           </div>
 
           {/* Mobile Title */}
-          <div className="d-sm-none d-flex align-items-center gap-1 small fw-bold text-truncate">
-            <TabIcon size={16} className="text-primary flex-shrink-0" />
-            <span className="text-truncate">{activeTabInfo.title.split('(')[0]}</span>
+          <div className="sm:hidden flex items-center space-x-1.5 text-xs font-bold text-slate-900 dark:text-white truncate">
+            <TabIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+            <span className="truncate">{activeTabInfo.title.split('(')[0]}</span>
           </div>
 
           {/* Quick Search Box */}
-          <div onClick={onOpenSearch} className="d-none d-md-flex position-relative ms-2" style={{ maxWidth: 260, width: '100%', cursor: 'pointer' }}>
-            <Search size={14} className="position-absolute top-50 start-0 translate-middle-y ms-3 text-body-secondary" style={{ pointerEvents: 'none' }} />
+          <div 
+            onClick={onOpenSearch}
+            className="hidden md:flex relative max-w-xs w-64 cursor-pointer group ml-2"
+          >
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+              <Search className="w-3.5 h-3.5" />
+            </div>
             <input
               type="text"
               readOnly
               placeholder="Tìm domain, IP, ASN..."
-              className="form-control form-control-sm rounded-3"
-              style={{ paddingLeft: '2rem', paddingRight: '2.5rem', cursor: 'pointer' }}
+              className="w-full pl-8 pr-8 py-1.5 text-xs bg-slate-100/90 dark:bg-slate-800/80 hover:bg-slate-200/60 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 placeholder-slate-400 rounded-xl border border-slate-200/60 dark:border-slate-700/60 transition-all outline-none cursor-pointer"
             />
-            <kbd className="position-absolute top-50 end-0 translate-middle-y me-2 small">⌘K</kbd>
+            <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
+              <kbd className="px-1.5 py-0.5 rounded bg-white dark:bg-slate-700 text-xs text-slate-500 dark:text-slate-300 font-mono shadow-xs border border-slate-200 dark:border-slate-600">⌘K</kbd>
+            </div>
           </div>
         </div>
 
-        {/* Right Section: Theme, Notifications, User Profile */}
-        <div className="d-flex align-items-center gap-2 flex-shrink-0">
+        {/* Right Section: Release status, Quick Add, Theme, Shortcuts, Notifications, User Profile */}
+        <div className="flex items-center space-x-2 flex-shrink-0">
           {/* Theme Toggle Button (Light / Dark) */}
           <button
             onClick={toggleTheme}
             id="btn-toggle-theme"
-            title={isDarkMode ? 'Chuyển sang giao diện Sáng' : 'Chuyển sang giao diện Tối'}
-            className="app-header-icon-btn"
+            title={isDarkMode ? "Chuyển sang giao diện Sáng" : "Chuyển sang giao diện Tối"}
+            className="w-9 h-9 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-muted rounded-full transition-colors cursor-pointer active-press"
           >
-            {isDarkMode ? <Sun size={16} className="text-warning" /> : <Moon size={16} />}
+            {isDarkMode ? (
+              <Sun className="w-4 h-4 text-amber-400" />
+            ) : (
+              <Moon className="w-4 h-4" />
+            )}
           </button>
 
           {/* Notification Bell */}
-          <div className="position-relative" ref={notificationsRef}>
+          <div className="relative" ref={notificationsRef}>
             <button
               onClick={() => setNotificationsOpen(!notificationsOpen)}
-              className="app-header-icon-btn position-relative"
+              className="w-9 h-9 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-muted rounded-full transition-colors relative cursor-pointer active-press"
               title="Thông báo"
             >
-              <Bell size={16} />
+              <Bell className="w-4 h-4" />
               {notifications.length > 0 && (
-                <span
-                  className="position-absolute badge rounded-pill bg-danger"
-                  style={{ top: 2, right: 2, fontSize: '0.625rem', minWidth: 16, padding: '0.15rem 0.35rem' }}
-                >
+                <span className="absolute top-1 right-1 min-w-[16px] h-4 px-0.5 rounded-full bg-danger text-white text-[10px] font-bold flex items-center justify-center border-2 border-card">
                   {notifications.length}
                 </span>
               )}
             </button>
 
             {notificationsOpen && (
-              <div className="dropdown-menu show shadow-lg p-0 mt-2" style={{ width: 320, right: 0, left: 'auto' }}>
-                <div className="px-3 pb-2 pt-2 border-bottom d-flex align-items-center justify-content-between">
-                  <span className="fw-bold small">Thông báo SOC</span>
+              <div className="absolute right-0 mt-3 w-80 bg-white dark:bg-slate-900 text-slate-800 dark:text-white rounded-2xl shadow-2xl border border-slate-200/80 dark:border-slate-800 py-3 z-50 animate-in fade-in zoom-in-95 duration-100">
+                <div className="px-4 pb-2.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                  <span className="font-bold text-xs text-slate-800 dark:text-white font-sans">Thông báo SOC</span>
                   {notifications.length > 0 && (
-                    <span className="badge rounded-pill text-bg-success-subtle text-success">{notifications.length} Mới</span>
+                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200/60 dark:border-emerald-800/60">
+                      {notifications.length} Mới
+                    </span>
                   )}
                 </div>
-                <div className="py-1" style={{ maxHeight: 288, overflowY: 'auto' }}>
+                <div className="py-2 divide-y divide-slate-100 dark:divide-slate-800 text-xs max-h-72 overflow-y-auto">
                   {notifications.length === 0 ? (
-                    <div className="px-3 py-4 text-center text-body-secondary small">Không có thông báo mới.</div>
+                    <div className="px-4 py-6 text-center text-slate-400 dark:text-slate-500">Không có thông báo mới.</div>
                   ) : (
                     notifications.map((n) => (
                       <div
                         key={n.id}
                         onClick={() => { setCurrentTab(n.tab); setNotificationsOpen(false); }}
-                        className="px-3 py-2 border-bottom small"
-                        style={{ cursor: 'pointer' }}
+                        className="px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer transition-colors"
                       >
-                        <div className="fw-semibold">{n.title}</div>
-                        <div className="text-body-secondary mt-1">{n.description}</div>
+                        <div className="font-semibold text-slate-800 dark:text-slate-200 font-sans">{n.title}</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{n.description}</div>
                       </div>
                     ))
                   )}
@@ -191,62 +201,74 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </div>
 
-          <div className="vr d-none d-sm-block mx-1" style={{ height: 20 }} />
+          <div className="w-px h-5 bg-slate-200 dark:bg-slate-700 hidden sm:block mx-1"></div>
 
           {/* User Profile — self-hosted email/password session */}
           {!currentUser ? (
             <button
               onClick={onOpenLogin}
               disabled={isAuthLoading}
-              className="btn btn-primary btn-sm rounded-pill d-flex align-items-center gap-1"
+              className="flex items-center space-x-1.5 pl-3 pr-3.5 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors cursor-pointer disabled:opacity-50 active-press"
               title="Đăng nhập để thực hiện các thao tác ghi (thêm/sửa domain, phát hành, v.v.)"
             >
-              <LogIn size={14} />
+              <LogIn className="w-3.5 h-3.5" />
               <span>Đăng nhập</span>
             </button>
           ) : (
-            <div className="position-relative" ref={roleDropdownRef}>
+            <div className="relative" ref={roleDropdownRef}>
               <button
                 onClick={() => setRoleDropdownOpen(!roleDropdownOpen)}
-                className="btn btn-light btn-sm rounded-pill d-flex align-items-center gap-2 border"
+                className="flex items-center space-x-2 pl-1.5 pr-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700/80 border border-slate-200/60 dark:border-slate-700/60 transition-colors cursor-pointer"
               >
-                <div className="rounded-circle overflow-hidden bg-body-tertiary d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 32, height: 32 }}>
+                <div className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-card bg-slate-200 dark:bg-slate-700 flex items-center justify-center flex-shrink-0">
                   {currentUser.avatarUrl ? (
-                    <img src={currentUser.avatarUrl} alt={currentUser.displayName || 'User avatar'} className="w-100 h-100" style={{ objectFit: 'cover' }} />
+                    <img
+                      src={currentUser.avatarUrl}
+                      alt={currentUser.displayName || 'User avatar'}
+                      className="w-full h-full object-cover"
+                    />
                   ) : (
-                    <UserCircle2 size={22} className="text-body-secondary" />
+                    <UserCircle2 className="w-6 h-6 text-slate-500 dark:text-slate-400" />
                   )}
                 </div>
-                <div className="d-none d-sm-flex flex-column align-items-start lh-sm">
-                  <span className="fw-bold small text-truncate" style={{ maxWidth: 120 }}>
+                <div className="hidden sm:flex flex-col items-start">
+                  <span className="font-bold text-slate-700 dark:text-slate-200 text-xs leading-tight font-sans tracking-tight truncate max-w-[120px]">
                     {currentUser.displayName || currentUser.email}
                   </span>
-                  <span className="text-primary fw-semibold" style={{ fontSize: '0.6875rem' }}>{userRole}</span>
+                  <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold leading-tight">{userRole}</span>
                 </div>
-                <ChevronDown size={14} className="text-body-secondary" />
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 ml-1" />
               </button>
 
               {roleDropdownOpen && (
-                <div className="dropdown-menu show shadow-lg mt-2" style={{ width: 224, right: 0, left: 'auto' }}>
-                  <div className="px-3 py-2 border-bottom mb-1">
-                    <div className="fw-bold small text-truncate">{currentUser.displayName || 'Người dùng'}</div>
-                    <div className="text-body-secondary font-monospace text-truncate" style={{ fontSize: '0.75rem' }}>{currentUser.email}</div>
-                    <div className="text-primary fw-bold mt-1" style={{ fontSize: '0.75rem' }}>Vai trò: {userRole}</div>
+                <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 rounded-2xl shadow-xl border border-slate-200/80 dark:border-slate-800 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
+                  <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-800 mb-1">
+                    <div className="font-bold text-xs text-slate-900 dark:text-white font-sans truncate">
+                      {currentUser.displayName || 'Người dùng'}
+                    </div>
+                    <div className="text-xs text-slate-500 font-mono mt-0.5 truncate">{currentUser.email}</div>
+                    <div className="text-xs text-emerald-600 dark:text-emerald-400 font-bold mt-1">Vai trò: {userRole}</div>
                   </div>
                   {userRole === 'Admin' && (
                     <button
-                      onClick={() => { setRoleDropdownOpen(false); setCurrentTab('users'); }}
-                      className="dropdown-item d-flex align-items-center gap-2 small"
+                      onClick={() => {
+                        setRoleDropdownOpen(false);
+                        setCurrentTab('users');
+                      }}
+                      className="w-full text-left px-4 py-2 text-xs flex items-center space-x-2 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer text-slate-600 dark:text-slate-300"
                     >
-                      <Users size={14} />
+                      <Users className="w-3.5 h-3.5" />
                       <span>Quản lý người dùng</span>
                     </button>
                   )}
                   <button
-                    onClick={() => { setRoleDropdownOpen(false); onSignOut(); }}
-                    className="dropdown-item d-flex align-items-center gap-2 small text-danger border-top mt-1 pt-2"
+                    onClick={() => {
+                      setRoleDropdownOpen(false);
+                      onSignOut();
+                    }}
+                    className="w-full text-left px-4 py-2 text-xs flex items-center space-x-2 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer text-red-600 dark:text-red-400 border-t border-slate-100 dark:border-slate-800 mt-1 pt-2"
                   >
-                    <LogOut size={14} />
+                    <LogOut className="w-3.5 h-3.5" />
                     <span>Đăng xuất</span>
                   </button>
                 </div>

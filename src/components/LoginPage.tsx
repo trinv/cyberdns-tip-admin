@@ -36,96 +36,92 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, isDarkMode, toggl
   };
 
   return (
-    <div className="vh-100 vw-100 overflow-y-auto d-flex flex-column flex-lg-row bg-body">
-      {/* Left: brand panel — always dark regardless of the app's light/dark
-          toggle (see CyberDNSLogo's variant="dark" below: with the default
-          "auto" variant, switching the app to light mode would render
-          "Cyber" in near-black text sitting on this permanently-dark panel,
-          unreadable). */}
-      <div
-        className="position-relative flex-shrink-0 text-white d-flex flex-column justify-content-between p-4 p-sm-5 p-lg-5"
-        style={{
-          width: '100%',
-          minHeight: 280,
-          background: 'linear-gradient(135deg, #0f172a 0%, #0f172a 55%, #052e16 100%)',
-        }}
-      >
-        <div
-          className="position-absolute top-0 start-0 end-0 bottom-0"
-          style={{
-            opacity: 0.07,
-            pointerEvents: 'none',
-            backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)',
-            backgroundSize: '28px 28px',
-          }}
-        />
+    <div className="h-screen w-screen overflow-y-auto bg-background flex flex-col lg:flex-row transition-colors">
+      {/* Left: brand panel */}
+      <div className="relative lg:w-1/2 xl:w-[55%] flex-shrink-0 bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950 dark:from-[#060a14] dark:via-[#060a14] dark:to-emerald-950 text-white flex flex-col justify-between p-8 sm:p-12 lg:p-16 min-h-[280px] lg:min-h-0">
+        <div className="absolute inset-0 opacity-[0.07] pointer-events-none" style={{
+          backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)',
+          backgroundSize: '28px 28px',
+        }} />
 
-        <div className="position-relative">
-          <CyberDNSLogo size={40} showText textClassName="fs-3" glow variant="dark" />
+        <div className="relative">
+          {/* variant="dark": this panel's background is ALWAYS the dark
+              slate/emerald gradient above, regardless of the app's actual
+              light/dark toggle (see the toggle button on the right side of
+              this page) — with the default "auto" variant, switching the
+              app to light mode would render "Cyber" in near-black text
+              sitting on this permanently-dark panel, unreadable. */}
+          <CyberDNSLogo size={40} showText textClassName="text-2xl" glow variant="dark" />
         </div>
 
-        <div className="position-relative py-4 py-lg-0" style={{ maxWidth: 480 }}>
-          <h1 className="fw-bold" style={{ fontSize: '2rem', letterSpacing: '-0.02em', lineHeight: 1.15 }}>
+        <div className="relative space-y-5 py-10 lg:py-0">
+          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight leading-tight">
             Lá chắn an toàn<br />trên không gian mạng
           </h1>
-          <p className="mt-3 mb-0 small" style={{ color: 'rgba(255,255,255,0.75)', lineHeight: 1.6 }}>
+          <p className="text-slate-300 text-sm max-w-md leading-relaxed">
             An toàn hơn trên Internet, bắt đầu từ DNS. Cổng quản trị Threat Intelligence Platform — đồng bộ nguồn feed, phân loại danh mục, kiểm duyệt và phát hành danh sách chặn có kiểm soát.
           </p>
 
-          <div className="row g-3 mt-3">
-            {[
-              { Icon: Globe, label: 'Đồng bộ nguồn feed thời gian thực' },
-              { Icon: CheckSquare, label: 'Kiểm duyệt & phân loại danh mục' },
-              { Icon: ShieldCheck, label: 'Kiểm soát truy cập theo vai trò' },
-            ].map(({ Icon, label }) => (
-              <div className="col-4" key={label}>
-                <div
-                  className="rounded-3 d-flex align-items-center justify-content-center mb-2"
-                  style={{ width: 36, height: 36, background: 'rgba(255,255,255,0.1)' }}
-                >
-                  <Icon size={16} style={{ color: '#6ee7b7' }} />
-                </div>
-                <span className="small" style={{ color: 'rgba(255,255,255,0.75)', lineHeight: 1.4 }}>{label}</span>
+          <div className="grid grid-cols-3 gap-4 pt-4 max-w-md">
+            <div className="flex flex-col items-start space-y-2">
+              <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center">
+                <Globe className="w-4 h-4 text-emerald-400" />
               </div>
-            ))}
+              <span className="text-xs text-slate-300 leading-snug">Đồng bộ nguồn feed thời gian thực</span>
+            </div>
+            <div className="flex flex-col items-start space-y-2">
+              <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center">
+                <CheckSquare className="w-4 h-4 text-emerald-400" />
+              </div>
+              <span className="text-xs text-slate-300 leading-snug">Kiểm duyệt &amp; phân loại danh mục</span>
+            </div>
+            <div className="flex flex-col items-start space-y-2">
+              <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              </div>
+              <span className="text-xs text-slate-300 leading-snug">Kiểm soát truy cập theo vai trò</span>
+            </div>
           </div>
         </div>
 
-        <div className="position-relative small" style={{ color: 'rgba(255,255,255,0.6)' }}>
+        <div className="relative text-xs text-slate-400">
           © CyberDNS. All rights reserved. ·{' '}
-          <a href="https://cyberdns.vn" target="_blank" rel="noreferrer" className="link-light">
+          <a href="https://cyberdns.vn" target="_blank" rel="noreferrer" className="hover:text-emerald-400 transition-colors underline decoration-slate-600">
             cyberdns.vn
           </a>
         </div>
       </div>
 
       {/* Right: sign-in form */}
-      <div className="flex-grow-1 d-flex align-items-center justify-content-center p-4 p-sm-5 position-relative">
+      <div className="flex-1 flex items-center justify-center p-6 sm:p-10 relative">
         <button
           onClick={toggleTheme}
           title={isDarkMode ? 'Chế độ sáng' : 'Chế độ tối'}
-          className="app-header-icon-btn position-absolute"
-          style={{ top: 20, right: 20 }}
+          className="absolute top-5 right-5 sm:top-8 sm:right-8 p-2 rounded-xl text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
         >
-          {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
+          {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </button>
 
-        <div className="w-100" style={{ maxWidth: 384 }}>
-          <div className="mb-4">
-            <h2 className="fw-bold fs-5 mb-1">Đăng nhập</h2>
-            <p className="text-body-secondary small mb-0">Truy cập CyberDNS Threat Intelligence Platform</p>
+        <div className="w-full max-w-sm space-y-7">
+          {/* Matches every other page's header pattern (see e.g.
+              SourcesView/AuditLogsView/ReviewQueueView's <h1>) — this used
+              to be text-xl/text-sm, one step larger than the rest of the
+              app uses for a page title + subtitle. */}
+          <div className="space-y-1">
+            <h2 className="text-lg font-bold font-sans text-slate-900 dark:text-white">Đăng nhập</h2>
+            <p className="text-slate-500 dark:text-slate-400 text-xs">Truy cập CyberDNS Threat Intelligence Platform</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="d-flex flex-column gap-3">
+          <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div className="alert alert-danger d-flex align-items-start gap-2 py-2 px-3 small mb-0">
-                <ShieldAlert size={16} className="flex-shrink-0 mt-1" />
+              <div className="flex items-start space-x-2 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 rounded-xl px-3.5 py-2.5 text-xs font-medium">
+                <ShieldAlert className="w-4 h-4 flex-shrink-0 mt-0.5" />
                 <span>{error}</span>
               </div>
             )}
 
-            <div>
-              <label className="form-label small fw-bold">EMAIL</label>
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">EMAIL</label>
               <input
                 type="email"
                 required
@@ -133,40 +129,43 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, isDarkMode, toggl
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@cyberdns.vn"
-                className="form-control"
+                className="w-full h-10 bg-muted border border-border focus:border-primary focus:bg-card rounded-md px-3.5 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-3 focus:ring-primary-soft transition-all"
               />
             </div>
 
-            <div>
-              <label className="form-label small fw-bold">MẬT KHẨU</label>
-              <div className="position-relative">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">MẬT KHẨU</label>
+              <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="form-control"
-                  style={{ paddingRight: '2.5rem' }}
+                  className="w-full h-10 bg-muted border border-border focus:border-primary focus:bg-card rounded-md px-3.5 pr-10 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-3 focus:ring-primary-soft transition-all"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
                   tabIndex={-1}
-                  className="btn btn-link position-absolute top-50 end-0 translate-middle-y text-body-secondary p-0 me-3"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer"
                 >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
             </div>
 
-            <button type="submit" disabled={isSubmitting} className="btn btn-primary fw-bold d-flex align-items-center justify-content-center gap-2">
-              <LogIn size={16} />
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full h-10 bg-primary hover:bg-primary-hover text-white font-bold text-xs rounded-md transition-all flex items-center justify-center space-x-2 cursor-pointer shadow-sm active-press disabled:opacity-60"
+            >
+              <LogIn className="w-4 h-4" />
               <span>{isSubmitting ? 'Đang đăng nhập...' : 'Đăng nhập'}</span>
             </button>
           </form>
 
-          <p className="text-center text-body-secondary small mt-4 mb-0">
+          <p className="text-center text-xs text-slate-400 dark:text-slate-600">
             Cần tài khoản? Liên hệ quản trị viên hệ thống của bạn để được cấp quyền truy cập.
           </p>
         </div>

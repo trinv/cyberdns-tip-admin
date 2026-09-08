@@ -1,9 +1,9 @@
 import React from 'react';
 import {
   LayoutDashboard, Globe, CheckSquare, Rocket, Upload,
-  Rss, History, X,
-  ShieldCheck, ChevronLeft, ChevronRight,
-  Plus, Search, Keyboard, Users, UserCircle2
+  Rss, History, SlidersHorizontal, ArrowUpRight, X,
+  Sun, Moon, ShieldCheck, Sparkles, ChevronLeft, ChevronRight,
+  Shield, Server, Activity, Plus, Search, Bell, Keyboard, Users, UserCircle2
 } from 'lucide-react';
 import { CyberDNSLogo } from './CyberDNSLogo';
 import { AppUser } from '../types';
@@ -24,23 +24,6 @@ interface SidebarProps {
   onOpenAddDomain?: () => void;
   onOpenShortcuts?: () => void;
   onOpenSearch?: () => void;
-}
-
-// Bootstrap `text-bg-*` badge variant per nav-item badge color — same
-// semantic mapping the Tailwind version used (green="Live" status, amber="review
-// queue" attention color, slate="neutral count").
-function badgeVariantClass(color: string | undefined, isActive: boolean): string {
-  if (isActive) return 'badge rounded-pill bg-primary-subtle text-primary';
-  switch (color) {
-    case 'emerald':
-      return 'badge rounded-pill text-bg-success';
-    case 'amber':
-      return 'badge rounded-pill text-bg-warning';
-    case 'rose':
-      return 'badge rounded-pill text-bg-danger';
-    default:
-      return 'badge rounded-pill text-bg-secondary';
-  }
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -82,7 +65,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ]
     },
     {
-      group: 'QUY TRÌNH & KIỂM DUYỆT',
+      group: 'QUY TRÌNH & DUYỆT',
       items: [
         { id: 'review', label: 'Hàng đợi duyệt', icon: CheckSquare, badge: reviewCount > 0 ? `${reviewCount}` : undefined, badgeColor: 'amber' },
         { id: 'release', label: 'Blocklist URL', icon: Rocket, badge: undefined, badgeColor: 'rose' },
@@ -90,7 +73,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ]
     },
     {
-      group: 'AUDIT & ACCOUNTS',
+      group: 'TÌNH BÁO & KIỂM TOÁN',
       items: [
         {
           id: 'sources',
@@ -114,23 +97,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <>
       {/* Mobile Backdrop Overlay */}
       {isMobileOpen && (
-        <div
+        <div 
           onClick={onCloseMobile}
-          className="d-md-none position-fixed top-0 start-0 end-0 bottom-0 bg-dark bg-opacity-75"
-          style={{ zIndex: 1039 }}
+          className="md:hidden fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-50 transition-opacity animate-in fade-in duration-200"
         />
       )}
 
       {/* Main Sidebar Container */}
-      <aside
-        className={`app-sidebar d-flex flex-column h-100 flex-shrink-0 ${isMobileOpen ? 'is-mobile-open' : ''} ${isCollapsed ? 'is-collapsed' : ''}`}
+      <aside 
+        className={`
+          bg-card border-r border-border 
+          flex flex-col h-full select-none flex-shrink-0 z-50
+          transition-all duration-300 ease-in-out
+          fixed md:relative top-0 bottom-0 left-0
+          ${isMobileOpen ? 'translate-x-0 w-64 shadow-2xl' : '-translate-x-full md:translate-x-0'}
+          ${isCollapsed ? 'md:w-[72px]' : 'md:w-[260px]'}
+        `}
       >
         {/* Brand Header with CyberDNS Logo */}
-        <div className={`app-sidebar-brand d-flex align-items-center px-3 ${isCollapsed ? 'justify-content-center' : 'justify-content-between'}`}>
-          <div
+        <div className={`h-16 px-4 flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} border-b border-slate-100 dark:border-slate-800/80`}>
+          <div 
             onClick={() => handleNavClick('dashboard')}
-            className="d-flex align-items-center gap-2 cursor-pointer"
-            style={{ cursor: 'pointer' }}
+            className="flex items-center gap-2.5 cursor-pointer group"
             title="CyberDNS Category Manager"
           >
             <CyberDNSLogo size={32} showText={!isCollapsed} glow={isDarkMode} />
@@ -139,54 +127,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {/* Close button for Mobile Drawer */}
           <button
             onClick={onCloseMobile}
-            className="app-header-icon-btn d-md-none"
+            className="md:hidden p-2 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
-            <X size={18} />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* User Profile Card — real signed-in account, or a neutral "signed
             out" state (this app has no Google/photo avatar anymore — see
             src/middleware/auth.ts, self-hosted email/password only). */}
-        <div className={`p-2 border-bottom ${isCollapsed ? 'd-flex justify-content-center' : ''}`}>
+        <div className={`p-3 border-b border-slate-100 dark:border-slate-800/80 ${isCollapsed ? 'flex justify-center' : ''}`}>
           {isCollapsed ? (
-            <div className="position-relative d-inline-block" title={currentUser ? `${currentUser.email} — ${userRole}` : 'Chưa đăng nhập'}>
-              <div
-                className="rounded-circle d-flex align-items-center justify-content-center text-white"
-                style={{ width: 40, height: 40, background: 'linear-gradient(135deg, var(--bs-primary), var(--bs-info))' }}
-              >
-                <UserCircle2 size={26} />
+            <div className="relative cursor-pointer group p-1" title={currentUser ? `${currentUser.email} — ${userRole}` : 'Chưa đăng nhập'}>
+              <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-600 flex items-center justify-center text-white shadow-sm overflow-hidden ring-2 ring-emerald-500/20 group-hover:ring-emerald-500">
+                <UserCircle2 className="w-7 h-7" />
               </div>
-              {currentUser && (
-                <span
-                  className="position-absolute bottom-0 end-0 rounded-circle bg-success border border-2 border-body"
-                  style={{ width: 12, height: 12 }}
-                />
-              )}
+              {currentUser && <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-green-500 ring-2 ring-white dark:ring-slate-900"></span>}
             </div>
           ) : (
-            <div className="bg-body-tertiary rounded-3 p-2 d-flex align-items-center justify-content-between">
-              <div className="d-flex align-items-center gap-2 min-w-0">
-                <div className="position-relative flex-shrink-0">
-                  <div
-                    className="rounded-circle d-flex align-items-center justify-content-center text-white"
-                    style={{ width: 32, height: 32, background: 'linear-gradient(135deg, var(--bs-primary), var(--bs-info))' }}
-                  >
-                    <UserCircle2 size={20} />
+            <div className="bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100/80 dark:hover:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60 rounded-2xl p-2.5 flex items-center justify-between transition-colors">
+              <div className="flex items-center space-x-2.5 min-w-0">
+                <div className="relative flex-shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-600 flex items-center justify-center text-white shadow-sm overflow-hidden ring-2 ring-emerald-500/20">
+                    <UserCircle2 className="w-5 h-5" />
                   </div>
-                  {currentUser && (
-                    <span
-                      className="position-absolute bottom-0 end-0 rounded-circle bg-success border border-2 border-body"
-                      style={{ width: 10, height: 10 }}
-                    />
-                  )}
+                  {currentUser && <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green-500 ring-2 ring-white dark:ring-slate-800"></span>}
                 </div>
-                <div className="text-truncate">
-                  <div className="fw-bold small text-truncate">
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
                     {currentUser ? currentUser.displayName || currentUser.email : 'Chưa đăng nhập'}
                   </div>
-                  <div className="text-body-secondary text-truncate d-flex align-items-center gap-1" style={{ fontSize: '0.75rem' }}>
-                    <span className={`rounded-circle ${currentUser ? 'bg-success' : 'bg-secondary'}`} style={{ width: 6, height: 6, display: 'inline-block' }} />
+                  <div className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate flex items-center space-x-1.5 mt-0.5">
+                    <span className={`w-1.5 h-1.5 rounded-full ${currentUser ? 'bg-green-500' : 'bg-slate-400'}`}></span>
                     <span>{currentUser ? userRole : 'Chỉ xem'}</span>
                   </div>
                 </div>
@@ -196,11 +168,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Navigation Links */}
-        <div className="flex-grow-1 overflow-y-auto py-3 px-2" style={{ fontSize: '0.8125rem' }}>
+        <div className="flex-1 overflow-y-auto py-3 px-2 space-y-4 text-xs font-medium scrollbar-thin">
           {navItems.map((sec, secIdx) => (
             <div key={secIdx}>
-              {!isCollapsed && <div className="app-nav-group-label">{sec.group}</div>}
-              <div className="d-flex flex-column gap-1">
+              {!isCollapsed && (
+                <div className="px-3 mb-1.5 mt-6 first:mt-0 text-[11px] font-bold text-slate-400 dark:text-slate-500 tracking-[.06em] uppercase">
+                  {sec.group}
+                </div>
+              )}
+              <div className="space-y-1">
                 {sec.items.map((item) => {
                   const Icon = item.icon;
                   const isActive = currentTab === item.id;
@@ -210,27 +186,50 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       key={item.id}
                       onClick={() => handleNavClick(item.id)}
                       title={isCollapsed ? item.label : undefined}
-                      className={`app-nav-link ${isActive ? 'is-active' : ''} ${isCollapsed ? 'justify-content-center' : 'justify-content-between'}`}
+                      className={`
+                        w-full flex items-center rounded-md transition-all cursor-pointer group relative min-h-11
+                        ${isCollapsed ? 'justify-center p-2.5' : 'justify-between px-3 py-2.5'}
+                        ${
+                          isActive
+                            ? 'bg-primary-soft text-primary font-semibold shadow-[inset_3px_0_0_var(--color-primary)]'
+                            : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/80 dark:hover:bg-slate-800/80'
+                        }
+                      `}
                     >
-                      <span className="d-flex align-items-center gap-2 min-w-0">
-                        <Icon size={18} />
-                        {!isCollapsed && <span className="text-truncate">{item.label}</span>}
-                      </span>
+                      <div className="flex items-center space-x-2.5 min-w-0">
+                        <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-primary' : 'text-slate-400 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200'}`} />
+                        {!isCollapsed && (
+                          <span className="truncate text-xs">{item.label}</span>
+                        )}
+                      </div>
 
                       {!isCollapsed && item.badge && (
-                        <span className={badgeVariantClass(item.badgeColor, isActive)}>{item.badge}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-md font-mono font-bold flex-shrink-0 ${
+                          isActive
+                            ? 'bg-primary/15 text-primary'
+                            : item.badgeColor === 'emerald'
+                            // 'Live' status badge — kept genuinely green (not
+                            // the new primary blue) for the same "positive
+                            // status, not a brand action" reasoning as
+                            // DomainTable's status dots.
+                            ? 'bg-green-50 dark:bg-green-950/60 text-green-600 dark:text-green-400 border border-green-200/60 dark:border-green-800/60'
+                            : item.badgeColor === 'amber'
+                            ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800/60 animate-pulse'
+                            : item.badgeColor === 'rose'
+                            ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200/60 dark:border-rose-800/60'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                        }`}>
+                          {item.badge}
+                        </span>
                       )}
 
                       {/* Small badge dot if collapsed */}
                       {isCollapsed && item.badge && (
-                        <span
-                          className={`position-absolute top-0 end-0 rounded-circle border border-2 border-body ${
-                            item.badgeColor === 'amber' ? 'bg-warning' :
-                            item.badgeColor === 'rose' ? 'bg-danger' :
-                            item.badgeColor === 'emerald' ? 'bg-success' : 'bg-secondary'
-                          }`}
-                          style={{ width: 8, height: 8 }}
-                        />
+                        <span className={`absolute top-1.5 right-1.5 w-2 h-2 rounded-full ring-2 ring-white dark:ring-slate-900 ${
+                          item.badgeColor === 'amber' ? 'bg-amber-500' :
+                          item.badgeColor === 'rose' ? 'bg-rose-500' :
+                          item.badgeColor === 'emerald' ? 'bg-green-500' : 'bg-slate-400'
+                        }`} />
                       )}
                     </button>
                   );
@@ -240,45 +239,62 @@ export const Sidebar: React.FC<SidebarProps> = ({
           ))}
 
           {/* Quick Actions / Controls */}
-          <div className="mt-4">
-            {!isCollapsed && <div className="app-nav-group-label">Công cụ điều khiển</div>}
-            <div className="d-flex flex-column gap-1">
+          <div className="mt-6">
+            {!isCollapsed && (
+              <div className="px-3 mb-1.5 text-xs font-bold text-slate-400 dark:text-slate-500 tracking-wider uppercase">
+                Công cụ điều khiển
+              </div>
+            )}
+            <div className="space-y-1">
               {/* Search */}
               <button
                 onClick={onOpenSearch}
-                title={isCollapsed ? 'Tìm kiếm...' : undefined}
-                className={`app-nav-link ${isCollapsed ? 'justify-content-center' : 'justify-content-between'}`}
+                title={isCollapsed ? "Tìm kiếm..." : undefined}
+                className={`
+                  w-full flex items-center rounded-xl transition-all cursor-pointer group relative text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/80 dark:hover:bg-slate-800/80
+                  ${isCollapsed ? 'justify-center p-2.5' : 'justify-between px-3 py-2'}
+                `}
               >
-                <span className="d-flex align-items-center gap-2 min-w-0">
-                  <Search size={16} />
-                  {!isCollapsed && <span className="text-truncate">Tìm kiếm...</span>}
-                </span>
-                {!isCollapsed && <kbd className="small">Ctrl K</kbd>}
+                <div className="flex items-center space-x-2.5 min-w-0">
+                  <Search className="w-4 h-4 flex-shrink-0 text-slate-400 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200" />
+                  {!isCollapsed && <span className="truncate text-xs">Tìm kiếm...</span>}
+                </div>
+                {!isCollapsed && (
+                  <span className="text-xs px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700 font-mono">
+                    Ctrl K
+                  </span>
+                )}
               </button>
 
               {/* Add Domain */}
               <button
                 onClick={onOpenAddDomain}
-                title={isCollapsed ? 'Thêm tên miền mới' : undefined}
-                className={`app-nav-link ${isCollapsed ? 'justify-content-center' : 'justify-content-between'}`}
+                title={isCollapsed ? "Thêm tên miền mới" : undefined}
+                className={`
+                  w-full flex items-center rounded-xl transition-all cursor-pointer group relative text-slate-600 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40
+                  ${isCollapsed ? 'justify-center p-2.5' : 'justify-between px-3 py-2'}
+                `}
               >
-                <span className="d-flex align-items-center gap-2 min-w-0">
-                  <Plus size={16} />
-                  {!isCollapsed && <span className="text-truncate">Thêm tên miền</span>}
-                </span>
+                <div className="flex items-center space-x-2.5 min-w-0">
+                  <Plus className="w-4 h-4 flex-shrink-0 text-slate-400 dark:text-slate-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-500" />
+                  {!isCollapsed && <span className="truncate text-xs">Thêm tên miền</span>}
+                </div>
               </button>
 
               {/* Shortcuts */}
               {onOpenShortcuts && (
                 <button
                   onClick={onOpenShortcuts}
-                  title={isCollapsed ? 'Phím tắt' : undefined}
-                  className={`app-nav-link ${isCollapsed ? 'justify-content-center' : 'justify-content-between'}`}
+                  title={isCollapsed ? "Phím tắt" : undefined}
+                  className={`
+                    w-full flex items-center rounded-xl transition-all cursor-pointer group relative text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/80 dark:hover:bg-slate-800/80
+                    ${isCollapsed ? 'justify-center p-2.5' : 'justify-between px-3 py-2'}
+                  `}
                 >
-                  <span className="d-flex align-items-center gap-2 min-w-0">
-                    <Keyboard size={16} />
-                    {!isCollapsed && <span className="text-truncate">Phím tắt</span>}
-                  </span>
+                  <div className="flex items-center space-x-2.5 min-w-0">
+                    <Keyboard className="w-4 h-4 flex-shrink-0 text-slate-400 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200" />
+                    {!isCollapsed && <span className="truncate text-xs">Phím tắt</span>}
+                  </div>
                 </button>
               )}
             </div>
@@ -291,16 +307,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
             network, so that was purely decorative/fabricated infrastructure
             copy and was removed rather than left implying a capability that
             doesn't exist.) */}
-        <div className="p-2 border-top">
-          {onToggleCollapse && (
-            <button
-              onClick={onToggleCollapse}
-              title={isCollapsed ? 'Mở rộng thanh điều hướng' : 'Thu gọn thanh điều hướng'}
-              className="btn btn-outline-secondary btn-sm w-100 d-none d-md-flex align-items-center justify-content-center"
-            >
-              {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-            </button>
-          )}
+        <div className="p-3 border-t border-slate-100 dark:border-slate-800/80 space-y-2">
+          {/* Desktop sidebar collapse toggle */}
+          <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-end'}`}>
+            {/* Desktop Collapse Button */}
+            {onToggleCollapse && (
+              <button
+                onClick={onToggleCollapse}
+                title={isCollapsed ? "Mở rộng thanh điều hướng" : "Thu gọn thanh điều hướng"}
+                className="hidden md:flex p-2 w-full justify-center text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl border border-slate-200/60 dark:border-slate-700/60 transition-colors cursor-pointer flex-shrink-0"
+              >
+                {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+              </button>
+            )}
+          </div>
         </div>
       </aside>
     </>
