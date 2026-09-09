@@ -40,10 +40,16 @@ export const CyberDNSLogo: React.FC<LogoProps> = ({
           glow ? 'drop-shadow-[0_0_12px_rgba(16,185,129,0.35)]' : ''
         }`}
       >
-        {/* Real logo artwork (public/logo_light.svg, public/logo_dark.svg)
+        {/* Real logo artwork (public/logo-light.png, public/logo-dark.png)
             replaces the earlier hand-drawn shield paths — same shield
             silhouette, now sourced from the actual brand asset instead of
-            an approximation of it. 'auto' stacks both and lets the same
+            an approximation of it. PNG, not the originally-provided SVGs
+            (which used a <mask>+feColorMatrix technique) — that combo is a
+            known cross-browser rendering gap specifically for SVGs loaded
+            via <img>/favicon ("image context", more restricted than an
+            inlined <svg>) and was in fact what broke the logo everywhere
+            it appears right after that switch; flattening to PNG removes
+            the whole risk category. 'auto' stacks both and lets the same
             ambient `.dark` class this file already keyed off of (see
             variant's own doc-comment) show/hide the right one via Tailwind
             `dark:` — no JS theme detection needed. 'light'/'dark' render
@@ -52,13 +58,13 @@ export const CyberDNSLogo: React.FC<LogoProps> = ({
         {isAuto ? (
           <>
             <img
-              src="/logo_light.svg"
+              src="/logo-light.png"
               alt="CyberDNS"
               draggable={false}
               className="w-full h-full object-contain transition-colors duration-200 dark:hidden"
             />
             <img
-              src="/logo_dark.svg"
+              src="/logo-dark.png"
               alt="CyberDNS"
               draggable={false}
               className="hidden w-full h-full object-contain transition-colors duration-200 dark:block"
@@ -66,7 +72,7 @@ export const CyberDNSLogo: React.FC<LogoProps> = ({
           </>
         ) : (
           <img
-            src={isForcedDark ? '/logo_dark.svg' : '/logo_light.svg'}
+            src={isForcedDark ? '/logo-dark.png' : '/logo-light.png'}
             alt="CyberDNS"
             draggable={false}
             className="w-full h-full object-contain"
