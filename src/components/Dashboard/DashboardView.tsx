@@ -708,10 +708,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
               <div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white font-sans">
-                  Phân Bổ Theo Trạng Thái Xử Lý
+                  Phân bố tên miền theo trạng thái xử lý
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Số lượng tên miền thật trong CyberDNSTIP-DB theo từng trạng thái (đang chặn, ân hạn, allowlist, đã thôi chặn...)
+                  Thống kê số lượng tên miền theo từng trạng thái xử lý trên nền tảng CyberDNS TI
                 </p>
               </div>
             </div>
@@ -739,11 +739,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white font-sans tracking-tight">
-                  Phân Bổ Danh Mục Nguy Cơ
+                  Phân bố tên miền theo danh mục (Category) bị chặn
                 </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 font-normal mt-0.5">
-                  Tỷ trọng {totalActiveDisplay} domain đang chặn (active)
-                </p>
               </div>
               <button 
                 onClick={() => setSelectedMetricModal('sources_coverage')}
@@ -861,24 +858,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100 dark:border-slate-800">
               <div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white font-sans">
-                  Mật Độ Tên Miền Theo Đuôi (TLD) & ASN
+                  Phân bố theo đuôi tên miền (TLD)
                 </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Tỷ trọng trong danh sách chặn hiện tại — không phải tỷ lệ độc hại tuyệt đối của toàn bộ đuôi tên miền
-                </p>
               </div>
             </div>
 
-            {/* TLD Bar Chart — real counts per TLD, one bar each, hover for
-                exact count + share (was a stacked list of horizontal
-                percentage bars). */}
+            {/* TLD Bar Chart — real counts per TLD (top 20 by blocked-domain
+                count), one bar each, hover for exact count + share (was a
+                stacked list of horizontal percentage bars). */}
             {tldBreakdownSource.length === 0 ? (
               <div className="py-6 text-center text-slate-400 dark:text-slate-500 text-xs">
                 {stats ? 'Chưa có dữ liệu TLD.' : 'Đang tải...'}
               </div>
             ) : (
-              <div className="h-64">
-                <canvas ref={tldCanvasRef} role="img" aria-label="Mật độ tên miền theo đuôi (TLD)" />
+              <div className="h-72">
+                <canvas ref={tldCanvasRef} role="img" aria-label="Phân bố theo đuôi tên miền (TLD)" />
               </div>
             )}
 
@@ -903,7 +897,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 DNS Blocklist URL
               </span>
               <span className="block text-xs text-slate-500 dark:text-slate-400">
-                Mỗi Category có 1 URL text thuần để Blocky (hoặc bộ chặn DNS khác) tải định kỳ
+                Mỗi Category có một URL riêng và được cập nhật định kỳ
               </span>
             </div>
           </div>

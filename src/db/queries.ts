@@ -459,13 +459,18 @@ export async function getDashboardStats() {
         ORDER BY count(*) DESC
         LIMIT 8
       `),
+      // Top 20 TLDs by blocked-domain count (per explicit request — was
+      // top 6) — still capped, not every TLD ever seen: with potentially
+      // hundreds of distinct TLDs across a large blocklist, the chart needs
+      // a bound, and the long tail past the top 20 is not meaningfully
+      // "high density" data anyway.
       db
         .select({ tld: domains.tld, count: sql<number>`count(*)` })
         .from(domains)
         .where(activeFilter)
         .groupBy(domains.tld)
         .orderBy(desc(sql`count(*)`))
-        .limit(6),
+        .limit(20),
       // Every status, not just 'active' — this is what backs the real
       // "Active / Allowlist / Đã thôi chặn" breakdown in the dashboard's
       // total-blocked detail modal (see MetricDetailModal.tsx).
