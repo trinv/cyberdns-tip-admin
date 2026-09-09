@@ -1,26 +1,46 @@
 # Reverse proxy CyberDNS TIP (listening on 127.0.0.1:3000, whether started
-# via Docker Compose or the native systemd service) behind Nginx, so you can
-# put a real domain + free HTTPS (Let's Encrypt) in front of it instead of
-# exposing the raw app port.
+# via Docker Compose or the native systemd service) — and, on this
+# deployment, a second local service (Uptime Kuma) on its own subdomain —
+# behind Nginx, so real domains + free HTTPS (Let's Encrypt) sit in front
+# instead of exposing raw app ports.
 #
-# For tipadmin.cyberdns.vn specifically, prefer the automated script
-# instead of following this file by hand — it does everything below plus
-# firewall hardening: deploy/setup-domain-ssl.sh. Keep this file as a manual
-# reference, or for a different domain.
+# Prefer the automated script over following this file by hand — it does
+# everything below (both vhosts, the shared WebSocket-upgrade map, SSL,
+# firewall hardening) in one command per domain:
+#   ./deploy/setup-domain-ssl.sh tip.cyberdns.vn 3000 cyberdns-tip
+#   ./deploy/setup-domain-ssl.sh uptime.cyberdns.vn 18080 uptime-kuma
+# Keep this file as a manual reference, or for a domain/service the script
+# doesn't cover.
 #
-# Install:
+# Install (repeat per vhost):
 #   sudo cp deploy/nginx.conf.example /etc/nginx/sites-available/cyberdns-tip
-#   # edit server_name below to your real domain first
+#   # edit server_name/proxy_pass below for your real domain/port first
 #   sudo ln -s /etc/nginx/sites-available/cyberdns-tip /etc/nginx/sites-enabled/
 #   sudo nginx -t && sudo systemctl reload nginx
 #
-# Then add HTTPS with Certbot (free, auto-renewing):
+# Then add HTTPS with Certbot (free, auto-renewing), once per domain:
 #   sudo apt-get install -y certbot python3-certbot-nginx
 #   sudo certbot --nginx -d your-domain.example
 
+# Shared WebSocket-upgrade map — belongs in the `http` block, so put this
+# part in its own file under /etc/nginx/conf.d/ (included there by the
+# stock Debian/Ubuntu nginx package), NOT inside either server{} below.
+# $connection_upgrade only becomes "upgrade" when the client's own request
+# actually asked for it (e.g. Uptime Kuma's Socket.IO handshake) — a no-op
+# for plain HTTP/REST traffic like the TIP app's own requests.
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
+# ---- Vhost 1: tip.cyberdns.vn — CyberDNS TIP admin portal, also serves the
+# public /v1/blocklist/:category.txt URLs Blocky polls (same app/port, no
+# separate routing needed — see server.ts). ----
 server {
     listen 80;
-    server_name your-domain.example;
+    server_name tip.cyberdns.vn;
+
+    client_max_body_size 25m;
 
     location / {
         proxy_pass http://127.0.0.1:3000;
@@ -29,11 +49,37 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
         # Default (60s) can be shorter than a slow query legitimately takes
         # under heavy write load (e.g. mid-checkpoint on a VPS with slow
         # disk I/O — see .env.example's PG_MAX_WAL_SIZE) — a request that's
         # still genuinely running shouldn't get cut off and reported to the
         # user as a failure.
+        proxy_read_timeout 120s;
+    }
+}
+
+# ---- Vhost 2: uptime.cyberdns.vn — Uptime Kuma, running in its own
+# separate container on this VPS, host-mapped to 127.0.0.1:18080 (bind it
+# to 127.0.0.1 specifically, not 0.0.0.0 — the same "never reachable
+# directly from the internet, only through Nginx" reasoning docker-
+# compose.yml already applies to the TIP app's own port). Real-time status
+# updates need the WebSocket upgrade headers above — without them the
+# dashboard loads but live updates silently don't work. ----
+server {
+    listen 80;
+    server_name uptime.cyberdns.vn;
+
+    location / {
+        proxy_pass http://127.0.0.1:18080;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
         proxy_read_timeout 120s;
     }
 }

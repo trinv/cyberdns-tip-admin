@@ -68,17 +68,22 @@ sudo journalctl -u cyberdns-tip -f
 
 ## Đưa ra domain thật / HTTPS
 
-Cả hai cách cài đặt trên đều chạy app ở cổng `3000`, chỉ lắng nghe trên `127.0.0.1` (không lộ ra ngoài Internet trực tiếp — xem chú thích trong `docker-compose.yml`). Để gắn domain thật (`tipadmin.cyberdns.vn`) + HTTPS miễn phí (Let's Encrypt) + tường lửa, chạy 1 lệnh:
+Cả hai cách cài đặt trên đều chạy app ở cổng `3000`, chỉ lắng nghe trên `127.0.0.1` (không lộ ra ngoài Internet trực tiếp — xem chú thích trong `docker-compose.yml`). Để gắn domain thật + HTTPS miễn phí (Let's Encrypt) + tường lửa, chạy 1 lệnh cho mỗi domain (script nhận `<domain> [port] [tên-site]`, dùng chung cho cả TIP lẫn bất kỳ service local nào khác — có sẵn hỗ trợ WebSocket upgrade nên cũng dùng được cho Uptime Kuma):
 
 ```bash
-# DNS: trỏ A record của tipadmin.cyberdns.vn về đúng IP public của VPS trước
 chmod +x deploy/setup-domain-ssl.sh
-./deploy/setup-domain-ssl.sh tipadmin.cyberdns.vn
+
+# DNS: trỏ A record của tip.cyberdns.vn về đúng IP public của VPS trước
+./deploy/setup-domain-ssl.sh tip.cyberdns.vn 3000 cyberdns-tip
+
+# Nếu có chạy Uptime Kuma ở container riêng (host-map ra 127.0.0.1:18080) —
+# trỏ A record của uptime.cyberdns.vn về VPS trước, rồi:
+./deploy/setup-domain-ssl.sh uptime.cyberdns.vn 18080 uptime-kuma
 ```
 
-Script này cài Nginx + Certbot (nếu chưa có), tạo vhost reverse-proxy, mở `ufw` chỉ cho 22/80/443 (chặn truy cập trực tiếp vào cổng 3000 từ Internet — quan trọng để nhật ký đăng nhập ghi đúng IP thật, không bị giả mạo), và xin chứng chỉ SSL tự động gia hạn. Sau khi chạy xong, truy cập `https://tipadmin.cyberdns.vn`.
+Script này cài Nginx + Certbot (nếu chưa có), tạo vhost reverse-proxy, mở `ufw` chỉ cho 22/80/443 (chặn truy cập trực tiếp vào cổng app từ Internet — quan trọng để nhật ký đăng nhập ghi đúng IP thật, không bị giả mạo), và xin chứng chỉ SSL tự động gia hạn cho từng domain. Sau khi chạy xong, truy cập `https://tip.cyberdns.vn` (và `https://uptime.cyberdns.vn` nếu có chạy).
 
-Muốn tự cấu hình thủ công hoặc dùng domain khác, xem `deploy/nginx.conf.example`.
+Muốn tự cấu hình thủ công hoặc dùng domain khác, xem `deploy/nginx.conf.example` (có sẵn cả 2 vhost mẫu ở trên làm tham khảo).
 
 ## Biến môi trường
 
