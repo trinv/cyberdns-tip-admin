@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { AuditLog } from '../../types';
-import { 
-  RotateCcw, History, CheckCircle2, User, Clock, 
+import {
+  History, CheckCircle2, User, Clock,
   ShieldAlert, Database, Search, FileText, Sparkles
 } from 'lucide-react';
 
@@ -23,20 +23,8 @@ function getInitials(user: string): string {
   return namePart.slice(0, 2).toUpperCase();
 }
 
-export const AuditLogsView: React.FC<AuditLogsViewProps> = ({ logs, onRollbackTransaction }) => {
+export const AuditLogsView: React.FC<AuditLogsViewProps> = ({ logs }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  // Tracks which single row's rollback is in flight — id-keyed so only that
-  // row's button shows "Đang xử lý...", the rest of the table stays usable.
-  const [rollingBackId, setRollingBackId] = useState<string | null>(null);
-
-  const handleRollbackClick = async (log: AuditLog) => {
-    setRollingBackId(log.id);
-    try {
-      await onRollbackTransaction(log);
-    } finally {
-      setRollingBackId(null);
-    }
-  };
 
   const filteredLogs = logs.filter((l) =>
     l.summary.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -99,40 +87,8 @@ export const AuditLogsView: React.FC<AuditLogsViewProps> = ({ logs, onRollbackTr
                     <div className="font-semibold text-xs">{log.summary}</div>
                   </td>
 
-                  <td className="px-5 py-3.5 text-emerald-600 dark:text-emerald-400 font-bold text-xs">
-                    {log.targetCount.toLocaleString('vi-VN')} domain
-                  </td>
-
                   <td className="px-5 py-3.5 font-sans text-slate-500 dark:text-slate-400 max-w-xs truncate text-xs" title={log.reason}>
                     {log.reason}
-                  </td>
-
-                  <td className="px-5 py-3.5 text-right">
-                    {(() => {
-                      const expiresAt = log.rollbackExpiresAt ? new Date(log.rollbackExpiresAt).getTime() : null;
-                      const hoursLeft = expiresAt ? Math.max(0, Math.round((expiresAt - Date.now()) / 3600000)) : null;
-                      const isExpired = hoursLeft !== null && hoursLeft <= 0;
-                      // hasRollbackData === false: canRollback is true but no
-                      // structured "before" state was captured for this entry
-                      // (logged before this feature existed, or a feed-sync
-                      // bulk add — too large to snapshot cheaply, see
-                      // rollbackAuditLog). Treated the same as !canRollback
-                      // rather than showing a button that would just error.
-                      if (!log.canRollback || isExpired || log.hasRollbackData === false) {
-                        return <span className="text-slate-300 dark:text-slate-600 text-xs">—</span>;
-                      }
-                      const isRollingBack = rollingBackId === log.id;
-                      return (
-                        <button
-                          onClick={() => handleRollbackClick(log)}
-                          disabled={isRollingBack}
-                          className="px-3.5 py-1.5 bg-amber-50 dark:bg-amber-950/60 hover:bg-amber-100 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-xl text-xs font-bold flex items-center space-x-1 ml-auto cursor-pointer transition-colors shadow-xs active-press disabled:opacity-60 disabled:cursor-not-allowed"
-                        >
-                          <RotateCcw className={`w-3.5 h-3.5 ${isRollingBack ? 'animate-spin' : ''}`} />
-                          <span>{isRollingBack ? 'Đang hoàn tác...' : `Hoàn tác${hoursLeft !== null ? ` (còn ${hoursLeft}h)` : ''}`}</span>
-                        </button>
-                      );
-                    })()}
                   </td>
                 </tr>
               ))}
