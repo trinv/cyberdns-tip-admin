@@ -304,7 +304,11 @@ export const DnsNodesView: React.FC = () => {
       {/* Map */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-5 shadow-xs transition-colors">
         <h2 className="text-sm font-bold text-slate-900 dark:text-white font-sans mb-3">CyberDNS Pop MAP</h2>
-        <DnsNodeStatusMap nodes={nodes} />
+        {/* Lớn hơn bản sao trên Dashboard (h-[420px] cố định) — trang này
+            dành riêng cho việc xem bản đồ nên có nhiều không gian hơn để
+            dùng, mặc định 600px ở màn hình lớn (lg+), tự thu nhỏ dần trên
+            màn hình hẹp/mobile để không chiếm quá nhiều chỗ cuộn trang. */}
+        <DnsNodeStatusMap nodes={nodes} heightClassName="h-[420px] sm:h-[520px] lg:h-[600px]" />
         {nodes.every((n) => n.latitude == null || n.longitude == null) && nodes.length > 0 && (
           <p className="text-slate-400 dark:text-slate-500 mt-2">
             Chưa có node nào được nhập toạ độ — thêm vĩ độ/kinh độ khi sửa node để ghim lên bản đồ.

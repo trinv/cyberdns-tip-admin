@@ -4,6 +4,13 @@ import { DnsNode } from '../../types';
 
 interface DnsNodeStatusMapProps {
   nodes: DnsNode[];
+  // Tailwind height classes for the map's container — each caller picks
+  // what fits its own layout (e.g. DnsNodesView.tsx's full-page map vs.
+  // Dashboard/DnsNodeStatusCard.tsx's compact card copy), rather than one
+  // fixed size forced on every caller. Defaults to the Dashboard's own
+  // single-fixed-height convention (see DnsNodeStatusMap's own note below)
+  // so a caller that doesn't care can just omit this prop.
+  heightClassName?: string;
 }
 
 // Shared, presentational map view for CyberDNS's DNS resolver fleet — used
@@ -24,7 +31,7 @@ interface DnsNodeStatusMapProps {
 // DOM); MapLibre's own controls don't exhibit that bug, but there's no
 // downside to keeping the container's stacking self-contained regardless
 // of which map library renders inside it.
-export const DnsNodeStatusMap: React.FC<DnsNodeStatusMapProps> = ({ nodes }) => {
+export const DnsNodeStatusMap: React.FC<DnsNodeStatusMapProps> = ({ nodes, heightClassName = 'h-[420px]' }) => {
   const mapRef = useRef<MapRef>(null);
 
   const pinnedNodes = useMemo(
@@ -67,7 +74,7 @@ export const DnsNodeStatusMap: React.FC<DnsNodeStatusMapProps> = ({ nodes }) => 
   }, [pinnedNodes]);
 
   return (
-    <div className="w-full h-[420px] isolate rounded-xl overflow-hidden border border-slate-100 dark:border-slate-800">
+    <div className={`w-full ${heightClassName} isolate rounded-xl overflow-hidden border border-slate-100 dark:border-slate-800`}>
       <Map
         ref={mapRef}
         center={[106.0, 16.0]} // [lng, lat] — initial placement only, roughly Việt Nam; the effects above take over immediately
