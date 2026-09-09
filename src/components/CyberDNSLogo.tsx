@@ -36,11 +36,6 @@ export const CyberDNSLogo: React.FC<LogoProps> = ({
   const markFill = isAuto ? undefined : isForcedDark ? '#ffffff' : '#128e6f';
 
   const cyberTextClass = isAuto ? 'text-foreground' : isForcedDark ? 'text-white' : 'text-slate-900';
-  const badgeClass = isAuto
-    ? 'bg-emerald-50 dark:bg-emerald-950/60 text-[#0f8564] dark:text-emerald-300 border-emerald-200/60 dark:border-emerald-800/60'
-    : isForcedDark
-    ? 'bg-emerald-950/60 text-emerald-300 border-emerald-800/60'
-    : 'bg-emerald-50 text-[#0f8564] border-emerald-200/60';
   const subtitleClass = isAuto ? 'text-slate-500 dark:text-slate-400' : isForcedDark ? 'text-slate-400' : 'text-slate-500';
 
   return (
@@ -116,9 +111,6 @@ export const CyberDNSLogo: React.FC<LogoProps> = ({
                 it must read the same everywhere. */}
             <span className={`font-bold tracking-tight transition-colors ${cyberTextClass} ${textClassName || 'text-lg'}`}>
               Cyber<span style={{ color: '#059669' }}>DNS</span>
-            </span>
-            <span className={`text-xs font-bold px-1.5 py-0.5 rounded border font-mono ${badgeClass}`}>
-              TIP v4.0
             </span>
           </div>
           <span className={`text-xs font-medium tracking-wide mt-0.5 ${subtitleClass}`}>
