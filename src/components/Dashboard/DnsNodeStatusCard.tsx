@@ -34,7 +34,7 @@ export const DnsNodeStatusCard: React.FC = () => {
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xs transition-colors">
-      <h3 className="text-base font-bold text-slate-900 dark:text-white font-sans mb-3">Bản đồ vị trí & trạng thái node</h3>
+      <h3 className="text-base font-bold text-slate-900 dark:text-white font-sans mb-3">CyberDNS Pop MAP</h3>
       {nodes === null ? (
         <div className="h-[320px] sm:h-[400px] lg:h-[460px] flex items-center justify-center text-xs text-slate-400 dark:text-slate-500">
           Đang tải...

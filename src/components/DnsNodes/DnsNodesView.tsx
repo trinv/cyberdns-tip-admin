@@ -303,7 +303,7 @@ export const DnsNodesView: React.FC = () => {
 
       {/* Map */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-5 shadow-xs transition-colors">
-        <h2 className="text-sm font-bold text-slate-900 dark:text-white font-sans mb-3">Bản đồ vị trí & trạng thái node</h2>
+        <h2 className="text-sm font-bold text-slate-900 dark:text-white font-sans mb-3">CyberDNS Pop MAP</h2>
         <DnsNodeStatusMap nodes={nodes} />
         {nodes.every((n) => n.latitude == null || n.longitude == null) && nodes.length > 0 && (
           <p className="text-slate-400 dark:text-slate-500 mt-2">

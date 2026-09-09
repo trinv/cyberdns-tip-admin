@@ -67,7 +67,7 @@ export const DnsNodeStatusMap: React.FC<DnsNodeStatusMapProps> = ({ nodes }) => 
   }, [pinnedNodes]);
 
   return (
-    <div className="w-full h-[320px] sm:h-[400px] lg:h-[460px] isolate rounded-xl overflow-hidden border border-slate-100 dark:border-slate-800">
+    <div className="w-full h-[420px] isolate rounded-xl overflow-hidden border border-slate-100 dark:border-slate-800">
       <Map
         ref={mapRef}
         center={[106.0, 16.0]} // [lng, lat] — initial placement only, roughly Việt Nam; the effects above take over immediately
