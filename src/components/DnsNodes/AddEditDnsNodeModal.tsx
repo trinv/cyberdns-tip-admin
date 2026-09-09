@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import * as L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import { Map, MapMarker, MarkerContent, type MapRef } from '@/components/ui/map';
 import { X, Loader2 } from 'lucide-react';
 import { DnsNode, GeoCountry, GeoProvince } from '../../types';
 import { fetchGeoCountries, fetchGeoProvinces } from '../../lib/api';
@@ -107,58 +106,24 @@ export const AddEditDnsNodeModal: React.FC<AddEditDnsNodeModalProps> = ({
     setLongitude(String(province.longitude));
   };
 
-  // ---- Preview map (Leaflet + OpenStreetMap, free, no API key) — shows
-  // exactly where the currently entered lat/lng points to, live. ----
-  const previewMapContainerRef = useRef<HTMLDivElement>(null);
-  const previewMapRef = useRef<L.Map | null>(null);
-  const previewMarkerRef = useRef<L.Marker | null>(null);
+  // ---- Preview map (mapcn's <Map>, src/components/ui/map.tsx — free
+  // OpenStreetMap tiles, no API key) — shows exactly where the currently
+  // entered lat/lng points to, live. ----
+  const previewMapRef = useRef<MapRef>(null);
 
   const previewLat = latitude.trim() ? Number(latitude) : null;
   const previewLng = longitude.trim() ? Number(longitude) : null;
   const hasValidPreview =
     previewLat != null && previewLng != null && Number.isFinite(previewLat) && Number.isFinite(previewLng);
 
-  // Tied to `isOpen` (not `[]`) and always returns its own cleanup — since
-  // this component never truly unmounts between opens (see the sync effect
-  // above), a mount-once effect would create the map on the FIRST open, but
-  // `map.remove()` would never run on close (the container div itself gets
-  // removed from the DOM when this returns null below, without React ever
-  // unmounting the component to trigger effect cleanup) — leaving `mapRef`
-  // pointing at a dead map and the container empty on every reopen after
-  // the first. Re-running per `isOpen` toggle creates a fresh map bound to
-  // the freshly-mounted container on every open, and cleanly tears it down
-  // on every close.
+  // <Map>'s `center`/`zoom` props only set the INITIAL camera at mount —
+  // correct for the very first render of a given coordinate, but the map
+  // stays mounted (same JSX position) across switching between two
+  // DIFFERENT valid provinces while the modal is still open, so this
+  // effect flies the already-mounted map to each new point reactively.
   useEffect(() => {
-    if (!isOpen || !previewMapContainerRef.current) return;
-    const map = L.map(previewMapContainerRef.current, {
-      center: [16.0, 106.0],
-      zoom: 3,
-      zoomControl: false,
-      scrollWheelZoom: false,
-      attributionControl: false,
-    });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
-    previewMapRef.current = map;
-    return () => {
-      map.remove();
-      previewMapRef.current = null;
-      previewMarkerRef.current = null;
-    };
-  }, [isOpen]);
-
-  useEffect(() => {
-    const map = previewMapRef.current;
-    if (!map) return;
-    if (previewMarkerRef.current) {
-      previewMarkerRef.current.remove();
-      previewMarkerRef.current = null;
-    }
-    if (hasValidPreview) {
-      previewMarkerRef.current = L.marker([previewLat!, previewLng!]).addTo(map);
-      map.setView([previewLat!, previewLng!], 9);
-    } else {
-      map.setView([16.0, 106.0], 3);
-    }
+    if (!previewMapRef.current || !hasValidPreview) return;
+    previewMapRef.current.flyTo({ center: [previewLng!, previewLat!], zoom: 9, duration: 400 });
   }, [hasValidPreview, previewLat, previewLng]);
 
   if (!isOpen) return null;
@@ -338,8 +303,24 @@ export const AddEditDnsNodeModal: React.FC<AddEditDnsNodeModalProps> = ({
               </p>
             )}
 
-            <div ref={previewMapContainerRef} className="w-full h-36 rounded-xl overflow-hidden border border-slate-100 dark:border-slate-800 isolate mt-2" />
-            {!hasValidPreview && (
+            {hasValidPreview ? (
+              <div className="w-full h-36 rounded-xl overflow-hidden border border-slate-100 dark:border-slate-800 isolate mt-2">
+                <Map
+                  ref={previewMapRef}
+                  center={[previewLng!, previewLat!]}
+                  zoom={9}
+                  scrollZoom={false}
+                  dragRotate={false}
+                  pitchWithRotate={false}
+                >
+                  <MapMarker longitude={previewLng!} latitude={previewLat!}>
+                    <MarkerContent>
+                      <span className="block w-3.5 h-3.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-900 shadow" />
+                    </MarkerContent>
+                  </MapMarker>
+                </Map>
+              </div>
+            ) : (
               <p className="text-slate-400 dark:text-slate-500">Chọn Quốc gia và Tỉnh/Thành phố để hiển thị chính xác vị trí trên bản đồ.</p>
             )}
           </div>

@@ -340,6 +340,34 @@
   }
 }
 
+/* mapcn's <Map> component (src/components/ui/map.tsx) — themes MapLibre's
+   own popup/attribution chrome with this app's existing surface tokens
+   (bg-background/text-muted-foreground/border-border already resolve
+   through the @theme inline block above) instead of MapLibre's stock
+   white-box styling, and hides the popup's default arrow/shadow/padding so
+   MarkerPopup/MarkerTooltip's own themed content renders cleanly. Verbatim
+   from the mapcn registry's own required CSS for this component. */
+@layer base {
+  .maplibregl-popup-content {
+    @apply rounded-none! bg-transparent! p-0! shadow-none!;
+  }
+  .maplibregl-popup-tip {
+    @apply hidden!;
+  }
+  .maplibregl-ctrl-attrib {
+    @apply bg-background! text-muted-foreground! border-border! rounded-md! border! shadow-sm!;
+  }
+  .maplibregl-ctrl-attrib a {
+    @apply text-muted-foreground!;
+  }
+  .maplibregl-ctrl-attrib a:hover {
+    @apply text-foreground!;
+  }
+  .maplibregl-ctrl-attrib-button {
+    @apply bg-transparent! dark:invert;
+  }
+}
+
 /* Readable console scale: promote tiny utility text without changing
    the visual hierarchy of headings, metrics, or technical code. */
 .text-xs {

@@ -8,7 +8,12 @@ export default defineConfig(() => {
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
+        // Points at src/ (the shadcn/Next.js convention) rather than the repo
+        // root — matches components.json's aliases below, needed for the
+        // vendored mapcn map component's own `@/lib/utils`/`@/components/ui/*`
+        // imports to resolve. Safe: nothing in this codebase used the `@`
+        // alias before this (verified — every existing import is relative).
+        '@': path.resolve(__dirname, 'src'),
       },
     },
     server: {
