@@ -21,15 +21,21 @@ import { createPortal } from "react-dom";
 import { X, Minus, Plus, Locate, Maximize, Loader2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-// `?url` makes Vite bundle this as a static asset and hand back its final
-// served URL — self-hosts the worker instead of the upstream component's
-// default of fetching it from unpkg.com at runtime on every page load
-// (removes a real external-CDN runtime dependency; works identically in
-// dev and production, since Vite resolves/hashes `?url` imports either way).
-import mapLibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
 
+// Self-hosts the worker instead of the upstream component's default of
+// fetching it from unpkg.com at runtime on every page load (removes a real
+// external-CDN runtime dependency). Points at a plain static path under
+// public/ (see scripts/copy-maplibre-worker.mjs, wired into the `dev`/
+// `build` npm scripts) — NOT a Vite `?url` import: this worker script has
+// its own `import ... from "./maplibre-gl-shared.mjs"` (a ~490KB sibling
+// chunk), and `?url` only copies the one file you import, not that file's
+// own internal imports. The prior `?url`-only version silently produced a
+// worker that 404s on its own dependency the moment the browser tries to
+// run it, so the map hung forever on the loading spinner — this is why
+// both files need to be served from the SAME directory, with their
+// relative import between them intact.
 if (typeof window !== "undefined" && !MapLibreGL.getWorkerUrl()) {
-  MapLibreGL.setWorkerUrl(mapLibreWorkerUrl);
+  MapLibreGL.setWorkerUrl("/maplibre-gl/maplibre-gl-worker.mjs");
 }
 
 // CyberDNS TIP fork note: the upstream mapcn component defaults to CARTO's

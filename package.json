@@ -8,8 +8,8 @@
     "node": ">=20"
   },
   "scripts": {
-    "dev": "tsx server.ts",
-    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "dev": "node scripts/copy-maplibre-worker.mjs && tsx server.ts",
+    "build": "node scripts/copy-maplibre-worker.mjs && vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
     "db:push": "drizzle-kit push --config=src/db/drizzle.config.ts",
     "preview": "vite preview",
