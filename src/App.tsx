@@ -1035,6 +1035,7 @@ export default function App() {
               categories={categories}
               reviewItems={reviewItems}
               stats={dashboardStats}
+              isAdmin={userRole === 'Admin'}
               onOpenReleaseAlert={() => setCurrentTab('release')}
               onOpenCrawlerAlert={() => setCurrentTab('sources')}
               onOpenAllowlistAlert={() => {

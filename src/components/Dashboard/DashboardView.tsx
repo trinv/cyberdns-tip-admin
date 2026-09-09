@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, lazy, Suspense } from 'react';
 // Only the pieces this file's charts actually need — 'chart.js/auto'
 // registers every controller/scale/element Chart.js ships (radar, polar,
 // etc.), which would bloat the bundle for chart types this Dashboard never
@@ -27,6 +27,19 @@ import { FeedSource, CategoryInfo, DashboardStats, ReviewDomainItem } from '../.
 import { MetricDetailModal, MetricType } from './MetricDetailModal';
 import { copyToClipboard } from '../../lib/clipboard';
 import { buildBlocklistUrl } from '../../lib/blocklistUrl';
+
+// Lazy-loaded, not a static import: DnsNodeStatusCard pulls in mapcn's
+// <Map> (src/components/ui/map.tsx), which drags in MapLibre GL — a
+// ~900KB+ dependency. Dashboard is the very first screen after login for
+// EVERY user, so bundling that statically here would reintroduce exactly
+// the "load khá chậm" bundle-bloat problem already fixed for the DNS Node
+// tab itself (see App.tsx's own lazy-loaded DnsNodesView). Only actually
+// rendered (and therefore only actually dynamically imported) when
+// `isAdmin` is true below — a non-Admin viewing their Dashboard never
+// triggers this import at all, not even to find out the card would 401/403.
+const DnsNodeStatusCard = lazy(() =>
+  import('./DnsNodeStatusCard').then((m) => ({ default: m.DnsNodeStatusCard }))
+);
 
 // Chart.js draws onto a <canvas> once, at creation time — unlike CSS, it
 // has no way to react to a CSS variable changing on its own, so a chart
@@ -59,6 +72,10 @@ interface DashboardViewProps {
   onOpenReleaseAlert: () => void;
   onOpenCrawlerAlert: () => void;
   onOpenAllowlistAlert: () => void;
+  // Gates the DNS Node status map card below — GET /api/dns-nodes is
+  // Admin-only server-side (see server.ts), so there's nothing for a
+  // non-Admin to see here. Defaults to false rather than assuming access.
+  isAdmin?: boolean;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -70,6 +87,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenReleaseAlert,
   onOpenCrawlerAlert,
   onOpenAllowlistAlert,
+  isAdmin = false,
 }) => {
   const reviewCount = reviewItems.length;
   // Declared once, up top: every chart effect in this file (status, growth,
@@ -846,6 +864,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* DNS Node status map — read-only copy of DnsNodesView.tsx's own
+          card, Admin-only (see isAdmin prop's own note above). */}
+      {isAdmin && (
+        <Suspense
+          fallback={
+            <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xs text-xs text-slate-400 dark:text-slate-500">
+              Đang tải...
+            </div>
+          }
+        >
+          <DnsNodeStatusCard />
+        </Suspense>
+      )}
 
       {/* Row 3: High-Risk TLD & ASNs (real data only — the brand-impersonation
           panel that used to sit alongside this was 100% fabricated with no

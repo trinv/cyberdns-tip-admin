@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Map, MapControls, MapMarker, MarkerContent, MarkerTooltip, type MapRef } from '@/components/ui/map';
+import React, { useCallback, useEffect, useState } from 'react';
+import { DnsNodeStatusMap } from './DnsNodeStatusMap';
 import { DnsNode, BlocklistAclSettings, BlocklistUnknownRequester } from '../../types';
 import {
   fetchDnsNodes,
@@ -81,40 +81,6 @@ export const DnsNodesView: React.FC = () => {
   useEffect(() => {
     load();
   }, [load]);
-
-  // ---- MapLibre GL (mapcn's <Map> — src/components/ui/map.tsx, vendored
-  // from https://mapcn.dev, using its default CARTO basemap styles — see
-  // that file's own fork note for the license terms to be aware of). The
-  // container below is wrapped in Tailwind's
-  // `isolate` (CSS `isolation: isolate`) as defense-in-depth — the same fix
-  // that resolved a real bug the earlier Leaflet map had here (its internal
-  // control panes' high z-index painting over the Add/Edit modal despite
-  // being earlier in the DOM); MapLibre's own controls don't exhibit that
-  // bug, but there's no downside to keeping the container's stacking
-  // self-contained regardless of which map library renders inside it. ----
-  const mapRef = useRef<MapRef>(null);
-
-  const pinnedNodes = useMemo(
-    () => nodes.filter((n): n is DnsNode & { latitude: number; longitude: number } => n.latitude != null && n.longitude != null),
-    [nodes]
-  );
-
-  // Fit the viewport to every pinned node once there are any (mirrors the
-  // previous Leaflet map's own fitBounds behavior) — MapLibre's `center`/
-  // bounds coordinates are [longitude, latitude], the opposite order from
-  // Leaflet's [lat, lng].
-  useEffect(() => {
-    if (!mapRef.current || pinnedNodes.length === 0) return;
-    const lngs = pinnedNodes.map((n) => n.longitude);
-    const lats = pinnedNodes.map((n) => n.latitude);
-    mapRef.current.fitBounds(
-      [
-        [Math.min(...lngs), Math.min(...lats)],
-        [Math.max(...lngs), Math.max(...lats)],
-      ],
-      { padding: 48, maxZoom: 10, duration: 400 }
-    );
-  }, [pinnedNodes]);
 
   // ---- Mutations ----
   const handleSaveNode = async (data: Partial<DnsNode>) => {
@@ -338,41 +304,7 @@ export const DnsNodesView: React.FC = () => {
       {/* Map */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-5 shadow-xs transition-colors">
         <h2 className="text-sm font-bold text-slate-900 dark:text-white font-sans mb-3">Bản đồ vị trí & trạng thái node</h2>
-        <div className="w-full h-[420px] sm:h-[520px] lg:h-[600px] isolate rounded-xl overflow-hidden border border-slate-100 dark:border-slate-800">
-          <Map
-            ref={mapRef}
-            center={[106.0, 16.0]} // [lng, lat] — roughly centered on Việt Nam by default
-            zoom={2} // Whole-world view by default — fitBounds above zooms in once there are real pinned nodes
-            minZoom={2}
-            scrollZoom={false}
-            dragRotate={false}
-            pitchWithRotate={false}
-          >
-            <MapControls />
-            {pinnedNodes.map((n) => (
-              <MapMarker key={n.id} longitude={n.longitude} latitude={n.latitude}>
-                <MarkerContent>
-                  <span
-                    className={`block w-3.5 h-3.5 rounded-full ring-2 ring-white dark:ring-slate-900 shadow cursor-pointer transition-transform hover:scale-125 ${
-                      n.status === 'active' ? 'bg-emerald-500' : 'bg-slate-400'
-                    }`}
-                  />
-                </MarkerContent>
-                <MarkerTooltip
-                  offset={10}
-                  className="bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 shadow-lg font-sans"
-                >
-                  <div className="font-bold">{n.name}</div>
-                  <div className="text-slate-500 dark:text-slate-400">
-                    {n.tier} · {n.status === 'active' ? 'Active' : 'Inactive'}
-                  </div>
-                  <div className="font-mono text-slate-500 dark:text-slate-400">{n.ipAddress}</div>
-                  {n.location && <div className="text-slate-400 dark:text-slate-500">{n.location}</div>}
-                </MarkerTooltip>
-              </MapMarker>
-            ))}
-          </Map>
-        </div>
+        <DnsNodeStatusMap nodes={nodes} />
         {nodes.every((n) => n.latitude == null || n.longitude == null) && nodes.length > 0 && (
           <p className="text-slate-400 dark:text-slate-500 mt-2">
             Chưa có node nào được nhập toạ độ — thêm vĩ độ/kinh độ khi sửa node để ghim lên bản đồ.
