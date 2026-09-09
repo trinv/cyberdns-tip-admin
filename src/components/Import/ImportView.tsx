@@ -270,19 +270,12 @@ export const ImportView: React.FC<ImportViewProps> = ({ categories, onImportDoma
               KẾT QUẢ PHÂN TÍCH TỰ ĐỘNG
             </div>
 
-            <div className="grid grid-cols-3 gap-2.5 text-center font-mono">
+            <div className="grid grid-cols-2 gap-2.5 text-center font-mono">
               <div className="bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-100 dark:border-emerald-800 rounded-xl p-3">
                 <div className="text-xl font-bold text-emerald-700 dark:text-emerald-300">
                   {parsed.uniqueValid.length}
                 </div>
                 <div className="text-xs text-emerald-800 dark:text-emerald-400 font-bold uppercase mt-0.5">Hợp lệ</div>
-              </div>
-
-              <div className="bg-amber-50 dark:bg-amber-950/60 border border-amber-100 dark:border-amber-800 rounded-xl p-3">
-                <div className="text-xl font-bold text-amber-700 dark:text-amber-300">
-                  {parsed.protectedDomains.length}
-                </div>
-                <div className="text-xs text-amber-800 dark:text-amber-400 font-bold uppercase mt-0.5">Bảo vệ</div>
               </div>
 
               <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 rounded-xl p-3">

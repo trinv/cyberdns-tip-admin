@@ -66,7 +66,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       group: 'KIỂM DUYỆT & XỬ LÝ',
       items: [
-        { id: 'import', label: 'Nhập Batch', icon: Upload },
+        { id: 'import', label: 'Import dữ liệu', icon: Upload },
         { id: 'review', label: 'Hàng đợi duyệt', icon: CheckSquare },
         { id: 'release', label: 'DNS Blocklist URL', icon: Rocket },
       ]
