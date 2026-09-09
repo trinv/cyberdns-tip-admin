@@ -335,43 +335,17 @@ export const DnsNodesView: React.FC = () => {
         )}
       </div>
 
-      {/* Map */}
+      {/* Map — TEMPORARILY stripped down to the bare minimum <Map center
+          zoom /> (no markers/controls/fitBounds) to isolate whether the
+          base map itself renders at all, per explicit request while
+          debugging the stuck-loading-spinner report. Once confirmed
+          working, MapControls/MapMarker/MarkerTooltip/pinnedNodes/fitBounds
+          should be restored (still present just above this block, unused
+          for now). */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-5 shadow-xs transition-colors">
         <h2 className="text-sm font-bold text-slate-900 dark:text-white font-sans mb-3">Bản đồ vị trí & trạng thái node</h2>
         <div className="w-full h-[420px] sm:h-[520px] lg:h-[600px] isolate rounded-xl overflow-hidden border border-slate-100 dark:border-slate-800">
-          <Map
-            ref={mapRef}
-            center={[106.0, 16.0]} // [lng, lat] — roughly centered on Việt Nam by default
-            zoom={2} // Whole-world view by default — fitBounds above zooms in once there are real pinned nodes
-            minZoom={2}
-            scrollZoom={false}
-            dragRotate={false}
-            pitchWithRotate={false}
-          >
-            <MapControls />
-            {pinnedNodes.map((n) => (
-              <MapMarker key={n.id} longitude={n.longitude} latitude={n.latitude}>
-                <MarkerContent>
-                  <span
-                    className={`block w-3.5 h-3.5 rounded-full ring-2 ring-white dark:ring-slate-900 shadow cursor-pointer transition-transform hover:scale-125 ${
-                      n.status === 'active' ? 'bg-emerald-500' : 'bg-slate-400'
-                    }`}
-                  />
-                </MarkerContent>
-                <MarkerTooltip
-                  offset={10}
-                  className="bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 shadow-lg font-sans"
-                >
-                  <div className="font-bold">{n.name}</div>
-                  <div className="text-slate-500 dark:text-slate-400">
-                    {n.tier} · {n.status === 'active' ? 'Active' : 'Inactive'}
-                  </div>
-                  <div className="font-mono text-slate-500 dark:text-slate-400">{n.ipAddress}</div>
-                  {n.location && <div className="text-slate-400 dark:text-slate-500">{n.location}</div>}
-                </MarkerTooltip>
-              </MapMarker>
-            ))}
-          </Map>
+          <Map center={[106.0, 16.0]} zoom={2} />
         </div>
         {nodes.every((n) => n.latitude == null || n.longitude == null) && nodes.length > 0 && (
           <p className="text-slate-400 dark:text-slate-500 mt-2">
