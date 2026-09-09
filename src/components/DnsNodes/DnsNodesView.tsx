@@ -83,9 +83,9 @@ export const DnsNodesView: React.FC = () => {
   }, [load]);
 
   // ---- MapLibre GL (mapcn's <Map> — src/components/ui/map.tsx, vendored
-  // from https://mapcn.dev, reconfigured to use free OpenStreetMap raster
-  // tiles instead of its upstream CARTO default — see that file's own
-  // fork note for why). The container below is wrapped in Tailwind's
+  // from https://mapcn.dev, reconfigured to use free OpenFreeMap light/dark
+  // vector styles instead of its upstream CARTO default — see that file's
+  // own fork note for why). The container below is wrapped in Tailwind's
   // `isolate` (CSS `isolation: isolate`) as defense-in-depth — the same fix
   // that resolved a real bug the earlier Leaflet map had here (its internal
   // control panes' high z-index painting over the Add/Edit modal despite

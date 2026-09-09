@@ -34,32 +34,21 @@ if (typeof window !== "undefined" && !MapLibreGL.getWorkerUrl()) {
 
 // CyberDNS TIP fork note: the upstream mapcn component defaults to CARTO's
 // hosted basemap tiles (basemaps.cartocdn.com) here, which require a paid
-// CARTO Enterprise license for commercial use. Replaced with plain
-// OpenStreetMap raster tiles instead (the same free, no-API-key source
-// already used throughout this app — see DnsNodesView.tsx) so nothing ever
-// falls back to CARTO, even if a future <Map> call site forgets to pass its
-// own `styles` prop. OSM has no official dark-tile variant, so both themes
-// intentionally use the same light tileset — an accepted trade-off (see
-// AGENTS/session notes) rather than adding another third-party tile
-// provider or faking a dark look with a CSS filter hack.
-const OSM_RASTER_STYLE: MapLibreGL.StyleSpecification = {
-  version: 8,
-  sources: {
-    osm: {
-      type: "raster",
-      tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-      tileSize: 256,
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors',
-      maxzoom: 19,
-    },
-  },
-  layers: [{ id: "osm-tiles", type: "raster", source: "osm" }],
-};
-
+// CARTO Enterprise license for commercial use. Replaced with OpenFreeMap
+// (https://openfreemap.org) instead — real vector-tile styles built from
+// OpenStreetMap data via the same open-source OpenMapTiles schema CARTO
+// itself uses, but genuinely free: no API key, no request/usage limits, no
+// account, and commercial use explicitly allowed (self-hostable too, per
+// its own docs, if that's ever needed). Confirmed both style URLs below
+// resolve to real MapLibre style documents before using them here. Using
+// OpenFreeMap's own separate "positron" (light) and "dark" styles — a real
+// dark basemap, not a same-tile-both-themes compromise — is exactly why
+// this needed real light/dark URLs instead of one flat raster source.
+// Attribution ("OpenFreeMap © OpenMapTiles Data from OpenStreetMap") is
+// handled automatically by MapControls' attribution control below.
 const defaultStyles = {
-  dark: OSM_RASTER_STYLE,
-  light: OSM_RASTER_STYLE,
+  dark: "https://tiles.openfreemap.org/styles/dark",
+  light: "https://tiles.openfreemap.org/styles/positron",
 };
 
 // A tile-less, dependency-free style with a transparent background. Use it for
@@ -212,13 +201,13 @@ type MapProps = {
    * Pass your theme value here.
    */
   theme?: Theme;
-  /** Custom map styles for light and dark themes. Overrides the default OpenStreetMap raster styles. */
+  /** Custom map styles for light and dark themes. Overrides the default OpenFreeMap positron/dark styles. */
   styles?: {
     light?: MapStyleOption;
     dark?: MapStyleOption;
   };
   /**
-   * Use a transparent, tile-less basemap instead of the default OpenStreetMap
+   * Use a transparent, tile-less basemap instead of the default OpenFreeMap
    * street basemap — a blank canvas. Used alone it renders nothing; add your own
    * layers on top (`<MapGeoJSON>`, `<MapArc>`, markers, etc.). Ideal for data
    * visualizations (choropleths, arcs, dot maps).
@@ -298,7 +287,7 @@ const Map = forwardRef<MapRef, MapProps>(function Map(
 
   const mapStyles = useMemo(() => {
     // Explicit styles win. Otherwise `blank` opts into the transparent
-    // tile-less basemap; with neither, fall back to the OSM raster defaults.
+    // tile-less basemap; with neither, fall back to the OpenFreeMap defaults.
     if (stableStyles) {
       return {
         dark: stableStyles.dark ?? defaultStyles.dark,
