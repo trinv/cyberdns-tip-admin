@@ -47,6 +47,59 @@ interface DnsNodePointProperties {
 
 type PinnedDnsNode = DnsNode & { latitude: number; longitude: number };
 
+// Nodes added via the Country/Province picker (AddEditDnsNodeModal.tsx's
+// handleSelectProvince) get their lat/lng from ONE fixed province dataset
+// entry — 2 nodes that both picked "Hà Nội" end up with bit-identical
+// coordinates. MapLibre draws a point at its exact geographic position, so
+// 2 perfectly-identical coordinates always land on the exact same screen
+// pixel at EVERY zoom level — no amount of zooming ever separates them on
+// its own (below MapClusterLayer's clusterMaxZoom they're a correct "N"
+// cluster bubble; above it, MapLibre draws each as its own unclustered
+// point, but since the coordinates are identical they still draw on top of
+// each other, and whichever was added to the GeoJSON last visually "wins"
+// — this was the exact bug reported: clusters not showing correctly, only
+// the most-recently-added node visible).
+//
+// Fix: spread nodes that share an exact coordinate evenly around a small
+// circle centered on that shared point, BEFORE building the GeoJSON below.
+// Real nodes/DB coordinates are untouched — this only affects what's drawn.
+// Radius is fixed at 0.4km, well inside the "no more than 2km" cap from the
+// request (leaves margin, and doesn't visually imply nodes are farther
+// apart than they really are) — 2 nodes in the same group end up up to
+// ~0.8km apart, enough to visibly separate around zoom ~13, comfortably
+// before MapClusterLayer's clusterMaxZoom (14) is reached, without
+// touching that library's own radius/zoom thresholds at all.
+const OVERLAP_SPREAD_RADIUS_KM = 0.4;
+const KM_PER_DEGREE_LAT = 111.32;
+
+function spreadOverlappingNodes(pinnedNodes: PinnedDnsNode[]): PinnedDnsNode[] {
+  // A plain object, not a JS `Map` — this file already imports `Map` as
+  // mapcn's <Map> React component (see the import at the top), which
+  // shadows the built-in Map collection class within this module.
+  const groups: Record<string, PinnedDnsNode[]> = {};
+  for (const n of pinnedNodes) {
+    const key = `${n.latitude},${n.longitude}`;
+    (groups[key] ??= []).push(n);
+  }
+
+  const result: PinnedDnsNode[] = [];
+  for (const group of Object.values(groups)) {
+    if (group.length === 1) {
+      result.push(group[0]);
+      continue;
+    }
+    const { latitude: centerLat, longitude: centerLng } = group[0];
+    const kmPerDegreeLng = KM_PER_DEGREE_LAT * Math.cos((centerLat * Math.PI) / 180) || KM_PER_DEGREE_LAT;
+    group.forEach((n, i) => {
+      const angle = (2 * Math.PI * i) / group.length;
+      const latOffset = (OVERLAP_SPREAD_RADIUS_KM / KM_PER_DEGREE_LAT) * Math.cos(angle);
+      const lngOffset = (OVERLAP_SPREAD_RADIUS_KM / kmPerDegreeLng) * Math.sin(angle);
+      result.push({ ...n, latitude: centerLat + latOffset, longitude: centerLng + lngOffset });
+    });
+  }
+  return result;
+}
+
 function toFeatureCollection(
   pinnedNodes: PinnedDnsNode[]
 ): GeoJSON.FeatureCollection<GeoJSON.Point, DnsNodePointProperties> {
@@ -158,13 +211,17 @@ export const DnsNodeStatusMap: React.FC<DnsNodeStatusMapProps> = ({ nodes, heigh
   // there's no hover tooltip anymore — clicking a point opens the
   // MapPopup below instead; clicking a cluster zooms in (MapClusterLayer's
   // own default when onClusterClick isn't provided, left as-is here).
+  // Spread once across BOTH statuses together (not per-layer) — so e.g. 1
+  // active + 1 inactive node sharing a coordinate also get pulled apart,
+  // not just duplicates within the same status.
+  const spreadNodes = useMemo(() => spreadOverlappingNodes(pinnedNodes), [pinnedNodes]);
   const activeFeatures = useMemo(
-    () => toFeatureCollection(pinnedNodes.filter((n) => n.status === 'active')),
-    [pinnedNodes]
+    () => toFeatureCollection(spreadNodes.filter((n) => n.status === 'active')),
+    [spreadNodes]
   );
   const inactiveFeatures = useMemo(
-    () => toFeatureCollection(pinnedNodes.filter((n) => n.status !== 'active')),
-    [pinnedNodes]
+    () => toFeatureCollection(spreadNodes.filter((n) => n.status !== 'active')),
+    [spreadNodes]
   );
 
   const [selectedPoint, setSelectedPoint] = useState<{
