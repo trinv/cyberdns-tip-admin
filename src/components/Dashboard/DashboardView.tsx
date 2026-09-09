@@ -570,97 +570,102 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       <div className="space-y-6 max-w-7xl mx-auto w-full">
       {/* Row 1: 3 Key SOC Operational Metric Cards - Simplified General Numbers */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-        {/* Card 1: Tổng IOC Tên miền Đang chặn */}
-        <div 
+        {/* Card 1: Tổng IOC Tên miền Đang chặn — gradient-tinted "hero
+            metric" card style (per reference), each card's own semantic
+            accent color used for the tint/icon/badge/footer instead of a
+            flat white background. No week-over-week % anywhere here — see
+            the growth-trend card just below for why (no reliable historical
+            snapshot to compute a real delta against). */}
+        <div
           onClick={() => setSelectedMetricModal('total_blocked')}
-          className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-5 shadow-xs hover:shadow-md dark:hover:border-emerald-700/60 hover:border-emerald-500/60 transition-all cursor-pointer group active-press"
+          className="relative overflow-hidden bg-gradient-to-br from-emerald-50 via-white to-white dark:from-emerald-950/30 dark:via-slate-900 dark:to-slate-900 border border-emerald-100 dark:border-emerald-900/40 rounded-2xl p-5 shadow-xs hover:shadow-md transition-all cursor-pointer group active-press"
           title="Nhấp để xem đồ thị và phân tích chi tiết"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200/60 dark:border-emerald-800/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:scale-105 transition-transform">
+              <div className="w-10 h-10 rounded-xl bg-emerald-100/80 dark:bg-emerald-900/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:scale-105 transition-transform">
                 <Shield className="w-5 h-5" />
               </div>
-              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                IOCs / TỔNG DOMAIN CHẶN
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                IOCs / Tổng domain chặn
               </span>
             </div>
-            <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/80 px-2.5 py-0.5 rounded-full border border-emerald-200/60 dark:border-emerald-800/60 flex items-center space-x-1">
+            <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100/70 dark:bg-emerald-900/50 px-2.5 py-1 rounded-full flex items-center space-x-1 flex-shrink-0">
               <span>Chi tiết</span>
               <ChevronRight className="w-3.5 h-3.5" />
             </span>
           </div>
 
-          <div className="mt-4">
-            <div className="text-[28px] leading-9 font-extrabold font-mono text-slate-900 dark:text-white tracking-tight">
+          <div className="mt-5">
+            <div className="text-[32px] leading-none font-extrabold font-mono text-slate-900 dark:text-white tracking-tight">
               {stats ? totalActiveDisplay : '—'}
             </div>
-            <div className="flex items-center space-x-1.5 mt-3 pt-3 border-t border-dashed border-[var(--color-border-soft)] text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-              <CheckCircle2 className="w-4 h-4" />
+            <div className="flex items-center space-x-1.5 mt-3 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+              <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
               <span>{stats ? 'Cập nhật trực tiếp từ CyberDNSTIP-DB' : 'Đang tải...'}</span>
             </div>
           </div>
         </div>
 
         {/* Card 2: SOC Triage Queue */}
-        <div 
+        <div
           onClick={() => setSelectedMetricModal('soc_queue')}
-          className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-5 shadow-xs hover:shadow-md dark:hover:border-rose-700/60 hover:border-rose-500/60 transition-all cursor-pointer group active-press"
+          className="relative overflow-hidden bg-gradient-to-br from-rose-50 via-white to-white dark:from-rose-950/30 dark:via-slate-900 dark:to-slate-900 border border-rose-100 dark:border-rose-900/40 rounded-2xl p-5 shadow-xs hover:shadow-md transition-all cursor-pointer group active-press"
           title="Nhấp để xem đồ thị và phân tích chi tiết"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200/60 dark:border-rose-800/60 flex items-center justify-center text-rose-600 dark:text-rose-400 group-hover:scale-105 transition-transform">
+              <div className="w-10 h-10 rounded-xl bg-rose-100/80 dark:bg-rose-900/50 flex items-center justify-center text-rose-600 dark:text-rose-400 group-hover:scale-105 transition-transform">
                 <AlertTriangle className="w-5 h-5" />
               </div>
-              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                HÀNG ĐỢI DUYỆT SOC
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                Hàng đợi duyệt SOC
               </span>
             </div>
-            <span className="text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/80 px-2.5 py-0.5 rounded-full border border-rose-200/60 dark:border-rose-800/60 flex items-center space-x-1">
+            <span className="text-xs font-bold text-rose-700 dark:text-rose-300 bg-rose-100/70 dark:bg-rose-900/50 px-2.5 py-1 rounded-full flex items-center space-x-1 flex-shrink-0">
               <span>Chi tiết</span>
               <ChevronRight className="w-3.5 h-3.5" />
             </span>
           </div>
 
-          <div className="mt-4">
-            <div className="text-[28px] leading-9 font-extrabold font-mono text-rose-600 dark:text-rose-400 tracking-tight">
+          <div className="mt-5">
+            <div className="text-[32px] leading-none font-extrabold font-mono text-rose-600 dark:text-rose-400 tracking-tight">
               {reviewCount} Tên miền
             </div>
-            <div className="flex items-center space-x-1.5 mt-3 pt-3 border-t border-dashed border-[var(--color-border-soft)] text-xs font-semibold text-rose-600 dark:text-rose-400">
-              <AlertOctagon className="w-4 h-4" />
+            <div className="flex items-center space-x-1.5 mt-3 text-xs font-medium text-rose-700 dark:text-rose-400">
+              <AlertOctagon className="w-3.5 h-3.5 flex-shrink-0" />
               <span>Chờ phê duyệt thủ công</span>
             </div>
           </div>
         </div>
 
         {/* Card 3: Nguồn cấp IOC & Phân loại Danh mục */}
-        <div 
+        <div
           onClick={() => setSelectedMetricModal('sources_coverage')}
-          className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-5 shadow-xs hover:shadow-md dark:hover:border-indigo-700/60 hover:border-indigo-500/60 transition-all cursor-pointer group active-press"
+          className="relative overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-white dark:from-indigo-950/30 dark:via-slate-900 dark:to-slate-900 border border-indigo-100 dark:border-indigo-900/40 rounded-2xl p-5 shadow-xs hover:shadow-md transition-all cursor-pointer group active-press"
           title="Nhấp để xem nguồn cấp và phân loại chi tiết"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200/60 dark:border-indigo-800/60 flex items-center justify-center text-indigo-600 dark:text-indigo-400 group-hover:scale-105 transition-transform">
+              <div className="w-10 h-10 rounded-xl bg-indigo-100/80 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400 group-hover:scale-105 transition-transform">
                 <Layers className="w-5 h-5" />
               </div>
-              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                NGUỒN CẤP & DANH MỤC
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                Nguồn cấp & danh mục
               </span>
             </div>
-            <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/80 px-2.5 py-0.5 rounded-full border border-indigo-200/60 dark:border-indigo-800/60 flex items-center space-x-1">
+            <span className="text-xs font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-100/70 dark:bg-indigo-900/50 px-2.5 py-1 rounded-full flex items-center space-x-1 flex-shrink-0">
               <span>Chi tiết</span>
               <ChevronRight className="w-3.5 h-3.5" />
             </span>
           </div>
 
-          <div className="mt-4">
-            <div className="text-[28px] leading-9 font-extrabold font-mono text-slate-900 dark:text-white tracking-tight">
+          <div className="mt-5">
+            <div className="text-[32px] leading-none font-extrabold font-mono text-slate-900 dark:text-white tracking-tight">
               {sources.length} Feeds / {categories.length} Nhóm
             </div>
-            <div className="flex items-center space-x-1.5 mt-3 pt-3 border-t border-dashed border-[var(--color-border-soft)] text-xs font-semibold text-indigo-600 dark:text-indigo-400">
-              <CheckCircle2 className="w-4 h-4" />
+            <div className="flex items-center space-x-1.5 mt-3 text-xs font-medium text-indigo-700 dark:text-indigo-400">
+              <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
               <span>
                 {sources.filter((s) => s.status === 'healthy').length}/{sources.length || 0} nguồn hoạt động tốt
               </span>
@@ -676,10 +681,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div>
             <h3 className="text-base font-bold text-slate-900 dark:text-white font-sans">
-              Xu Hướng Domain Mới Bị Chặn
+              Tên miền độc hại mới phát hiện
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Số tên miền phát hiện mới mỗi ngày (30 ngày gần nhất), theo thời điểm phát hiện thật trong CyberDNSTIP-DB
+              Theo dõi số lượng tên miền mới được phát hiện trong 30 ngày gần nhất.
             </p>
           </div>
         </div>
