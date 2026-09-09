@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Globe, CheckSquare, Rocket, Upload,
   Rss, History, SlidersHorizontal, ArrowUpRight, X,
   Sun, Moon, ShieldCheck, Sparkles, ChevronLeft, ChevronRight,
-  Shield, Server, Activity, Plus, Search, Bell, Keyboard, Users, UserCircle2
+  Shield, Server, Activity, Bell, Users, UserCircle2
 } from 'lucide-react';
 import { CyberDNSLogo } from './CyberDNSLogo';
 import { AppUser } from '../types';
@@ -18,6 +18,14 @@ interface SidebarProps {
   onToggleCollapse?: () => void;
   isMobileOpen?: boolean;
   onCloseMobile?: () => void;
+  // No longer rendered here — the "Công cụ điều khiển" quick-actions block
+  // (Search/Thêm tên miền/Phím tắt buttons) was removed per explicit
+  // request. Kept optional in this interface (rather than also editing
+  // App.tsx's call site). onOpenSearch/onOpenShortcuts stay reachable via
+  // their existing global keyboard shortcuts (Ctrl+K, '?' — see App.tsx),
+  // so those two lost nothing functionally. onOpenAddDomain did NOT have
+  // an equivalent anywhere else in the app — see the chat response this
+  // change shipped with.
   onOpenAddDomain?: () => void;
   onOpenShortcuts?: () => void;
   onOpenSearch?: () => void;
@@ -33,9 +41,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleCollapse,
   isMobileOpen = false,
   onCloseMobile,
-  onOpenAddDomain,
-  onOpenShortcuts,
-  onOpenSearch,
 }) => {
   const handleNavClick = (tab: string) => {
     setCurrentTab(tab);
@@ -170,7 +175,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {navItems.filter((sec) => sec.items.length > 0).map((sec, secIdx) => (
             <div key={secIdx}>
               {!isCollapsed && (
-                <div className="px-3 mb-1.5 mt-6 first:mt-0 text-[11px] font-bold text-slate-400 dark:text-slate-500 tracking-[.06em] uppercase">
+                <div className="px-3 mb-1.5 mt-6 first:mt-0 text-xs font-bold text-slate-400 dark:text-slate-500 tracking-[.06em] uppercase">
                   {sec.group}
                 </div>
               )}
@@ -206,68 +211,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             </div>
           ))}
-
-          {/* Quick Actions / Controls */}
-          <div className="mt-6">
-            {!isCollapsed && (
-              <div className="px-3 mb-1.5 text-xs font-bold text-slate-400 dark:text-slate-500 tracking-wider uppercase">
-                Công cụ điều khiển
-              </div>
-            )}
-            <div className="space-y-1">
-              {/* Search */}
-              <button
-                onClick={onOpenSearch}
-                title={isCollapsed ? "Tìm kiếm..." : undefined}
-                className={`
-                  w-full flex items-center rounded-xl transition-all cursor-pointer group relative text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/80 dark:hover:bg-slate-800/80
-                  ${isCollapsed ? 'justify-center p-2.5' : 'justify-between px-3 py-2'}
-                `}
-              >
-                <div className="flex items-center space-x-2.5 min-w-0">
-                  <Search className="w-4 h-4 flex-shrink-0 text-slate-400 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200" />
-                  {!isCollapsed && <span className="truncate text-xs">Tìm kiếm...</span>}
-                </div>
-                {!isCollapsed && (
-                  <span className="text-xs px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700 font-mono">
-                    Ctrl K
-                  </span>
-                )}
-              </button>
-
-              {/* Add Domain */}
-              <button
-                onClick={onOpenAddDomain}
-                title={isCollapsed ? "Thêm tên miền mới" : undefined}
-                className={`
-                  w-full flex items-center rounded-xl transition-all cursor-pointer group relative text-slate-600 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40
-                  ${isCollapsed ? 'justify-center p-2.5' : 'justify-between px-3 py-2'}
-                `}
-              >
-                <div className="flex items-center space-x-2.5 min-w-0">
-                  <Plus className="w-4 h-4 flex-shrink-0 text-slate-400 dark:text-slate-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-500" />
-                  {!isCollapsed && <span className="truncate text-xs">Thêm tên miền</span>}
-                </div>
-              </button>
-
-              {/* Shortcuts */}
-              {onOpenShortcuts && (
-                <button
-                  onClick={onOpenShortcuts}
-                  title={isCollapsed ? "Phím tắt" : undefined}
-                  className={`
-                    w-full flex items-center rounded-xl transition-all cursor-pointer group relative text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/80 dark:hover:bg-slate-800/80
-                    ${isCollapsed ? 'justify-center p-2.5' : 'justify-between px-3 py-2'}
-                  `}
-                >
-                  <div className="flex items-center space-x-2.5 min-w-0">
-                    <Keyboard className="w-4 h-4 flex-shrink-0 text-slate-400 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200" />
-                    {!isCollapsed && <span className="truncate text-xs">Phím tắt</span>}
-                  </div>
-                </button>
-              )}
-            </div>
-          </div>
         </div>
 
         {/* Footer Area: Collapse Toggle
