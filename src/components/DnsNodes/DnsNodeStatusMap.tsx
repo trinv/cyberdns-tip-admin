@@ -1,6 +1,16 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { Map, MapControls, MapMarker, MarkerContent, MarkerTooltip, type MapRef } from '@/components/ui/map';
+import { Map, MapControls, MapMarker, MarkerContent, MarkerTooltip, MarkerLabel, type MapRef } from '@/components/ui/map';
+import { Flag } from 'lucide-react';
 import { DnsNode } from '../../types';
+
+// Marker mặc định, cố định — không phụ thuộc dữ liệu DNS node — đánh dấu
+// chủ quyền Việt Nam đối với 2 quần đảo. Toạ độ tâm theo dữ liệu do người
+// dùng cung cấp trực tiếp (không lấy từ API), nên khai báo tĩnh ngay tại
+// đây thay vì fetch.
+const SOVEREIGNTY_MARKERS: { id: string; name: string; lat: number; lng: number }[] = [
+  { id: 'hoang-sa', name: 'Quần đảo Hoàng Sa', lat: 16.5, lng: 112.0 },
+  { id: 'truong-sa', name: 'Quần đảo Trường Sa', lat: 9.3, lng: 114.2 },
+];
 
 interface DnsNodeStatusMapProps {
   nodes: DnsNode[];
@@ -60,6 +70,15 @@ export const DnsNodeStatusMap: React.FC<DnsNodeStatusMapProps> = ({ nodes, heigh
   // bounds coordinates are [longitude, latitude], the opposite order from
   // Leaflet's [lat, lng]. Takes over from the world-bounds effect above
   // the moment real node coordinates exist.
+  //
+  // Deliberately does NOT factor SOVEREIGNTY_MARKERS into this bounds
+  // calculation — they're always drawn on the map (see the JSX below),
+  // but forcing every fit to also cover both archipelagos (which span
+  // lat 9-17, lng 111-117) would zoom this view out far past what's
+  // needed to see the actual DNS node cluster, defeating the point of a
+  // tight operational fit. Users can pan/zoom (scrollZoom is on) to see
+  // them; the world-bounds effect above already shows everything when no
+  // node is pinned yet.
   useEffect(() => {
     if (!mapRef.current || pinnedNodes.length === 0) return;
     const lngs = pinnedNodes.map((n) => n.longitude);
@@ -84,6 +103,28 @@ export const DnsNodeStatusMap: React.FC<DnsNodeStatusMapProps> = ({ nodes, heigh
         pitchWithRotate={false}
       >
         <MapControls />
+        {SOVEREIGNTY_MARKERS.map((m) => (
+          <MapMarker key={m.id} longitude={m.lng} latitude={m.lat}>
+            <MarkerContent>
+              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-red-600 ring-2 ring-white dark:ring-slate-900 shadow cursor-pointer transition-transform hover:scale-110">
+                <Flag className="w-3 h-3 text-white" fill="currentColor" />
+              </span>
+            </MarkerContent>
+            <MarkerLabel
+              position="top"
+              className="text-[10px] font-bold text-slate-700 dark:text-slate-200 bg-white/90 dark:bg-slate-900/90 px-1.5 py-0.5 rounded shadow-sm"
+            >
+              {m.name}
+            </MarkerLabel>
+            <MarkerTooltip
+              offset={12}
+              className="bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 shadow-lg font-sans"
+            >
+              <div className="font-bold">{m.name}</div>
+              <div className="text-slate-500 dark:text-slate-400">Chủ quyền: Việt Nam</div>
+            </MarkerTooltip>
+          </MapMarker>
+        ))}
         {pinnedNodes.map((n) => (
           <MapMarker key={n.id} longitude={n.longitude} latitude={n.latitude}>
             <MarkerContent>
