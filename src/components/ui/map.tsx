@@ -38,23 +38,22 @@ if (typeof window !== "undefined" && !MapLibreGL.getWorkerUrl()) {
   MapLibreGL.setWorkerUrl("/maplibre-gl/maplibre-gl-worker.mjs");
 }
 
-// CyberDNS TIP fork note: the upstream mapcn component defaults to CARTO's
-// hosted basemap tiles (basemaps.cartocdn.com) here, which require a paid
-// CARTO Enterprise license for commercial use. Replaced with OpenFreeMap
-// (https://openfreemap.org) instead — real vector-tile styles built from
-// OpenStreetMap data via the same open-source OpenMapTiles schema CARTO
-// itself uses, but genuinely free: no API key, no request/usage limits, no
-// account, and commercial use explicitly allowed (self-hostable too, per
-// its own docs, if that's ever needed). Confirmed both style URLs below
-// resolve to real MapLibre style documents before using them here. Using
-// OpenFreeMap's own separate "positron" (light) and "dark" styles — a real
-// dark basemap, not a same-tile-both-themes compromise — is exactly why
-// this needed real light/dark URLs instead of one flat raster source.
-// Attribution ("OpenFreeMap © OpenMapTiles Data from OpenStreetMap") is
-// handled automatically by MapControls' attribution control below.
+// CyberDNS TIP fork note: this briefly pointed at OpenFreeMap instead of
+// CARTO (avoiding CARTO's commercial-license question entirely), but per
+// explicit decision this now uses mapcn's own original CARTO default
+// again — the attribution/visual match to mapcn's own reference docs
+// mattered more here than the license question, and CARTO's terms (see
+// carto.com/basemaps, checked directly) are: free up to 5 million tile
+// requests/month via a free API key (quick signup, no CARTO account
+// needed), with commercial use beyond that requiring an Enterprise
+// conversation with CARTO. This file does NOT wire in an API key — it's
+// the same unauthenticated basemaps.cartocdn.com URLs mapcn ships by
+// default. Whoever operates this deployment should get a free CARTO API
+// key and review CARTO's actual commercial terms for CyberDNS TIP's real
+// usage rather than relying on the unauthenticated default indefinitely.
 const defaultStyles = {
-  dark: "https://tiles.openfreemap.org/styles/dark",
-  light: "https://tiles.openfreemap.org/styles/positron",
+  dark: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
+  light: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
 };
 
 // A tile-less, dependency-free style with a transparent background. Use it for
@@ -136,11 +135,19 @@ function useResolvedTheme(themeProp?: "light" | "dark"): Theme {
 
     // Watch for document theme changes (e.g., next-themes toggling the class
     // or the data-theme attribute).
+    // CyberDNS TIP fork note: this app (see src/App.tsx) only ever
+    // toggles a `dark` class on <html> on/off — it never sets an explicit
+    // `light` class or `data-theme` attribute. getDocumentTheme() then
+    // legitimately returns null the moment `dark` is removed (neither
+    // condition in it matches), which is exactly this app's real meaning
+    // of "light". The upstream `if (docTheme) { setDetectedTheme(...) }`
+    // guard here silently no-ops on that null — MutationObserver still
+    // fired (it detected the class change), but detectedTheme was never
+    // actually updated — so switching from dark back to light visibly did
+    // nothing. Falling back to "light" instead of skipping the update
+    // fixes it for this app's actual toggle convention.
     const observer = new MutationObserver(() => {
-      const docTheme = getDocumentTheme();
-      if (docTheme) {
-        setDetectedTheme(docTheme);
-      }
+      setDetectedTheme(getDocumentTheme() ?? "light");
     });
     observer.observe(document.documentElement, {
       attributes: true,
@@ -207,13 +214,13 @@ type MapProps = {
    * Pass your theme value here.
    */
   theme?: Theme;
-  /** Custom map styles for light and dark themes. Overrides the default OpenFreeMap positron/dark styles. */
+  /** Custom map styles for light and dark themes. Overrides the default CARTO styles. */
   styles?: {
     light?: MapStyleOption;
     dark?: MapStyleOption;
   };
   /**
-   * Use a transparent, tile-less basemap instead of the default OpenFreeMap
+   * Use a transparent, tile-less basemap instead of the default CARTO
    * street basemap — a blank canvas. Used alone it renders nothing; add your own
    * layers on top (`<MapGeoJSON>`, `<MapArc>`, markers, etc.). Ideal for data
    * visualizations (choropleths, arcs, dot maps).
@@ -293,7 +300,7 @@ const Map = forwardRef<MapRef, MapProps>(function Map(
 
   const mapStyles = useMemo(() => {
     // Explicit styles win. Otherwise `blank` opts into the transparent
-    // tile-less basemap; with neither, fall back to the OpenFreeMap defaults.
+    // tile-less basemap; with neither, fall back to the CARTO defaults.
     if (stableStyles) {
       return {
         dark: stableStyles.dark ?? defaultStyles.dark,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
 import { DomainItem, CategoryInfo, FeedSource, AuditLog, ReviewDomainItem, SavedFilter, DomainStatus, DashboardStats, CategoryStatusBreakdown, AppUser } from './types';
 import {
   fetchDashboardStats,
@@ -50,7 +50,16 @@ import { ExportModal } from './components/Modals/ExportModal';
 import { LoginModal } from './components/Modals/LoginModal';
 import { UserManagementView } from './components/Users/UserManagementView';
 import { LoginHistoryView } from './components/LoginHistory/LoginHistoryView';
-import { DnsNodesView } from './components/DnsNodes/DnsNodesView';
+// Lazy-loaded (not a static import like every other tab above): this pulls
+// in MapLibre GL (~900KB+) via src/components/ui/map.tsx, so bundling it
+// statically here would ship that weight on EVERY page load (Dashboard,
+// Domain Explorer, ...) regardless of whether this tab is ever opened —
+// this is what was actually making the whole app feel slower, not just the
+// DNS Node map itself. AddEditDnsNodeModal.tsx (also map-heavy) is imported
+// BY DnsNodesView.tsx, so it rides along in this same lazy chunk for free.
+const DnsNodesView = lazy(() =>
+  import('./components/DnsNodes/DnsNodesView').then((m) => ({ default: m.DnsNodesView }))
+);
 import { LoginPage } from './components/LoginPage';
 import { CyberDNSLogo } from './components/CyberDNSLogo';
 import { CheckCircle2, AlertTriangle, Info, X } from 'lucide-react';
@@ -1207,7 +1216,15 @@ export default function App() {
           {/* TAB 9b: DNS NODES (CyberDNS resolver fleet + Blocklist ACL — Admin only) */}
           {currentTab === 'dns-nodes' && (
             userRole === 'Admin' ? (
-              <DnsNodesView />
+              <Suspense
+                fallback={
+                  <div className="flex-1 flex items-center justify-center text-sm text-slate-500 dark:text-slate-400">
+                    Đang tải...
+                  </div>
+                }
+              >
+                <DnsNodesView />
+              </Suspense>
             ) : (
               <div className="flex-1 flex items-center justify-center text-sm text-slate-500 dark:text-slate-400">
                 Chỉ tài khoản Admin mới có quyền truy cập trang quản lý DNS Node.
