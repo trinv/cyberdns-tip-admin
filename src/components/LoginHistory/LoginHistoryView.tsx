@@ -49,7 +49,7 @@ export const LoginHistoryView: React.FC = () => {
             )}
           </h1>
           <p className="text-slate-500 dark:text-slate-400 text-xs mt-1">
-            Toàn bộ lượt đăng nhập thành công và thất bại, kèm địa chỉ IP thật (qua Nginx) — dòng đánh dấu "IP MỚI" là lần đầu tài khoản đó đăng nhập thành công từ địa chỉ này.
+            Nhật ký đăng nhập thành công vào hệ thống CyberDNS TIP
           </p>
         </div>
 

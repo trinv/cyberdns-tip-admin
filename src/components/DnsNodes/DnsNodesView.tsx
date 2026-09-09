@@ -244,7 +244,7 @@ export const DnsNodesView: React.FC = () => {
             </span>
           </h1>
           <p className="text-slate-500 dark:text-slate-400 text-xs mt-1">
-            Danh sách máy chủ DNS thật của CyberDNS — dùng để giám sát hạ tầng và làm ACL cho Blocklist URL.
+            Danh sách các máy chủ DNS của CyberDNS, phục vụ giám sát hạ tầng và kiểm soát quyền truy cập Blocklist URL.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -325,8 +325,8 @@ export const DnsNodesView: React.FC = () => {
               </h2>
               <p className="text-slate-500 dark:text-slate-400 mt-0.5">
                 {aclSettings?.enforceEnabled
-                  ? 'Chỉ những IP thuộc DNS node đang Active mới được phép tải Blocklist URL.'
-                  : 'Blocklist URL vẫn phục vụ mọi request như trước — rà soát danh sách "IP lạ gần đây" bên dưới trước khi bật chặn thật.'}
+                  ? 'Chỉ những IP thuộc CyberDNS đang Active mới được phép truy cập Blocklist URL.'
+                  : 'Blocklist URL vẫn cho phép mọi request như bình thường ở chế độ chỉ ghi log. Rà soát các IP lạ gần đây trước khi kích hoạt ACL chặn.'}
                 {aclSettings?.updatedBy && (
                   <span className="block mt-0.5 text-slate-400 dark:text-slate-500">
                     Cập nhật lần cuối bởi {aclSettings.updatedBy} · {new Date(aclSettings.updatedAt).toLocaleString('vi-VN')}
@@ -351,16 +351,16 @@ export const DnsNodesView: React.FC = () => {
         {unknownRequesters.length > 0 && (
           <div className="border-t border-slate-100 dark:border-slate-800 pt-4">
             <div className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
-              IP lạ gần đây gọi Blocklist URL ({unknownRequesters.length})
+              IP truy cập Blocklist URL chưa xác thực ({unknownRequesters.length})
             </div>
             <div className="overflow-x-auto rounded-xl border border-slate-100 dark:border-slate-800">
               <table className="w-full text-left border-collapse min-w-[600px]">
                 <thead className="bg-slate-50/80 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 font-bold">
                   <tr>
                     <th className="px-4 py-2">ĐỊA CHỈ IP</th>
-                    <th className="px-4 py-2">SỐ LẦN GỌI</th>
-                    <th className="px-4 py-2">CATEGORY GẦN NHẤT</th>
-                    <th className="px-4 py-2">LẦN CUỐI</th>
+                    <th className="px-4 py-2">SỐ LẦN TRUY CẬP</th>
+                    <th className="px-4 py-2">CATEGORY</th>
+                    <th className="px-4 py-2">LẦN GẦN NHẤT</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono text-slate-600 dark:text-slate-300">
@@ -494,8 +494,8 @@ export const DnsNodesView: React.FC = () => {
         title={aclConfirmMode === 'enable' ? 'Bật chặn ACL theo IP?' : 'Tắt chặn ACL?'}
         message={
           aclConfirmMode === 'enable'
-            ? `Từ lúc này, CHỈ ${activeCount} DNS node đang Active mới gọi được Blocklist URL — mọi IP khác sẽ nhận lỗi 403. Hãy chắc chắn đã khai báo đầy đủ node thật (xem lại danh sách "IP lạ gần đây" phía trên) trước khi tiếp tục.`
-            : 'Blocklist URL sẽ phục vụ mọi request như trước (không chặn IP nào) — chỉ tiếp tục ghi log các IP lạ để rà soát.'
+            ? `Chỉ có ${activeCount} CyberDNS node đang Active mới được phép truy cập Blocklist URL; mọi IP khác sẽ bị từ chối với mã lỗi 403. Kiểm tra đầy đủ danh sách DNS Node trước khi kích hoạt.`
+            : 'Blocklist URL hoạt động ở chế độ ghi log, cho phép mọi request và không chặn IP. Các IP lạ truy cập sẽ được ghi nhận để theo dõi và rà soát.'
         }
         confirmLabel={aclConfirmMode === 'enable' ? 'Bật chặn' : 'Tắt chặn'}
         tone={aclConfirmMode === 'enable' ? 'warning' : 'default'}

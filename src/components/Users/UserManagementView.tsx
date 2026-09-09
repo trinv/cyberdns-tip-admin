@@ -55,7 +55,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({
             <span>Quản lý người dùng & phân quyền</span>
           </h1>
           <p className="text-slate-500 dark:text-slate-400 text-xs mt-1">
-            Tạo tài khoản mới, đổi vai trò, hoặc thu hồi quyền truy cập. Chỉ Admin mới thấy trang này.
+            Tạo tài khoản mới, đổi vai trò, hoặc thu hồi quyền truy cập. 
           </p>
         </div>
         <button

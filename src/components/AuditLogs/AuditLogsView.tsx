@@ -49,11 +49,8 @@ export const AuditLogsView: React.FC<AuditLogsViewProps> = ({ logs, onRollbackTr
       <div className="flex flex-wrap items-center justify-between gap-4 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs transition-colors">
         <div>
           <h1 className="text-lg font-bold font-sans text-slate-900 dark:text-white flex items-center space-x-2">
-            <span>Nhật ký thao tác & Giao dịch (Audit Logs)</span>
+            <span>Audit Logs</span>
           </h1>
-          <p className="text-slate-500 dark:text-slate-400 text-xs mt-1">
-            Ghi vết toàn bộ hành vi thêm, gỡ, đổi nhóm, allowlist và phát hành với khả năng hoàn tác tức thì (Instant Rollback).
-          </p>
         </div>
 
         <div className="relative w-full sm:w-80">
@@ -75,10 +72,8 @@ export const AuditLogsView: React.FC<AuditLogsViewProps> = ({ logs, onRollbackTr
               <tr>
                 <th className="px-5 py-3.5">THỜI GIAN</th>
                 <th className="px-5 py-3.5">NGƯỜI THỰC HIỆN</th>
-                <th className="px-5 py-3.5">HÀNH ĐỘNG / TÓM TẮT</th>
-                <th className="px-5 py-3.5">QUY MÔ</th>
+                <th className="px-5 py-3.5">NỘI DUNG THỰC HIỆN</th>
                 <th className="px-5 py-3.5">LÝ DO (AUDIT REASON)</th>
-                <th className="px-5 py-3.5 text-right">HOÀN TÁC</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono text-slate-700 dark:text-slate-300">

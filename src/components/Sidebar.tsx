@@ -49,31 +49,46 @@ export const Sidebar: React.FC<SidebarProps> = ({
       group: 'TỔNG QUAN',
       items: [
         { id: 'dashboard', label: 'SOC Dashboard', icon: LayoutDashboard },
+      ]
+    },
+    {
+      group: 'THREAT INTELLIGENCE',
+      items: [
         { id: 'domain', label: 'Domain Explorer', icon: Globe },
-      ]
-    },
-    {
-      group: 'QUY TRÌNH & KIỂM DUYỆT',
-      items: [
-        { id: 'review', label: 'Hàng đợi duyệt', icon: CheckSquare },
-        { id: 'release', label: 'Blocklist URL', icon: Rocket },
-        { id: 'import', label: 'Nhập Batch', icon: Upload },
-      ]
-    },
-    {
-      group: 'MANAGEMENT & ACCOUNTS',
-      items: [
         { id: 'sources', label: 'Nguồn Threat Feeds', icon: Rss },
-        { id: 'logs', label: 'Nhật ký Audit Logs', icon: History },
-        ...(userRole === 'Admin'
-          ? [
-              { id: 'dns-nodes', label: 'Quản lý DNS Node', icon: Server },
-              { id: 'login-logs', label: 'Nhật ký đăng nhập', icon: ShieldCheck },
-              { id: 'users', label: 'Người dùng & Phân quyền', icon: Users },
-            ]
-          : []),
       ]
-    }
+    },
+    {
+      group: 'KIỂM DUYỆT & XỬ LÝ',
+      items: [
+        { id: 'import', label: 'Nhập Batch', icon: Upload },
+        { id: 'review', label: 'Hàng đợi duyệt', icon: CheckSquare },
+        { id: 'release', label: 'DNS Blocklist URL', icon: Rocket },
+      ]
+    },
+    {
+      group: 'HẠ TẦNG',
+      items: [
+        ...(userRole === 'Admin' ? [{ id: 'dns-nodes', label: 'Quản lý DNS Node', icon: Server }] : []),
+      ]
+    },
+    {
+      group: 'NHẬT KÝ & GIÁM SÁT',
+      items: [
+        { id: 'logs', label: 'Nhật ký Audit', icon: History },
+        ...(userRole === 'Admin' ? [{ id: 'login-logs', label: 'Nhật ký đăng nhập', icon: ShieldCheck }] : []),
+      ]
+    },
+    {
+      group: 'QUẢN TRỊ TÀI KHOẢN',
+      items: [
+        ...(userRole === 'Admin' ? [{ id: 'users', label: 'Người dùng & Phân quyền', icon: Users }] : []),
+      ]
+    },
+    // Groups that end up with zero items for the current role (HẠ TẦNG /
+    // QUẢN TRỊ TÀI KHOẢN are entirely Admin-gated) are filtered out below,
+    // right before rendering — otherwise a non-Admin would see an empty
+    // group heading with nothing under it.
   ];
 
   return (
@@ -152,7 +167,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Navigation Links */}
         <div className="flex-1 overflow-y-auto py-3 px-2 space-y-4 text-xs font-medium scrollbar-thin">
-          {navItems.map((sec, secIdx) => (
+          {navItems.filter((sec) => sec.items.length > 0).map((sec, secIdx) => (
             <div key={secIdx}>
               {!isCollapsed && (
                 <div className="px-3 mb-1.5 mt-6 first:mt-0 text-[11px] font-bold text-slate-400 dark:text-slate-500 tracking-[.06em] uppercase">
