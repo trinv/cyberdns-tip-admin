@@ -865,20 +865,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* DNS Node status map — read-only copy of DnsNodesView.tsx's own
-          card, Admin-only (see isAdmin prop's own note above). */}
-      {isAdmin && (
-        <Suspense
-          fallback={
-            <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xs text-xs text-slate-400 dark:text-slate-500">
-              Đang tải...
-            </div>
-          }
-        >
-          <DnsNodeStatusCard />
-        </Suspense>
-      )}
-
       {/* Row 3: High-Risk TLD & ASNs (real data only — the brand-impersonation
           panel that used to sit alongside this was 100% fabricated with no
           backing data source, so it was removed rather than left showing
@@ -990,6 +976,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           )}
         </div>
       </div>
+
+      {/* DNS Node status map — read-only copy of DnsNodesView.tsx's own
+          card, Admin-only (see isAdmin prop's own note above). Placed last
+          on the page per explicit request — infrastructure/reference info,
+          not an operational metric that needs to be seen first, same
+          reasoning as the DNS Blocklist URL card just above it. */}
+      {isAdmin && (
+        <Suspense
+          fallback={
+            <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xs text-xs text-slate-400 dark:text-slate-500">
+              Đang tải...
+            </div>
+          }
+        >
+          <DnsNodeStatusCard />
+        </Suspense>
+      )}
       </div>
 
       {/* Metric Detail Modal when clicking on any of the 3 Top KPI Blocks */}
