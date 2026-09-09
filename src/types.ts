@@ -171,7 +171,11 @@ export interface DnsNode {
   id: number;
   name: string;
   hostname: string | null;
-  ipAddress: string;
+  // A node may have only an IPv4 address, only an IPv6 address, or both —
+  // the app requires at least one of the two (see AddEditDnsNodeModal.tsx
+  // and createDnsNode/updateDnsNode in src/db/queries.ts), never both null.
+  ipAddress: string | null;
+  ipv6Address: string | null;
   tier: 'LITE' | 'PRO' | 'FAMILY' | string;
   location: string | null;
   latitude: number | null;

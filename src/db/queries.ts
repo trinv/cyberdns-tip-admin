@@ -13,7 +13,13 @@ import {
   blocklistAclSettings,
   blocklistUnknownRequesters,
 } from './schema.ts';
-import { eq, desc, asc, sql, ilike, and, inArray } from 'drizzle-orm';
+import { eq, desc, asc, sql, ilike, and, or, inArray } from 'drizzle-orm';
+// Built into Node (no new dependency) — the authoritative format check for
+// dnsNodes.ipAddress/ipv6Address in createDnsNode/updateDnsNode below. The
+// client (AddEditDnsNodeModal.tsx) has its own regex-based sanity check for
+// immediate UX feedback, but this is the real validation the DB boundary
+// relies on.
+import { isIPv4, isIPv6 } from 'node:net';
 import { parseFeedText } from './feedParser.ts';
 import { hashPassword, verifyPassword, generateSessionToken, generateTempPassword } from '../lib/password.ts';
 import { sendNewIpLoginAlert } from '../lib/mailer.ts';
@@ -2629,11 +2635,34 @@ export async function getDnsNodes() {
   }
 }
 
+// Shared by createDnsNode and updateDnsNode below: a node needs at least
+// one of ipAddress/ipv6Address (not necessarily both), and whichever is
+// present must actually be a well-formed address of its own kind — using
+// node:net's isIPv4/isIPv6 (built-in, authoritative) rather than a hand-
+// rolled regex, so e.g. an IPv6 literal pasted into the IPv4 field is
+// rejected instead of silently stored. Called with the FINAL values that
+// would actually be written — for updateDnsNode that means the patch
+// merged onto the existing row (see its own call site), since a patch
+// touching only one of the two columns must still be rejected if it would
+// leave both empty.
+function validateDnsNodeAddresses(ipAddress: string | null, ipv6Address: string | null) {
+  if (!ipAddress && !ipv6Address) {
+    throw new Error('Phải khai báo ít nhất 1 địa chỉ IP (IPv4 hoặc IPv6).');
+  }
+  if (ipAddress && !isIPv4(ipAddress)) {
+    throw new Error(`Địa chỉ IPv4 "${ipAddress}" không hợp lệ.`);
+  }
+  if (ipv6Address && !isIPv6(ipv6Address)) {
+    throw new Error(`Địa chỉ IPv6 "${ipv6Address}" không hợp lệ.`);
+  }
+}
+
 export async function createDnsNode(
   data: {
     name: string;
     hostname?: string | null;
-    ipAddress: string;
+    ipAddress?: string | null;
+    ipv6Address?: string | null;
     tier?: string;
     location?: string | null;
     latitude?: number | null;
@@ -2644,6 +2673,10 @@ export async function createDnsNode(
   },
   actingUser: { email?: string; role?: string } = {}
 ) {
+  const ipAddress = data.ipAddress?.trim() || null;
+  const ipv6Address = data.ipv6Address?.trim() || null;
+  validateDnsNodeAddresses(ipAddress, ipv6Address);
+
   try {
     return await db.transaction(async (tx) => {
       const created = await tx
@@ -2651,7 +2684,8 @@ export async function createDnsNode(
         .values({
           name: data.name.trim(),
           hostname: data.hostname?.trim() || null,
-          ipAddress: data.ipAddress.trim(),
+          ipAddress,
+          ipv6Address,
           tier: data.tier || 'LITE',
           location: data.location?.trim() || null,
           latitude: data.latitude ?? null,
@@ -2667,7 +2701,7 @@ export async function createDnsNode(
         role: actingUser.role || 'Admin',
         action: 'dns_node_add',
         targetCount: 1,
-        summary: `Thêm DNS node "${created[0].name}" (${created[0].ipAddress})`,
+        summary: `Thêm DNS node "${created[0].name}" (${[created[0].ipAddress, created[0].ipv6Address].filter(Boolean).join(' / ')})`,
         reason: `Thêm mới node hạ tầng DNS — tier ${created[0].tier}`,
         canRollback: false,
       });
@@ -2676,7 +2710,11 @@ export async function createDnsNode(
     });
   } catch (error: any) {
     if (error?.code === '23505' || error?.cause?.code === '23505') {
-      throw new Error(`Địa chỉ IP "${data.ipAddress}" đã được đăng ký cho một node khác.`);
+      const constraintName = String(error?.constraint || error?.cause?.constraint || '');
+      if (constraintName.includes('ipv6')) {
+        throw new Error(`Địa chỉ IPv6 "${ipv6Address}" đã được đăng ký cho một node khác.`);
+      }
+      throw new Error(`Địa chỉ IPv4 "${ipAddress}" đã được đăng ký cho một node khác.`);
     }
     console.error('createDnsNode failed:', error);
     throw error instanceof Error && !error.cause ? error : new Error('Failed to create DNS node', { cause: error });
@@ -2688,7 +2726,8 @@ export async function updateDnsNode(
   patch: {
     name?: string;
     hostname?: string | null;
-    ipAddress?: string;
+    ipAddress?: string | null;
+    ipv6Address?: string | null;
     tier?: string;
     location?: string | null;
     latitude?: number | null;
@@ -2701,10 +2740,14 @@ export async function updateDnsNode(
 ) {
   try {
     return await db.transaction(async (tx) => {
+      const existing = await tx.select().from(dnsNodes).where(eq(dnsNodes.id, id)).limit(1);
+      if (!existing[0]) throw new Error(`DNS node id ${id} not found`);
+
       const setValues: Record<string, any> = { updatedAt: new Date() };
       if (patch.name !== undefined) setValues.name = patch.name.trim();
       if (patch.hostname !== undefined) setValues.hostname = patch.hostname?.trim() || null;
-      if (patch.ipAddress !== undefined) setValues.ipAddress = patch.ipAddress.trim();
+      if (patch.ipAddress !== undefined) setValues.ipAddress = patch.ipAddress?.trim() || null;
+      if (patch.ipv6Address !== undefined) setValues.ipv6Address = patch.ipv6Address?.trim() || null;
       if (patch.tier !== undefined) setValues.tier = patch.tier;
       if (patch.location !== undefined) setValues.location = patch.location?.trim() || null;
       if (patch.latitude !== undefined) setValues.latitude = patch.latitude;
@@ -2712,6 +2755,15 @@ export async function updateDnsNode(
       if (patch.provider !== undefined) setValues.provider = patch.provider?.trim() || null;
       if (patch.status !== undefined) setValues.status = patch.status;
       if (patch.notes !== undefined) setValues.notes = patch.notes?.trim() || null;
+
+      // Validate the FINAL values (patch's value if it touched this
+      // column, else whatever's already on the row) — a patch that only
+      // clears ipv6Address, say, must still be rejected if the node's
+      // ipAddress is also empty, which wasn't reachable before ipAddress
+      // became nullable.
+      const finalIpAddress = 'ipAddress' in setValues ? setValues.ipAddress : existing[0].ipAddress;
+      const finalIpv6Address = 'ipv6Address' in setValues ? setValues.ipv6Address : existing[0].ipv6Address;
+      validateDnsNodeAddresses(finalIpAddress, finalIpv6Address);
 
       const updated = await tx.update(dnsNodes).set(setValues).where(eq(dnsNodes.id, id)).returning();
       if (!updated[0]) throw new Error(`DNS node id ${id} not found`);
@@ -2721,7 +2773,7 @@ export async function updateDnsNode(
         role: actingUser.role || 'Admin',
         action: 'dns_node_update',
         targetCount: 1,
-        summary: `Cập nhật DNS node "${updated[0].name}" (${updated[0].ipAddress})`,
+        summary: `Cập nhật DNS node "${updated[0].name}" (${[updated[0].ipAddress, updated[0].ipv6Address].filter(Boolean).join(' / ')})`,
         reason:
           patch.status !== undefined
             ? `Đổi trạng thái node sang ${patch.status === 'active' ? 'Active' : 'Inactive'}`
@@ -2733,7 +2785,11 @@ export async function updateDnsNode(
     });
   } catch (error: any) {
     if (error?.code === '23505' || error?.cause?.code === '23505') {
-      throw new Error(`Địa chỉ IP "${patch.ipAddress}" đã được đăng ký cho một node khác.`);
+      const constraintName = String(error?.constraint || error?.cause?.constraint || '');
+      if (constraintName.includes('ipv6')) {
+        throw new Error(`Địa chỉ IPv6 "${patch.ipv6Address}" đã được đăng ký cho một node khác.`);
+      }
+      throw new Error(`Địa chỉ IPv4 "${patch.ipAddress}" đã được đăng ký cho một node khác.`);
     }
     console.error('updateDnsNode failed:', error);
     throw error instanceof Error && !error.cause ? error : new Error('Failed to update DNS node', { cause: error });
@@ -2753,7 +2809,7 @@ export async function deleteDnsNode(id: number, actingUser: { email?: string; ro
         role: actingUser.role || 'Admin',
         action: 'dns_node_delete',
         targetCount: 1,
-        summary: `Xoá DNS node "${existing[0].name}" (${existing[0].ipAddress})`,
+        summary: `Xoá DNS node "${existing[0].name}" (${[existing[0].ipAddress, existing[0].ipv6Address].filter(Boolean).join(' / ')})`,
         reason: 'Xoá node khỏi danh sách hạ tầng DNS',
         canRollback: false,
       });
@@ -2848,10 +2904,19 @@ export async function evaluateBlocklistAccess(
   category: string
 ): Promise<{ allowed: boolean; isKnownNode: boolean }> {
   try {
+    // Matches against EITHER address column — a node registered with only
+    // an ipv6Address (no ipAddress) must still be recognized when its real
+    // traffic arrives over IPv6, not just the IPv4 case this used to be
+    // the only column for.
     const match = await db
       .select({ id: dnsNodes.id })
       .from(dnsNodes)
-      .where(and(eq(dnsNodes.ipAddress, ipAddress), eq(dnsNodes.status, 'active')))
+      .where(
+        and(
+          or(eq(dnsNodes.ipAddress, ipAddress), eq(dnsNodes.ipv6Address, ipAddress)),
+          eq(dnsNodes.status, 'active')
+        )
+      )
       .limit(1);
     if (match[0]) return { allowed: true, isKnownNode: true };
 

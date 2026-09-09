@@ -324,7 +324,7 @@ export const DnsNodesView: React.FC = () => {
               <tr>
                 <th className="px-5 py-3.5">TÊN NODE</th>
                 <th className="px-5 py-3.5">IP / HOSTNAME</th>
-                <th className="px-5 py-3.5">TIER</th>
+                <th className="px-5 py-3.5">PROFILE</th>
                 <th className="px-5 py-3.5">VỊ TRÍ</th>
                 <th className="px-5 py-3.5">NHÀ CUNG CẤP</th>
                 <th className="px-5 py-3.5">TRẠNG THÁI</th>
@@ -343,7 +343,8 @@ export const DnsNodesView: React.FC = () => {
                 <tr key={n.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
                   <td className="px-5 py-3.5 font-sans font-semibold text-slate-800 dark:text-slate-200">{n.name}</td>
                   <td className="px-5 py-3.5 font-mono">
-                    <div className="text-slate-800 dark:text-slate-200">{n.ipAddress}</div>
+                    {n.ipAddress && <div className="text-slate-800 dark:text-slate-200">{n.ipAddress}</div>}
+                    {n.ipv6Address && <div className="text-slate-800 dark:text-slate-200 truncate max-w-[200px]" title={n.ipv6Address}>{n.ipv6Address}</div>}
                     {n.hostname && <div className="text-slate-400 dark:text-slate-500">{n.hostname}</div>}
                   </td>
                   <td className="px-5 py-3.5">
@@ -402,7 +403,7 @@ export const DnsNodesView: React.FC = () => {
       <ConfirmModal
         isOpen={!!nodeToDelete}
         title="Xoá DNS node?"
-        message={`Node "${nodeToDelete?.name}" (${nodeToDelete?.ipAddress}) sẽ bị xoá vĩnh viễn khỏi danh sách. Nếu ACL đang bật, node này sẽ mất quyền truy cập Blocklist URL ngay lập tức.`}
+        message={`Node "${nodeToDelete?.name}" (${[nodeToDelete?.ipAddress, nodeToDelete?.ipv6Address].filter(Boolean).join(' / ')}) sẽ bị xoá vĩnh viễn khỏi danh sách. Nếu ACL đang bật, node này sẽ mất quyền truy cập Blocklist URL ngay lập tức.`}
         confirmLabel="Xoá node"
         tone="danger"
         isProcessing={isDeleting}

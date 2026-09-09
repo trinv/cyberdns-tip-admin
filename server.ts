@@ -264,9 +264,14 @@ async function startServer() {
 
   app.post('/api/dns-nodes', requireAuth, requireRole('Admin'), async (req: AuthRequest, res) => {
     try {
-      const { name, ipAddress } = req.body;
-      if (!name || !ipAddress) {
-        return res.status(400).json({ error: 'name và ipAddress là bắt buộc.' });
+      const { name, ipAddress, ipv6Address } = req.body;
+      // A node needs at least one address (IPv4 or IPv6), not necessarily
+      // both — the real per-field format validation (net.isIPv4/isIPv6)
+      // and the same "at least one" check on PATCH both live in
+      // createDnsNode/updateDnsNode (src/db/queries.ts), since PATCH has
+      // no equivalent presence check here.
+      if (!name || (!ipAddress && !ipv6Address)) {
+        return res.status(400).json({ error: 'name và ít nhất 1 trong 2 địa chỉ IP (IPv4/IPv6) là bắt buộc.' });
       }
       const created = await createDnsNode(req.body, { email: req.user?.email, role: req.user?.role });
       res.status(201).json({ success: true, node: created });

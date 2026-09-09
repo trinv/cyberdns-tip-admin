@@ -392,8 +392,9 @@ export const savedFilters = pgTable(
 // feed source). Purpose: (a) an operational inventory of the physical/
 // virtual servers running Blocky, with location/provider/tier for map +
 // reporting, and (b) the allowlist backing the Blocklist-URL ACL below —
-// only the ipAddress of a `status = 'active'` row here is ever allowed to
-// bypass that ACL. See getBlocklistTextForCategory's call site in server.ts.
+// only an ipAddress/ipv6Address of a `status = 'active'` row here is ever
+// allowed to bypass that ACL. See getBlocklistTextForCategory's call site
+// in server.ts, and evaluateBlocklistAccess in this file for the match.
 export const dnsNodes = pgTable(
   'dns_nodes',
   {
@@ -402,9 +403,22 @@ export const dnsNodes = pgTable(
     // Display-only — NEVER used to decide ACL access. Matching by hostname
     // would mean trusting reverse/forward DNS, which is trivially spoofable
     // by anyone who controls the requesting host's own resolver; the real
-    // ACL key is always ipAddress below.
+    // ACL key is always ipAddress/ipv6Address below.
     hostname: text('hostname'),
-    ipAddress: varchar('ip_address', { length: 64 }).notNull().unique(),
+    // A node's IPv4 address — nullable (a node may be IPv6-only), but the
+    // application layer (see createDnsNode/updateDnsNode) requires at
+    // least one of ipAddress/ipv6Address to be set; not enforced as a DB
+    // CHECK constraint, matching this schema's existing convention of
+    // validating business rules in code rather than at the DB level.
+    // Column name kept as `ip_address` (not renamed to `ipv4_address`) to
+    // avoid an unnecessary rename touching evaluateBlocklistAccess, audit
+    // logs, and the push-based migration.
+    ipAddress: varchar('ip_address', { length: 64 }).unique(),
+    // A node's IPv6 address — same nullable/unique/"at least one of the
+    // two" reasoning as ipAddress above. Postgres allows multiple NULLs in
+    // a UNIQUE column, so IPv4-only nodes never collide with each other
+    // here.
+    ipv6Address: varchar('ipv6_address', { length: 64 }).unique(),
     // 'LITE' | 'PRO' | 'FAMILY' — which CyberDNS product tier this resolver
     // serves; free-form varchar (not a DB enum) so a new tier never needs a
     // migration, same reasoning as domains.status/feedSources.status above.

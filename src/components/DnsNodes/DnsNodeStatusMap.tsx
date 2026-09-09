@@ -142,7 +142,8 @@ export const DnsNodeStatusMap: React.FC<DnsNodeStatusMapProps> = ({ nodes, heigh
               <div className="text-slate-500 dark:text-slate-400">
                 {n.tier} · {n.status === 'active' ? 'Active' : 'Inactive'}
               </div>
-              <div className="font-mono text-slate-500 dark:text-slate-400">{n.ipAddress}</div>
+              {n.ipAddress && <div className="font-mono text-slate-500 dark:text-slate-400">{n.ipAddress}</div>}
+              {n.ipv6Address && <div className="font-mono text-slate-500 dark:text-slate-400">{n.ipv6Address}</div>}
               {n.location && <div className="text-slate-400 dark:text-slate-500">{n.location}</div>}
             </MarkerTooltip>
           </MapMarker>

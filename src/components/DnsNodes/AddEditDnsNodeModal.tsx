@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Map, MapMarker, MarkerContent, type MapRef } from '@/components/ui/map';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2, AlertTriangle } from 'lucide-react';
 import { DnsNode, GeoCountry, GeoProvince } from '../../types';
 import { fetchGeoCountries, fetchGeoProvinces } from '../../lib/api';
 
@@ -24,7 +24,12 @@ export const AddEditDnsNodeModal: React.FC<AddEditDnsNodeModalProps> = ({
 }) => {
   const isEditing = !!nodeToEdit;
   const [name, setName] = useState('');
-  const [ipAddress, setIpAddress] = useState('');
+  // A node may have only an IPv4 address, only an IPv6 address, or both —
+  // see AddEditDnsNodeModal's own form section below and
+  // createDnsNode/updateDnsNode in src/db/queries.ts (the actual "at least
+  // one" + format enforcement).
+  const [ipv4Address, setIpv4Address] = useState('');
+  const [ipv6Address, setIpv6Address] = useState('');
   const [hostname, setHostname] = useState('');
   const [tier, setTier] = useState<(typeof TIERS)[number]>('LITE');
   const [status, setStatus] = useState<'active' | 'inactive'>('active');
@@ -34,6 +39,10 @@ export const AddEditDnsNodeModal: React.FC<AddEditDnsNodeModalProps> = ({
   const [longitude, setLongitude] = useState('');
   const [notes, setNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  // Submit-time validation/server error — shown inline right above the
+  // buttons; previously an invalid submit just silently no-op'd with no
+  // feedback at all.
+  const [formError, setFormError] = useState('');
 
   // ---- Country/Province location picker ----
   const [countries, setCountries] = useState<GeoCountry[]>([]);
@@ -54,7 +63,8 @@ export const AddEditDnsNodeModal: React.FC<AddEditDnsNodeModalProps> = ({
   useEffect(() => {
     if (!isOpen) return;
     setName(nodeToEdit?.name || '');
-    setIpAddress(nodeToEdit?.ipAddress || '');
+    setIpv4Address(nodeToEdit?.ipAddress || '');
+    setIpv6Address(nodeToEdit?.ipv6Address || '');
     setHostname(nodeToEdit?.hostname || '');
     setTier((nodeToEdit?.tier as (typeof TIERS)[number]) || 'LITE');
     setStatus(nodeToEdit?.status || 'active');
@@ -63,6 +73,7 @@ export const AddEditDnsNodeModal: React.FC<AddEditDnsNodeModalProps> = ({
     setLatitude(nodeToEdit?.latitude != null ? String(nodeToEdit.latitude) : '');
     setLongitude(nodeToEdit?.longitude != null ? String(nodeToEdit.longitude) : '');
     setNotes(nodeToEdit?.notes || '');
+    setFormError('');
     // Country/Province always start unselected on open — an existing node's
     // free-text `location` (e.g. "Hà Nội - VNPT IDC", entered before this
     // picker existed) can't be reliably reverse-matched to one exact dataset
@@ -128,20 +139,52 @@ export const AddEditDnsNodeModal: React.FC<AddEditDnsNodeModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Basic IPv4/IPv6 sanity check — not exhaustive RFC validation, just
-  // enough to catch an obvious typo (e.g. a hostname pasted into the IP
-  // field) before it hits the ACL's exact-match check server-side.
-  const isValidIp = (v: string) => /^(\d{1,3}\.){3}\d{1,3}$/.test(v.trim()) || /^[0-9a-fA-F:]+$/.test(v.trim());
+  // Client-side sanity checks only — not exhaustive RFC 4291/791 parsers,
+  // just enough to catch an obvious typo (a hostname pasted into an IP
+  // field, an IPv6 literal pasted into the IPv4 field, octets out of
+  // range) before it reaches the server. node:net's isIPv4/isIPv6
+  // (src/db/queries.ts's validateDnsNodeAddresses) is the real authority —
+  // it isn't available in the browser bundle, hence a regex here instead.
+  const isValidIPv4 = (v: string) =>
+    /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/.test(v.trim());
+  // The commonly-used comprehensive IPv6 pattern — covers full/compressed
+  // (`::`) notation, embedded IPv4-mapped forms, and link-local `%zone`
+  // suffixes. Still not a 100% RFC 4291 parser (e.g. doesn't reject a
+  // second `::` in the same address), but far tighter than a bare
+  // "hex digits and colons" check.
+  const IPV6_REGEX =
+    /^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]+|::(ffff(:0{1,4})?:)?((25[0-5]|(2[0-4]|1?[0-9])?[0-9])\.){3}(25[0-5]|(2[0-4]|1?[0-9])?[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1?[0-9])?[0-9])\.){3}(25[0-5]|(2[0-4]|1?[0-9])?[0-9]))$/;
+  const isValidIPv6 = (v: string) => IPV6_REGEX.test(v.trim());
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !ipAddress.trim() || !isValidIp(ipAddress)) return;
+    setFormError('');
+
+    if (!name.trim()) {
+      setFormError('Tên node là bắt buộc.');
+      return;
+    }
+    const v4 = ipv4Address.trim();
+    const v6 = ipv6Address.trim();
+    if (!v4 && !v6) {
+      setFormError('Phải điền ít nhất 1 trong 2 địa chỉ IP (IPv4 hoặc IPv6).');
+      return;
+    }
+    if (v4 && !isValidIPv4(v4)) {
+      setFormError(`Địa chỉ IPv4 "${v4}" không hợp lệ.`);
+      return;
+    }
+    if (v6 && !isValidIPv6(v6)) {
+      setFormError(`Địa chỉ IPv6 "${v6}" không hợp lệ.`);
+      return;
+    }
 
     setIsSaving(true);
     try {
       await onSave({
         name: name.trim(),
-        ipAddress: ipAddress.trim(),
+        ipAddress: v4 || null,
+        ipv6Address: v6 || null,
         hostname: hostname.trim() || null,
         tier,
         status,
@@ -152,6 +195,13 @@ export const AddEditDnsNodeModal: React.FC<AddEditDnsNodeModalProps> = ({
         notes: notes.trim() || null,
       });
       onClose();
+    } catch (err: any) {
+      // onSave (DnsNodesView.handleSaveNode) re-throws on failure so this
+      // modal stays open — surface the server's own friendly message
+      // (e.g. a duplicate-address error from createDnsNode/updateDnsNode)
+      // right here instead of it only showing in DnsNodesView's toast,
+      // which the admin might not connect back to which field was wrong.
+      setFormError(err?.message || 'Không thể lưu DNS node — vui lòng thử lại.');
     } finally {
       setIsSaving(false);
     }
@@ -173,38 +223,52 @@ export const AddEditDnsNodeModal: React.FC<AddEditDnsNodeModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
-                TÊN NODE <span className="text-rose-500">*</span>
-              </label>
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
+              TÊN NODE <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="ví dụ: HN-EDGE-01"
+              className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none"
+            />
+          </div>
+
+          {/* Không dùng `required` HTML trên 2 ô này — không ô nào riêng lẻ
+              bắt buộc, chỉ cần ÍT NHẤT 1 trong 2 (xem ghi chú bên dưới +
+              handleSubmit). Một node có thể chỉ có IPv4, chỉ có IPv6, hoặc
+              cả 2. */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
+              ĐỊA CHỈ IP <span className="text-rose-500">*</span>
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <input
                 type="text"
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="ví dụ: HN-EDGE-01"
-                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none"
+                value={ipv4Address}
+                onChange={(e) => setIpv4Address(e.target.value)}
+                placeholder="IPv4 — ví dụ: 103.21.244.10"
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-800 rounded-xl px-3.5 py-2 font-mono text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none"
               />
-            </div>
-            <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
-                ĐỊA CHỈ IP <span className="text-rose-500">*</span> (khoá ACL)
-              </label>
               <input
                 type="text"
-                required
-                value={ipAddress}
-                onChange={(e) => setIpAddress(e.target.value)}
-                placeholder="ví dụ: 103.21.244.10"
+                value={ipv6Address}
+                onChange={(e) => setIpv6Address(e.target.value)}
+                placeholder="IPv6 — ví dụ: 2001:db8::1"
                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-800 rounded-xl px-3.5 py-2 font-mono text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none"
               />
             </div>
+            <p className="text-slate-400 dark:text-slate-500">
+              * Phải điền ít nhất 1 trong 2 địa chỉ (IPv4 hoặc IPv6) — có thể điền cả 2 nếu node dual-stack.
+            </p>
           </div>
 
           <div className="space-y-1.5">
             <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
-              HOSTNAME (chỉ hiển thị, không dùng để so khớp ACL)
+              HOSTNAME
             </label>
             <input
               type="text"
@@ -217,7 +281,7 @@ export const AddEditDnsNodeModal: React.FC<AddEditDnsNodeModalProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">TIER</label>
+              <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">PROFILE</label>
               <select
                 value={tier}
                 onChange={(e) => setTier(e.target.value as (typeof TIERS)[number])}
@@ -338,7 +402,7 @@ export const AddEditDnsNodeModal: React.FC<AddEditDnsNodeModalProps> = ({
             </div>
             <div className="space-y-1.5">
               <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
-                TOẠ ĐỘ (tự động điền, có thể chỉnh tay)
+                TOẠ ĐỘ
               </label>
               <div className="grid grid-cols-2 gap-2">
                 <input
@@ -371,6 +435,13 @@ export const AddEditDnsNodeModal: React.FC<AddEditDnsNodeModalProps> = ({
               className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-emerald-500 rounded-xl px-3.5 py-2 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none resize-none"
             />
           </div>
+
+          {formError && (
+            <div className="flex items-start space-x-2 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 rounded-xl px-3.5 py-2.5 font-medium">
+              <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <span>{formError}</span>
+            </div>
+          )}
 
           <div className="flex items-center justify-end space-x-2 pt-4 border-t border-slate-100 dark:border-slate-800">
             <button
