@@ -91,7 +91,7 @@ export const ReleasesView: React.FC<ReleasesViewProps> = ({ categories, stats, o
   };
 
   return (
-    <div className="flex-1 bg-[#f8fafc] dark:bg-[#0B1120] overflow-y-auto p-4 sm:p-6 space-y-6 transition-colors">
+    <div className="flex-1 bg-[#f8fafc] dark:bg-[#0B1120] overflow-y-auto p-4 sm:p-6 space-y-6 text-slate-700 dark:text-slate-300 text-xs transition-colors">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs transition-colors">
         <div className="flex items-center space-x-3.5">
@@ -122,12 +122,12 @@ export const ReleasesView: React.FC<ReleasesViewProps> = ({ categories, stats, o
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse min-w-[860px]">
             <thead>
-              <tr className="bg-slate-50/80 dark:bg-slate-800/60 text-slate-400 dark:text-slate-500 font-mono font-medium text-[10px] tracking-[.14em] uppercase border-b border-slate-100 dark:border-slate-800">
-                <th className="px-5 py-3">Nhóm danh mục</th>
+              <tr className="bg-slate-50/80 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 font-bold border-b border-slate-100 dark:border-slate-800">
+                <th className="px-5 py-3">NHÓM DANH MỤC</th>
                 <th className="px-5 py-3">URL</th>
-                <th className="px-5 py-3 text-right">Domain (CSDL)</th>
-                <th className="px-5 py-3">Trạng thái kiểm tra</th>
-                <th className="px-5 py-3 text-right">Thao tác</th>
+                <th className="px-5 py-3 text-right">DOMAIN (CSDL)</th>
+                <th className="px-5 py-3">TRẠNG THÁI KIỂM TRA</th>
+                <th className="px-5 py-3 text-right">THAO TÁC</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
