@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Plus, Tag, ShieldCheck, Trash2, Edit3 } from 'lucide-react';
+import { X, Tag, Trash2, Edit3 } from 'lucide-react';
 import { CategoryInfo } from '../../types';
 import { ConfirmModal } from './ConfirmModal';
 

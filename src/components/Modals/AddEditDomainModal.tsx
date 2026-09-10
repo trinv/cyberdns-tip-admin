@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import { X } from 'lucide-react';
 import { CategoryInfo, DomainItem } from '../../types';
 
 interface AddEditDomainModalProps {

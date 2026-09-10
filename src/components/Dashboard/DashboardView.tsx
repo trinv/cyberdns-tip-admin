@@ -32,41 +32,16 @@ Chart.register(
   Tooltip,
 );
 import {
-  ShieldAlert,
-  ShieldCheck,
-  Activity,
-  Globe,
-  Database,
   ArrowUpRight,
-  ArrowDownRight,
   AlertTriangle,
   CheckCircle2,
-  TrendingUp,
   Layers,
-  RefreshCw,
-  BarChart3,
-  Download,
-  Radio,
-  PieChart as PieIcon,
   ChevronRight,
   ExternalLink,
   Shield,
-  Server,
-  Eye,
-  FileText,
   Check,
   MoreVertical,
-  Zap,
-  Lock,
   AlertOctagon,
-  Terminal,
-  Filter,
-  Crosshair,
-  Flame,
-  Share2,
-  Search,
-  ArrowRight,
-  PlayCircle,
   Link2,
   Copy,
   Files,
@@ -311,8 +286,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       statusChartRef.current?.destroy();
       statusChartRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- same reasoning
-    // as the other chart effects: statusBreakdownSorted is a derived array.
+    // statusBreakdownSorted is a derived array (new ref each render); the
+    // JSON.stringify in the dep list is the deliberate value-compare.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(statusBreakdownSorted), themeVersion]);
 
   // Donut slices — Chart.js (see the canvas effect below) computes its own
@@ -463,10 +439,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       growthChartRef.current?.destroy();
       growthChartRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- same reasoning
-    // as the donut chart's effect above: domainGrowth is a derived array
-    // (new reference on every render), so comparing its real values (via
-    // JSON) is what actually matters, not the reference.
+    // domainGrowth is a derived array (new reference on every render), so
+    // comparing its real values via JSON in the dep list is what matters,
+    // not the reference.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(domainGrowth), themeVersion]);
 
   useEffect(() => {
@@ -520,10 +496,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       donutChartRef.current?.destroy();
       donutChartRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- donutSlices is
-    // a derived array (new reference every render); comparing its actual
-    // values (JSON) here is unnecessary since the effect is cheap and only
-    // ever fires on a genuine stats/category refresh or theme change.
+    // donutSlices is a derived array (new reference every render); the
+    // effect is cheap and only ever fires on a genuine stats/category
+    // refresh or theme change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(donutSlices), themeVersion]);
 
   // TLD breakdown: real counts from GET /api/dashboard/stats. The bar width
@@ -623,8 +599,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       tldChartRef.current?.destroy();
       tldChartRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- same reasoning
-    // as the other chart effects: tldBreakdownSource is a derived array.
+    // tldBreakdownSource is a derived array (new ref each render); the
+    // JSON.stringify in the dep list is the deliberate value-compare.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(tldBreakdownSource), themeVersion]);
 
   const handleCopyBlocklistUrl = async (categoryId: string) => {

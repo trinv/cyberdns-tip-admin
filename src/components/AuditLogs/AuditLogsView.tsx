@@ -1,16 +1,6 @@
 import React, { useState } from 'react';
 import { AuditLog } from '../../types';
-import {
-  History,
-  CheckCircle2,
-  User,
-  Clock,
-  ShieldAlert,
-  Database,
-  Search,
-  FileText,
-  Sparkles,
-} from 'lucide-react';
+import { Search } from 'lucide-react';
 
 interface AuditLogsViewProps {
   logs: AuditLog[];

@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Globe, CheckSquare, Rocket, Menu, Sparkles, ShieldAlert } from 'lucide-react';
+import { LayoutDashboard, Globe, CheckSquare, Rocket, Menu } from 'lucide-react';
 
 interface MobileBottomNavProps {
   currentTab: string;

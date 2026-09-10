@@ -1,23 +1,11 @@
 import React from 'react';
 import {
   Search,
-  Plus,
   Bell,
   ChevronDown,
   Menu,
-  Settings,
-  Zap,
-  Grid,
-  Sparkles,
-  GitBranch,
-  CheckCircle2,
-  Shield,
-  ArrowUpRight,
   Sun,
   Moon,
-  ShieldCheck,
-  Keyboard,
-  HelpCircle,
   LayoutDashboard,
   Globe,
   CheckSquare,
@@ -31,7 +19,6 @@ import {
   Users,
   Server,
 } from 'lucide-react';
-import { CyberDNSLogo } from './CyberDNSLogo';
 import { AppUser } from '../types';
 import { useClickOutside } from '../hooks/useClickOutside';
 

@@ -1,16 +1,5 @@
 import React from 'react';
-import {
-  X,
-  Shield,
-  AlertTriangle,
-  Layers,
-  ArrowUpRight,
-  CheckCircle2,
-  Clock,
-  ExternalLink,
-  PieChart,
-  AlertOctagon,
-} from 'lucide-react';
+import { X, Shield, AlertTriangle, Layers, ExternalLink, PieChart, AlertOctagon } from 'lucide-react';
 import { FeedSource, CategoryInfo, DashboardStats, ReviewDomainItem } from '../../types';
 
 export type MetricType = 'total_blocked' | 'soc_queue' | 'sources_coverage';

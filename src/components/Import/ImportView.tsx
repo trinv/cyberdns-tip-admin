@@ -1,19 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CategoryInfo } from '../../types';
-import {
-  Upload,
-  FileText,
-  Globe,
-  CheckCircle2,
-  AlertTriangle,
-  ShieldCheck,
-  ArrowRight,
-  Sparkles,
-  Filter,
-  Database,
-  RefreshCw,
-  Layers,
-} from 'lucide-react';
+import { Upload, FileText, Globe, CheckCircle2, AlertTriangle, ArrowRight } from 'lucide-react';
 
 interface ImportViewProps {
   categories: CategoryInfo[];

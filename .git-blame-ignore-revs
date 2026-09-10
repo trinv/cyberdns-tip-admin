@@ -1,0 +1,5 @@
+# Revisions to skip in `git blame`. Enable once per clone:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# P3 (2/7): one-time `prettier --write .` — mechanical reformat, no logic change
+0b0e589cc601073532115e9f75acba49bef673f4
