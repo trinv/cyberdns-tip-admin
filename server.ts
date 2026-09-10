@@ -58,6 +58,7 @@ import {
 } from './src/db/queries.ts';
 import { requireAuth, requireRole, AuthRequest } from './src/middleware/auth.ts';
 import { createLoginRateLimiter } from './src/middleware/rateLimit.ts';
+import { securityHeaders } from './src/middleware/securityHeaders.ts';
 import { listCountries, listProvincesForCountry } from './src/lib/geo.ts';
 
 // The sandbox's file-watcher restart does not reliably terminate the previous
@@ -110,6 +111,13 @@ async function startServer() {
   // pairs with this by sending `X-Forwarded-For $remote_addr` (replace, not
   // append) as defence in depth.
   app.set('trust proxy', 1);
+
+  // Security response headers (HSTS, CSP, X-Frame-Options, nosniff, …) on
+  // every response — API JSON, the SPA shell and the public blocklist .txt
+  // alike. Set here in the app so they hold regardless of whether a
+  // reverse proxy in front adds its own (see src/middleware/securityHeaders.ts
+  // and deploy/nginx.conf.example).
+  app.use(securityHeaders());
 
   // Middleware. `limit` well above the largest legitimate body (bulk-propose
   // paste) but far below Nginx's client_max_body_size — Express's own 100KB
