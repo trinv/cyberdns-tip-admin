@@ -24,6 +24,7 @@ import {
   ExternalLink,
   Radio,
   CheckCircle2,
+  XCircle,
 } from 'lucide-react';
 
 const TIER_BADGE: Record<string, string> = {
@@ -153,6 +154,45 @@ export const DnsNodesView: React.FC = () => {
   };
 
   const activeCount = nodes.filter((n) => n.status === 'active').length;
+  const inactiveCount = nodes.length - activeCount;
+
+  // Dải KPI ngay dưới header — số liệu suy ra 100% từ state đã có (nodes,
+  // aclSettings, unknownRequesters), không gọi thêm API nào. Thay cho badge
+  // "Active/Total" nhỏ trước đây vốn chỉ hiện đúng 1 con số.
+  const kpiTiles = [
+    {
+      label: 'Tổng số node',
+      value: nodes.length,
+      Icon: Server,
+      iconClass: 'text-slate-400 dark:text-slate-500',
+    },
+    {
+      label: 'Đang hoạt động',
+      value: activeCount,
+      Icon: CheckCircle2,
+      iconClass: 'text-emerald-500 dark:text-emerald-400',
+    },
+    {
+      label: 'Ngừng hoạt động',
+      value: inactiveCount,
+      Icon: XCircle,
+      iconClass: 'text-slate-400 dark:text-slate-500',
+    },
+    {
+      label: 'ACL Blocklist',
+      value: aclSettings?.enforceEnabled ? 'Đang bật' : 'Chỉ ghi log',
+      Icon: aclSettings?.enforceEnabled ? ShieldCheck : ShieldAlert,
+      iconClass: aclSettings?.enforceEnabled
+        ? 'text-emerald-500 dark:text-emerald-400'
+        : 'text-amber-500 dark:text-amber-400',
+      // Chỉ hiện khi ACL CHƯA chặn thật (đang log-only) và có IP lạ — đúng
+      // lúc thông tin này có giá trị cảnh báo nhất.
+      sub:
+        !aclSettings?.enforceEnabled && unknownRequesters.length > 0
+          ? `${unknownRequesters.length} IP lạ`
+          : undefined,
+    },
+  ];
 
   return (
     <div className="flex-1 bg-[#f8fafc] dark:bg-[#0B1120] overflow-y-auto p-4 sm:p-6 space-y-6 text-slate-700 dark:text-slate-300 text-xs transition-colors">
@@ -162,9 +202,6 @@ export const DnsNodesView: React.FC = () => {
           <h1 className="text-lg font-bold font-sans text-slate-900 dark:text-white flex items-center space-x-2">
             <Server className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
             <span>Quản lý DNS Node</span>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800">
-              {activeCount}/{nodes.length} Active
-            </span>
           </h1>
           <p className="text-slate-500 dark:text-slate-400 text-xs mt-1">
             Danh sách các máy chủ DNS của CyberDNS, phục vụ giám sát hạ tầng và kiểm soát quyền truy cập
@@ -211,6 +248,27 @@ export const DnsNodesView: React.FC = () => {
         </div>
       </div>
 
+      {/* Dải KPI */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {kpiTiles.map((tile) => (
+          <div
+            key={tile.label}
+            className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-5 shadow-xs transition-colors"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wide text-[10px]">
+                {tile.label}
+              </span>
+              <tile.Icon className={`w-4 h-4 flex-shrink-0 ${tile.iconClass}`} />
+            </div>
+            <div className="mt-2 text-xl font-bold font-sans text-slate-900 dark:text-white">
+              {tile.value}
+            </div>
+            {tile.sub && <div className="mt-1 text-amber-600 dark:text-amber-400">{tile.sub}</div>}
+          </div>
+        ))}
+      </div>
+
       {message && (
         <div
           className={`flex items-start space-x-2 rounded-2xl px-4 py-3 font-medium border ${
@@ -235,8 +293,69 @@ export const DnsNodesView: React.FC = () => {
         </div>
       )}
 
+      {/* Bản đồ + rail ACL nhanh */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-5 shadow-xs transition-colors">
+          <h2 className="text-sm font-bold text-slate-900 dark:text-white font-sans mb-3">
+            CyberDNS Pop MAP
+          </h2>
+          {/* Chiều cao co theo bề ngang thực tế của cột: full-width dưới
+              lg (như trước), rồi giảm nhẹ đúng ở lg (1024–1279px, lúc cột
+              bản đồ hẹp nhất do chỉ còn lg:col-span-2 trong 3 cột) để tránh
+              tỷ lệ cao-hẹp bất thường, và tăng lại ở xl (1280px+) khi cột đã
+              đủ rộng. */}
+          <DnsNodeStatusMap
+            nodes={nodes}
+            heightClassName="h-[420px] sm:h-[520px] lg:h-[480px] xl:h-[560px]"
+          />
+          {nodes.every((n) => n.latitude == null || n.longitude == null) && nodes.length > 0 && (
+            <p className="text-slate-400 dark:text-slate-500 mt-2">
+              Chưa có node nào được nhập toạ độ — thêm vĩ độ/kinh độ khi sửa node để ghim lên bản đồ.
+            </p>
+          )}
+        </div>
+
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-5 shadow-xs transition-colors flex flex-col gap-3">
+          <h2 className="text-sm font-bold text-slate-900 dark:text-white font-sans">ACL nhanh</h2>
+          <div className="flex items-center gap-2.5">
+            <div
+              className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                aclSettings?.enforceEnabled
+                  ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400'
+                  : 'bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400'
+              }`}
+            >
+              {aclSettings?.enforceEnabled ? (
+                <ShieldCheck className="w-4 h-4" />
+              ) : (
+                <ShieldAlert className="w-4 h-4" />
+              )}
+            </div>
+            <span className="font-bold text-slate-800 dark:text-slate-200">
+              {aclSettings?.enforceEnabled ? 'Đang bật' : 'Chỉ ghi log'}
+            </span>
+          </div>
+          {!aclSettings?.enforceEnabled && unknownRequesters.length > 0 && (
+            <p className="text-amber-600 dark:text-amber-400">
+              {unknownRequesters.length} IP lạ đang được ghi log — chưa bị chặn thật.
+            </p>
+          )}
+          <button
+            onClick={() =>
+              document.getElementById('acl-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            }
+            className="mt-auto text-left font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 cursor-pointer"
+          >
+            Xem chi tiết ACL →
+          </button>
+        </div>
+      </div>
+
       {/* ACL card */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-5 shadow-xs transition-colors space-y-4">
+      <div
+        id="acl-panel"
+        className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-5 shadow-xs transition-colors space-y-4"
+      >
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-start space-x-3">
             <div
@@ -313,21 +432,6 @@ export const DnsNodesView: React.FC = () => {
               </table>
             </div>
           </div>
-        )}
-      </div>
-
-      {/* Map */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-5 shadow-xs transition-colors">
-        <h2 className="text-sm font-bold text-slate-900 dark:text-white font-sans mb-3">CyberDNS Pop MAP</h2>
-        {/* Lớn hơn bản sao trên Dashboard (h-[420px] cố định) — trang này
-            dành riêng cho việc xem bản đồ nên có nhiều không gian hơn để
-            dùng, mặc định 600px ở màn hình lớn (lg+), tự thu nhỏ dần trên
-            màn hình hẹp/mobile để không chiếm quá nhiều chỗ cuộn trang. */}
-        <DnsNodeStatusMap nodes={nodes} heightClassName="h-[420px] sm:h-[520px] lg:h-[600px]" />
-        {nodes.every((n) => n.latitude == null || n.longitude == null) && nodes.length > 0 && (
-          <p className="text-slate-400 dark:text-slate-500 mt-2">
-            Chưa có node nào được nhập toạ độ — thêm vĩ độ/kinh độ khi sửa node để ghim lên bản đồ.
-          </p>
         )}
       </div>
 
