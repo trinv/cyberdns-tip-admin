@@ -24,6 +24,9 @@ Threat Intelligence & Domain Blocklist management platform — sync domain block
 
 ## Cài đặt nhanh — Docker Compose (khuyến nghị)
 
+> **Triển khai production đầy đủ** (VPS + tên miền + HTTPS + Uptime Kuma +
+> backup + Blocky): xem [`deploy/DEPLOYMENT.md`](deploy/DEPLOYMENT.md).
+
 ```bash
 git clone <URL_REPO_CUA_BAN>.git cyberdns-tip
 cd cyberdns-tip
