@@ -20,7 +20,7 @@ import { eq, desc, asc, sql, ilike, and, or, inArray } from 'drizzle-orm';
 // immediate UX feedback, but this is the real validation the DB boundary
 // relies on.
 import { isIPv4, isIPv6 } from 'node:net';
-import { parseFeedText } from './feedParser.ts';
+import { parseFeedText, normalizeDomain } from './feedParser.ts';
 import { hashPassword, verifyPassword, burnPasswordCompare, generateSessionToken, generateTempPassword } from '../lib/password.ts';
 import { sendNewIpLoginAlert } from '../lib/mailer.ts';
 import { assertPublicFeedUrl, safeFeedFetch } from '../lib/ssrfGuard.ts';
@@ -519,35 +519,41 @@ export async function getDashboardStats() {
         .where(activeFilter)
         .orderBy(desc(domains.lastSeen))
         .limit(6),
-      // Real daily count of newly-detected domains for the Dashboard's
-      // growth trend chart — grouped by firstSeen's own calendar day (server
-      // timezone; this app has no per-user timezone setting, same simplicity
-      // already used elsewhere for timestamp display). Every domain carries
-      // its own firstSeen forever, so this needs no new history table.
+      // Real daily count of newly-detected domains for the Dashboard's growth
+      // trend chart. The 30-day axis is generated *in SQL* (generate_series
+      // off current_date) and LEFT JOINed to the per-day counts, so:
+      //   - every day in the window is present with a real 0 (no GROUP BY gap);
+      //   - the axis and the buckets share one single clock — the Postgres
+      //     session calendar, the same one `now()`/`defaultNow()` used to
+      //     stamp first_seen — instead of the old split where SQL bucketed on
+      //     first_seen::date and JS gap-filled on UTC (toISOString), which
+      //     drifted a day and could pin "today" to 0 (LOGIC-05).
+      // to_char keeps `day` a plain 'YYYY-MM-DD' string regardless of the pg
+      // driver's date parsing. Every domain carries its own firstSeen forever,
+      // so this needs no history table.
       db.execute<{ day: string; count: number }>(sql`
-        SELECT first_seen::date AS day, count(*)::int AS count
-        FROM domains
-        WHERE first_seen >= now() - interval '30 days'
-        GROUP BY first_seen::date
-        ORDER BY day
+        WITH recent AS (
+          SELECT first_seen::date AS day
+          FROM domains
+          WHERE first_seen >= current_date - interval '29 days'
+        )
+        SELECT to_char(gs.day::date, 'YYYY-MM-DD') AS day, count(r.day)::int AS count
+        FROM generate_series(current_date - interval '29 days', current_date, interval '1 day') AS gs(day)
+        LEFT JOIN recent r ON r.day = gs.day::date
+        GROUP BY gs.day
+        ORDER BY gs.day
       `),
     ]);
 
     const totalActive = Number(totalActiveRows[0]?.count || 0);
     const totalAll = Number(totalAllRows[0]?.count || 0);
 
-    // Fill in every day of the 30-day window explicitly (defaulting to 0) —
-    // same "don't let GROUP BY silently omit a real zero" fix as
-    // statusBreakdown below: a day with no new domains must render as a real
-    // 0 bar on the trend chart, not be missing from the x-axis entirely.
-    const growthByDay = new Map(growthRows.rows.map((r) => [String(r.day).slice(0, 10), Number(r.count)]));
-    const domainGrowth: { date: string; count: number }[] = [];
-    for (let i = 29; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const key = d.toISOString().slice(0, 10);
-      domainGrowth.push({ date: key, count: growthByDay.get(key) || 0 });
-    }
+    // The SQL above already returns exactly 30 rows, oldest→newest, every day
+    // present with a real 0 — no JS gap-fill (and no JS/SQL clock mismatch).
+    const domainGrowth: { date: string; count: number }[] = growthRows.rows.map((r) => ({
+      date: String(r.day).slice(0, 10),
+      count: Number(r.count),
+    }));
 
     return {
       totalActive,
@@ -864,7 +870,14 @@ export async function createDomain(data: {
   executor: Executor = db
 ) {
   try {
-    const cleanDomain = data.domain.toLowerCase().trim();
+    // Defensive: every real caller (resolveReviewItem) now passes a domain
+    // that was already normalized at review_queue insert time, but keep the
+    // canonicalization here too so an old, pre-normalization review row can't
+    // create a malformed `domains` key on approval (LOGIC-11).
+    const cleanDomain = normalizeDomain(data.domain);
+    if (!cleanDomain) {
+      throw new Error(`Tên miền không hợp lệ: "${data.domain}".`);
+    }
     const parts = cleanDomain.split('.');
     const tld = parts.length > 1 ? parts[parts.length - 1] : 'vn';
     const etld1 = parts.length > 2 ? `${parts[parts.length - 2]}.${tld}` : cleanDomain;
@@ -2303,7 +2316,13 @@ export async function bulkCreateReviewItems(data: {
   feedSourceId?: string;
   onChunkProgress?: (processed: number, total: number) => void | Promise<void>;
 }) {
-  const cleanDomains = Array.from(new Set(data.domains.map((d) => d.toLowerCase().trim()).filter(Boolean)));
+  // Same canonicalization the feed parser applies (normalizeDomain) — a
+  // pasted "*.evil.com", "http://evil.com/x" or "evil.com." must land on the
+  // exact same key a feed would produce, and outright junk is dropped here
+  // rather than written into review_queue as a bogus item (LOGIC-11).
+  const cleanDomains = Array.from(
+    new Set(data.domains.map((d) => normalizeDomain(d)).filter((d): d is string => d !== null))
+  );
   if (cleanDomains.length === 0) return { insertedCount: 0, skippedCount: 0 };
 
   const CHECK_CHUNK = 10_000;

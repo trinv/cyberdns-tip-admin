@@ -25,6 +25,29 @@ const IPV4_REGEX = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
 // to match here and falls through to (and gets rejected by) the generic path below.
 const ADBLOCK_DOMAIN_RULE = /^\|\|([a-z0-9.-]+)\^/i;
 
+/**
+ * Canonicalize one already-extracted host token, or return `null` if it isn't
+ * a plain blockable domain. This is the ONE place domain normalization lives —
+ * shared by this feed parser's generic path and by the manual / batch-import
+ * propose path (bulkCreateReviewItems in queries.ts), so "*.evil.com",
+ * "evil.com.", "http://evil.com/path" and "EVIL.com" all collapse to the same
+ * key "evil.com" no matter which door a domain comes in through. Previously the
+ * manual path only did `toLowerCase().trim()`, letting those variants through
+ * as distinct string keys (LOGIC-11).
+ */
+export function normalizeDomain(raw: string): string | null {
+  let host = (raw ?? '').trim();
+  if (!host) return null;
+  host = host.replace(/^(https?:\/\/)/i, '');   // scheme
+  host = host.split('/')[0].split('?')[0];      // path / query
+  host = host.split(':')[0];                    // port
+  host = host.replace(/^\*\./, '');             // leading wildcard label
+  host = host.replace(/\.$/, '');               // trailing FQDN root dot
+  host = host.toLowerCase().trim();
+  if (!DOMAIN_REGEX.test(host) || IPV4_REGEX.test(host)) return null;
+  return host;
+}
+
 function parseFeedLine(line: string): string | null {
   let cleaned = line.trim();
   if (!cleaned) return null;
@@ -40,23 +63,17 @@ function parseFeedLine(line: string): string | null {
 
   const adblockMatch = cleaned.match(ADBLOCK_DOMAIN_RULE);
   if (adblockMatch) {
-    cleaned = adblockMatch[1];
-  } else {
-    // hosts-file style prefix strip: "0.0.0.0 domain.com" / "127.0.0.1 domain.com"
-    cleaned = cleaned.replace(/^(0\.0\.0\.0|127\.0\.0\.1|::1?)\s+/, '');
-    // Strip trailing inline comments.
-    cleaned = cleaned.split('#')[0].trim();
-    if (!cleaned) return null;
-    // Strip protocol, path/query, port, leading wildcard.
-    cleaned = cleaned.replace(/^(https?:\/\/)/i, '');
-    cleaned = cleaned.split('/')[0].split('?')[0];
-    cleaned = cleaned.split(':')[0];
-    cleaned = cleaned.replace(/^\*\./, '');
+    return normalizeDomain(adblockMatch[1]);
   }
 
-  cleaned = cleaned.toLowerCase().trim();
-  if (!DOMAIN_REGEX.test(cleaned) || IPV4_REGEX.test(cleaned)) return null;
-  return cleaned;
+  // hosts-file style prefix strip: "0.0.0.0 domain.com" / "127.0.0.1 domain.com"
+  cleaned = cleaned.replace(/^(0\.0\.0\.0|127\.0\.0\.1|::1?)\s+/, '');
+  // Strip trailing inline comments.
+  cleaned = cleaned.split('#')[0].trim();
+  if (!cleaned) return null;
+  // Scheme / path / port / wildcard / trailing-dot stripping + validation all
+  // live in normalizeDomain now, shared with the manual propose path.
+  return normalizeDomain(cleaned);
 }
 
 // No cap on the number of domains parsed from one feed — a sync is expected
