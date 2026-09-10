@@ -21,7 +21,7 @@ import { eq, desc, asc, sql, ilike, and, or, inArray } from 'drizzle-orm';
 // relies on.
 import { isIPv4, isIPv6 } from 'node:net';
 import { parseFeedText } from './feedParser.ts';
-import { hashPassword, verifyPassword, generateSessionToken, generateTempPassword } from '../lib/password.ts';
+import { hashPassword, verifyPassword, burnPasswordCompare, generateSessionToken, generateTempPassword } from '../lib/password.ts';
 import { sendNewIpLoginAlert } from '../lib/mailer.ts';
 // bulkCreateDomains' bulk load uses the real COPY wire protocol — the one
 // thing Drizzle's query builder has no equivalent for — so it needs a raw
@@ -53,7 +53,13 @@ export async function authenticateUser(email: string, password: string) {
   try {
     const rows = await db.select().from(users).where(eq(users.email, email.toLowerCase().trim())).limit(1);
     const user = rows[0];
-    if (!user || !user.isActive) return null;
+    if (!user || !user.isActive) {
+      // Spend the same ~scrypt time the real verify path would, so
+      // response latency doesn't leak whether this email maps to an
+      // active account (user-enumeration timing oracle).
+      await burnPasswordCompare(password);
+      return null;
+    }
     const valid = await verifyPassword(password, user.passwordHash);
     if (!valid) return null;
     return toSafeUser(user);

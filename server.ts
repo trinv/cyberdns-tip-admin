@@ -57,6 +57,7 @@ import {
   evaluateBlocklistAccess,
 } from './src/db/queries.ts';
 import { requireAuth, requireRole, AuthRequest } from './src/middleware/auth.ts';
+import { createLoginRateLimiter } from './src/middleware/rateLimit.ts';
 import { listCountries, listProvincesForCountry } from './src/lib/geo.ts';
 
 // The sandbox's file-watcher restart does not reliably terminate the previous
@@ -148,7 +149,11 @@ async function startServer() {
   });
 
   // ---- Authentication (self-hosted email/password) ----
-  app.post('/api/auth/login', async (req, res) => {
+  // In-memory brute-force limiter: 8 failed attempts per 15 min (by IP AND
+  // by target email) then a 15-min lock. Single-process, resets on restart
+  // — same design constraint as the feed-sync semaphore.
+  const loginLimiter = createLoginRateLimiter();
+  app.post('/api/auth/login', loginLimiter.middleware, async (req, res) => {
     try {
       const { email, password } = req.body;
       if (!email || !password) {
@@ -159,6 +164,7 @@ async function startServer() {
 
       const user = await authenticateUser(email, password);
       if (!user) {
+        loginLimiter.recordFailure(req);
         // Attribute the failed attempt to a real userId when the email
         // matches an existing account (wrong password / revoked account),
         // without changing what the response itself reveals — that stays a
@@ -175,6 +181,7 @@ async function startServer() {
         return res.status(401).json({ error: 'Email hoặc mật khẩu không đúng, hoặc tài khoản đã bị thu hồi.' });
       }
 
+      loginLimiter.recordSuccess(req);
       const { isNewIp } = await recordLoginAttempt({
         userId: user.id,
         email: user.email,

@@ -12,6 +12,23 @@ export async function hashPassword(password: string): Promise<string> {
   return `${salt}:${derived.toString('hex')}`;
 }
 
+// Burns the same work `verifyPassword` would (one scrypt + one
+// timingSafeEqual) without needing a real stored hash — call it on the
+// "no such user" / "user disabled" login paths so an attacker can't tell
+// from response time whether an email maps to a real account. The salt is
+// a fixed constant on purpose: this comparison is never expected to
+// succeed, it exists only to spend CPU time.
+const DECOY_SALT = 'cyberdns-tip-login-timing-decoy';
+const DECOY_KEY = Buffer.alloc(KEY_LENGTH);
+export async function burnPasswordCompare(password: string): Promise<void> {
+  try {
+    const derived = (await scrypt(password, DECOY_SALT, KEY_LENGTH)) as Buffer;
+    timingSafeEqual(derived, DECOY_KEY);
+  } catch {
+    // Never let the decoy path itself throw into the caller.
+  }
+}
+
 export async function verifyPassword(password: string, stored: string): Promise<boolean> {
   const [salt, hashHex] = stored.split(':');
   if (!salt || !hashHex) return false;
