@@ -322,26 +322,72 @@ export async function updateUserAccount(
 // system is never unreachable. There is no email/SMS delivery in this app,
 // so the generated credentials are printed to the server console instead —
 // change the password after first login via the user management panel.
+//
+// The literal placeholder shipped in .env.example — treated as "not set" so a
+// deploy that forgot to edit it gets a real random password, not this string.
+const SUPERADMIN_PW_PLACEHOLDER = 'CHANGE_ME_STRONG_PASSWORD';
+
+function configuredSuperadminPassword(): string | null {
+  const raw = process.env.SUPERADMIN_PASSWORD;
+  if (!raw) return null;
+  if (raw === SUPERADMIN_PW_PLACEHOLDER) {
+    console.warn('[ensureSuperAdmin] SUPERADMIN_PASSWORD is still the .env.example placeholder — ignoring it and generating a random password instead.');
+    return null;
+  }
+  return raw;
+}
+
 export async function ensureSuperAdmin() {
   try {
-    const existing = await db
+    const activeAdmin = await db
       .select({ id: users.id })
       .from(users)
       .where(and(eq(users.role, 'Admin'), eq(users.isActive, true)))
       .limit(1);
-    if (existing.length > 0) return;
+    if (activeAdmin.length > 0) return;
 
-    const email = process.env.SUPERADMIN_EMAIL || 'admin@cyberdns.local';
-    const password = process.env.SUPERADMIN_PASSWORD || generateTempPassword();
+    // Normalize the same way authenticateUser does on login — otherwise a
+    // SUPERADMIN_EMAIL with any uppercase can't actually sign in.
+    const email = (process.env.SUPERADMIN_EMAIL || 'admin@cyberdns.local').toLowerCase().trim();
+    const forceReset = process.env.SUPERADMIN_FORCE_RESET === 'true';
+    const existing = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
+
+    if (existing[0]) {
+      // The account exists but no usable active Admin does (it was deactivated
+      // or demoted). Restore access — but do NOT silently rewrite the password
+      // back to whatever SUPERADMIN_PASSWORD holds now (on a redeploy that's
+      // often stale, or the placeholder): that would clobber a password the
+      // operator legitimately changed in the UI. Password reset here is an
+      // explicit opt-in (SUPERADMIN_FORCE_RESET=true), used once then removed.
+      const set: Record<string, any> = { role: 'Admin', isActive: true, updatedAt: new Date() };
+      let resetTo: string | null = null;
+      if (forceReset) {
+        resetTo = configuredSuperadminPassword() ?? generateTempPassword();
+        set.passwordHash = await hashPassword(resetTo);
+      }
+      await db.update(users).set(set).where(eq(users.id, existing[0].id));
+
+      console.log('============================================================');
+      console.log(' Đã KHÔI PHỤC quyền Admin cho tài khoản CyberDNS TIP:');
+      console.log(`   Email: ${email}`);
+      if (resetTo) {
+        console.log(`   Mật khẩu (đặt lại do SUPERADMIN_FORCE_RESET=true): ${resetTo}`);
+        console.log('   → Bỏ SUPERADMIN_FORCE_RESET khỏi .env sau khi đăng nhập được.');
+      } else {
+        console.log('   Mật khẩu GIỮ NGUYÊN. Nếu không nhớ: đặt SUPERADMIN_FORCE_RESET=true');
+        console.log('   (+ SUPERADMIN_PASSWORD nếu muốn giá trị cụ thể) rồi khởi động lại một lần.');
+      }
+      console.log('============================================================');
+      return;
+    }
+
+    // Genuinely the first run for this email.
+    const password = configuredSuperadminPassword() ?? generateTempPassword();
     const passwordHash = await hashPassword(password);
-
     await db
       .insert(users)
       .values({ email, passwordHash, displayName: 'Super Admin', role: 'Admin', isActive: true })
-      .onConflictDoUpdate({
-        target: users.email,
-        set: { passwordHash, role: 'Admin', isActive: true, updatedAt: new Date() },
-      });
+      .onConflictDoNothing({ target: users.email });
 
     console.log('============================================================');
     console.log(' Đã tạo tài khoản Super Admin cho CyberDNS TIP:');
