@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel superseded runs on the same branch/PR.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # tsc --noEmit && eslint . — errors fail the build, warnings don't.
+      - run: npm run lint
+
+      - run: npm run format:check
+
+      # Vitest unit suite (pure functions — no database needed).
+      - run: npm test
+
+      # Full production build: client (Vite) + server/migrate/baseline
+      # bundles (esbuild). Catches anything the type-checker misses.
+      - run: npm run build

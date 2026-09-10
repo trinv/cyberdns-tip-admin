@@ -1,5 +1,7 @@
 # CyberDNS TIP
 
+[![CI](https://github.com/trinv/cyberdns-tip-admin/actions/workflows/ci.yml/badge.svg)](https://github.com/trinv/cyberdns-tip-admin/actions/workflows/ci.yml)
+
 Threat Intelligence & Domain Blocklist management platform — sync domain blocklists from feed sources (or import manually), organize them into categories, review/approve before blocking, and browse/export the result. Built with React 19 + Vite, a single Express server, and PostgreSQL (Drizzle ORM).
 
 ## Tính năng chính
