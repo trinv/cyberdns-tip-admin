@@ -57,5 +57,9 @@
     "typescript": "~5.8.2",
     "vite": "^6.2.3",
     "vitest": "^3.2.7"
+  },
+  "_overridesNote": "express 4.x pins qs 6.15.3 (last version in the qs DoS / array-limit advisory range); the override forces the patched line everywhere. Remove once express depends on qs >= 6.16.",
+  "overrides": {
+    "qs": "^6.16.0"
   }
 }
