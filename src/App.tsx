@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
 import { DomainItem, CategoryInfo, FeedSource, AuditLog, ReviewDomainItem, SavedFilter, DomainStatus, DashboardStats, CategoryStatusBreakdown, AppUser } from './types';
 import {
   fetchDashboardStats,
@@ -368,18 +368,28 @@ export default function App() {
       fetchDashboardStats().catch((e) => { console.warn('fetchDashboardStats failed:', e); return null; }),
     ]);
 
-    setDashboardStats(stats);
+    // Guard every setter the same way: a transient failure of ONE fetch
+    // (e.g. dashboardStats) must not blank that whole section while the
+    // rest loaded fine. `null` here means "this fetch failed" (see the
+    // .catch above); a genuinely-empty system still returns a real object.
+    if (stats) setDashboardStats(stats);
     if (cats) setCategories(cats);
     if (srcList) setSources(srcList);
     if (logsList) setAuditLogs(logsList);
     if (revsList) setReviewItems(revsList);
   }, []);
 
+  // Guards against out-of-order responses: rapid filter/search/page/sort
+  // changes fire overlapping fetchDomains calls, and setDomains must apply
+  // the LATEST request's result, not whichever happens to resolve last.
+  const domainsReqSeq = useRef(0);
+
   // Domain Explorer's list is fetched separately from everything else: it's
   // the one view whose data must reflect the CURRENT filters/page/sort
   // server-side (a category can now genuinely hold tens of thousands of
   // real synced domains — a fixed client-side snapshot can't represent that).
   const refreshDomains = useCallback(async () => {
+    const seq = ++domainsReqSeq.current;
     setIsDomainsLoading(true);
     try {
       const res = await fetchDomains({
@@ -393,14 +403,16 @@ export default function App() {
         sortField,
         sortDirection,
       });
+      if (seq !== domainsReqSeq.current) return; // a newer request superseded this one
       setDomains(res.domains);
       setDomainsTotal(res.total);
     } catch (err) {
+      if (seq !== domainsReqSeq.current) return;
       console.warn('fetchDomains failed:', err);
       setDomains([]);
       setDomainsTotal(0);
     } finally {
-      setIsDomainsLoading(false);
+      if (seq === domainsReqSeq.current) setIsDomainsLoading(false);
     }
   }, [selectedCategory, selectedStatus, selectedTld, selectedSource, debouncedSearchQuery, domainsPage, domainsPageSize, sortField, sortDirection]);
 
@@ -546,13 +558,22 @@ export default function App() {
     };
   }, [sources, refreshDomains, refreshAllData, currentUser]);
 
-  // Any actual filter change (not just paging/sorting) invalidates the
-  // current page/selection — jumping back to page 1 and clearing a
-  // selection that may no longer even be on screen.
+  // Any actual filter change (not just sorting) jumps back to page 1.
   useEffect(() => {
     setDomainsPage(1);
-    setSelectedDomainIds(new Set());
   }, [selectedCategory, selectedStatus, selectedTld, selectedSource, debouncedSearchQuery]);
+
+  // Selection is per-page: cleared on any filter change AND on page/
+  // page-size change. It used to persist across page navigation, but the
+  // bulk-action modal, the confirm toast, and "export selected" only ever
+  // read the rows currently loaded on screen (`domains.filter(...)`),
+  // while handleConfirmBulkAction sent the WHOLE accumulated id set — so
+  // "25 selected" could silently act on 50, and "export selected" could
+  // silently drop the off-page ones. Keeping selection page-scoped makes
+  // every count and payload agree.
+  useEffect(() => {
+    setSelectedDomainIds(new Set());
+  }, [selectedCategory, selectedStatus, selectedTld, selectedSource, debouncedSearchQuery, domainsPage, domainsPageSize]);
 
   // Keyboard shortcut listener
   useEffect(() => {
