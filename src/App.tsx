@@ -76,6 +76,12 @@ export default function App() {
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
   const userRole: 'Analyst' | 'Admin' | 'Reviewer' = currentUser?.role || 'Analyst';
+  // Mirrors the server-side requireRole gates (see server.ts): Admin does
+  // config, Reviewer+Admin resolve the review queue / run bulk domain
+  // actions, Analyst proposes + edits single domains. These only hide
+  // controls — the backend is authoritative.
+  const isAdmin = userRole === 'Admin';
+  const canReview = userRole === 'Admin' || userRole === 'Reviewer';
 
   const handleLogin = async (email: string, password: string) => {
     const { token, user, isNewIp } = await loginApi(email, password); // lets the caller show the real error on failure
@@ -988,6 +994,7 @@ export default function App() {
                 activeSavedFilter={activeSavedFilter}
                 onSelectSavedFilter={handleSelectSavedFilter}
                 onOpenAddCategory={() => setIsCategoryModalOpen(true)}
+                canManageCategories={isAdmin}
                 onSaveCurrentFilter={() => showToast('Đã lưu bộ lọc tìm kiếm hiện tại vào danh sách!', 'info')}
                 allCategoriesCount={dashboardStats?.totalAll ?? 0}
                 allStatusCount={categoryStatusBreakdown?.totalAll ?? 0}
@@ -1032,6 +1039,7 @@ export default function App() {
                 onQuickExportCsv={handleQuickExportCsv}
                 onSaveFilter={() => showToast('Đã lưu bộ lọc tìm kiếm hiện tại vào danh sách!', 'info')}
                 onOpenMobileFilters={() => setIsMobileFiltersOpen(true)}
+                canBulkAction={canReview}
               />
             </div>
           )}
@@ -1070,6 +1078,7 @@ export default function App() {
               onApprove={handleApproveReview}
               onReject={handleRejectReview}
               onApproveAll={handleApproveAllReviews}
+              canReview={canReview}
             />
           )}
 
@@ -1085,8 +1094,13 @@ export default function App() {
             />
           )}
 
-          {/* TAB 6: NGUỒN (Feed Sources) */}
-          {currentTab === 'sources' && (
+          {/* TAB 6: NGUỒN (Feed Sources — every action is Admin-only server-side) */}
+          {currentTab === 'sources' && !isAdmin && (
+            <div className="flex-1 flex items-center justify-center text-sm text-slate-500 dark:text-slate-400">
+              Chỉ tài khoản Admin mới có quyền quản lý nguồn Threat Feed.
+            </div>
+          )}
+          {currentTab === 'sources' && isAdmin && (
             <SourcesView
               sources={sources}
               categories={categories}

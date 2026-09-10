@@ -56,6 +56,10 @@ interface DomainTableProps {
   onQuickExportCsv: () => void;
   onSaveFilter: () => void;
   onOpenMobileFilters?: () => void;
+  // Bulk domain mutations (allowlist / unblock / block / add-to-group) are
+  // Reviewer/Admin only server-side (POST /api/domains/bulk-action). An
+  // Analyst can still select rows for export — just not act on them.
+  canBulkAction?: boolean;
 }
 
 export const DomainTable: React.FC<DomainTableProps> = ({
@@ -90,6 +94,7 @@ export const DomainTable: React.FC<DomainTableProps> = ({
   onQuickExportCsv,
   onSaveFilter,
   onOpenMobileFilters,
+  canBulkAction = true,
 }) => {
   const [tldFilterOpen, setTldFilterOpen] = useState(false);
   const [sourceFilterOpen, setSourceFilterOpen] = useState(false);
@@ -447,35 +452,41 @@ export const DomainTable: React.FC<DomainTableProps> = ({
             </span>
           </div>
 
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => onOpenBulkModal('add_group')}
-              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all shadow-xs cursor-pointer active-press"
-            >
-              Thêm vào nhóm...
-            </button>
-            <button
-              onClick={() => onOpenBulkModal('allowlist')}
-              className="px-3 py-1.5 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800 font-bold rounded-xl transition-colors cursor-pointer shadow-xs active-press"
-            >
-              Allowlist...
-            </button>
-            {selectedStatus === 'unblocked' ? (
+          {canBulkAction ? (
+            <div className="flex items-center space-x-2">
               <button
-                onClick={() => onOpenBulkModal('block')}
-                className="px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-bold rounded-xl transition-colors cursor-pointer shadow-xs active-press"
+                onClick={() => onOpenBulkModal('add_group')}
+                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all shadow-xs cursor-pointer active-press"
               >
-                Chặn...
+                Thêm vào nhóm...
               </button>
-            ) : (
               <button
-                onClick={() => onOpenBulkModal('unblock')}
-                className="px-3 py-1.5 bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800 font-bold rounded-xl transition-colors cursor-pointer shadow-xs active-press"
+                onClick={() => onOpenBulkModal('allowlist')}
+                className="px-3 py-1.5 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800 font-bold rounded-xl transition-colors cursor-pointer shadow-xs active-press"
               >
-                Thôi chặn...
+                Allowlist...
               </button>
-            )}
-          </div>
+              {selectedStatus === 'unblocked' ? (
+                <button
+                  onClick={() => onOpenBulkModal('block')}
+                  className="px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-bold rounded-xl transition-colors cursor-pointer shadow-xs active-press"
+                >
+                  Chặn...
+                </button>
+              ) : (
+                <button
+                  onClick={() => onOpenBulkModal('unblock')}
+                  className="px-3 py-1.5 bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800 font-bold rounded-xl transition-colors cursor-pointer shadow-xs active-press"
+                >
+                  Thôi chặn...
+                </button>
+              )}
+            </div>
+          ) : (
+            <span className="text-slate-500 dark:text-slate-400 font-medium">
+              Cần vai trò Reviewer/Admin để thao tác hàng loạt — có thể chọn để xuất dữ liệu.
+            </span>
+          )}
         </div>
       )}
 

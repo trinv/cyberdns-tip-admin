@@ -8,6 +8,11 @@ interface ReviewQueueViewProps {
   onApprove: (id: string, category: string) => void;
   onReject: (id: string) => void;
   onApproveAll: () => void;
+  // Only Reviewer/Admin can resolve items server-side (see server.ts's
+  // requireRole on POST /api/reviews/:id/resolve). An Analyst still sees
+  // the queue — including their own pending proposals — but not the
+  // approve/reject controls.
+  canReview?: boolean;
 }
 
 export const ReviewQueueView: React.FC<ReviewQueueViewProps> = ({
@@ -16,6 +21,7 @@ export const ReviewQueueView: React.FC<ReviewQueueViewProps> = ({
   onApprove,
   onReject,
   onApproveAll,
+  canReview = true,
 }) => {
   const [selectedFilter, setSelectedFilter] = useState<string>('all');
 
@@ -39,7 +45,7 @@ export const ReviewQueueView: React.FC<ReviewQueueViewProps> = ({
           </p>
         </div>
 
-        {items.length > 0 && (
+        {items.length > 0 && canReview && (
           <button
             onClick={onApproveAll}
             className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all flex items-center space-x-2 cursor-pointer shadow-sm active-press"
@@ -47,6 +53,11 @@ export const ReviewQueueView: React.FC<ReviewQueueViewProps> = ({
             <CheckCheck className="w-4 h-4" />
             <span>Duyệt chặn toàn bộ ({items.length})</span>
           </button>
+        )}
+        {!canReview && (
+          <span className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+            Chỉ xem — cần vai trò Reviewer/Admin để duyệt
+          </span>
         )}
       </div>
 
@@ -130,25 +141,27 @@ export const ReviewQueueView: React.FC<ReviewQueueViewProps> = ({
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex items-center justify-end pt-2 border-t border-slate-100 dark:border-slate-800">
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => onReject(item.id)}
-                    className="px-3.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/60 hover:text-rose-700 dark:hover:text-rose-400 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-semibold transition-colors cursor-pointer active-press"
-                  >
-                    Từ chối (R)
-                  </button>
+              {/* Action Buttons — Reviewer/Admin only */}
+              {canReview && (
+                <div className="flex items-center justify-end pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => onReject(item.id)}
+                      className="px-3.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/60 hover:text-rose-700 dark:hover:text-rose-400 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-semibold transition-colors cursor-pointer active-press"
+                    >
+                      Từ chối (R)
+                    </button>
 
-                  <button
-                    onClick={() => onApprove(item.id, item.proposedCategory)}
-                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition-all flex items-center space-x-1 cursor-pointer shadow-xs active-press"
-                  >
-                    <Check className="w-3.5 h-3.5" />
-                    <span>Duyệt chặn (A)</span>
-                  </button>
+                    <button
+                      onClick={() => onApprove(item.id, item.proposedCategory)}
+                      className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition-all flex items-center space-x-1 cursor-pointer shadow-xs active-press"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Duyệt chặn (A)</span>
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           ))}
         </div>

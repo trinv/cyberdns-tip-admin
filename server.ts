@@ -486,7 +486,10 @@ async function startServer() {
     }
   });
 
-  app.post('/api/domains/bulk-action', requireAuth, async (req: AuthRequest, res) => {
+  // Reviewer/Admin only: a single bulk-action call can allowlist or unblock
+  // the entire blocklist at once. An Analyst proposes domains; confirming a
+  // decision (here and at /reviews/:id/resolve) is the Reviewer's job.
+  app.post('/api/domains/bulk-action', requireAuth, requireRole('Reviewer', 'Admin'), async (req: AuthRequest, res) => {
     try {
       const { action, domainIds, category, reason } = req.body;
       // bulkUpdateDomains itself now also rejects an unrecognized action
@@ -526,7 +529,9 @@ async function startServer() {
   // server-side at creation time so it stays stable forever afterward,
   // independent of the display name (which IS freely editable — see
   // PATCH below).
-  app.post('/api/categories', requireAuth, async (req: AuthRequest, res) => {
+  // Admin only: creating/renaming a category is a structural config change
+  // (DELETE already required Admin — this closes that inconsistency).
+  app.post('/api/categories', requireAuth, requireRole('Admin'), async (req: AuthRequest, res) => {
     try {
       const { name, description, color, deltaThreshold } = req.body;
       if (!name) {
@@ -535,11 +540,11 @@ async function startServer() {
       const created = await createCategory({ name, description, color, deltaThreshold });
       res.status(201).json({ success: true, category: created });
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(400).json({ error: error.message });
     }
   });
 
-  app.patch('/api/categories/:id', requireAuth, async (req: AuthRequest, res) => {
+  app.patch('/api/categories/:id', requireAuth, requireRole('Admin'), async (req: AuthRequest, res) => {
     try {
       const updated = await updateCategory(req.params.id, req.body);
       res.json({ success: true, category: updated });
@@ -610,7 +615,10 @@ async function startServer() {
     }
   });
 
-  app.post('/api/sources', requireAuth, async (req: AuthRequest, res) => {
+  // Admin only: registering a feed URL is config, and it's the SSRF surface
+  // — runFeedSourceSyncJob fetches whatever URL is stored here. pause/resume/
+  // delete were already Admin; add + sync now match.
+  app.post('/api/sources', requireAuth, requireRole('Admin'), async (req: AuthRequest, res) => {
     try {
       const { name, url, category } = req.body;
       if (!name || !url || !category) {
@@ -620,7 +628,7 @@ async function startServer() {
       res.status(201).json({ success: true, source: created });
     } catch (error: any) {
       console.error('API POST /api/sources error:', error);
-      res.status(500).json({ error: error.message });
+      res.status(400).json({ error: error.message });
     }
   });
 
@@ -630,7 +638,7 @@ async function startServer() {
   // request. Clients observe real progress by polling GET /api/sources,
   // which is what makes the sync immune to the requesting tab navigating
   // away (see startFeedSourceSync / runFeedSourceSyncJob in queries.ts).
-  app.post('/api/sources/:id/sync', requireAuth, async (req: AuthRequest, res) => {
+  app.post('/api/sources/:id/sync', requireAuth, requireRole('Admin'), async (req: AuthRequest, res) => {
     try {
       const started = await startFeedSourceSync(req.params.id, { email: req.user?.email, role: req.user?.role });
       res.status(202).json({ success: true, source: started });
@@ -686,9 +694,14 @@ async function startServer() {
     }
   });
 
-  app.post('/api/reviews/:id/resolve', requireAuth, async (req: AuthRequest, res) => {
+  // Reviewer/Admin only: an Analyst submits domains to the queue (propose /
+  // bulk-propose above); a *different* person with the Reviewer role
+  // confirms the decision. resolveReviewItem itself also rejects a
+  // self-review and an already-resolved item.
+  app.post('/api/reviews/:id/resolve', requireAuth, requireRole('Reviewer', 'Admin'), async (req: AuthRequest, res) => {
     try {
       const id = parseInt(req.params.id, 10);
+      if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid review id' });
       const { decision, category } = req.body; // decision: 'approved' | 'rejected'; category: optional override
       if (!decision || !['approved', 'rejected'].includes(decision)) {
         return res.status(400).json({ error: 'Invalid decision' });
@@ -696,7 +709,11 @@ async function startServer() {
       const resolved = await resolveReviewItem(id, decision, req.user?.email || 'SOC Approver', category, req.user?.role);
       res.json({ success: true, item: resolved });
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      // resolveReviewItem throws deliberately-clear validation messages
+      // (self-review, already resolved, bad category override) — surface
+      // those as 400, not 500.
+      const isValidation = error instanceof Error && !(error as any).cause;
+      res.status(isValidation ? 400 : 500).json({ error: error.message });
     }
   });
 

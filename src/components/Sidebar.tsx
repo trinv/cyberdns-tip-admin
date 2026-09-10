@@ -60,7 +60,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       group: 'THREAT INTELLIGENCE',
       items: [
         { id: 'domain', label: 'Domain Explorer', icon: Globe },
-        { id: 'sources', label: 'Nguồn Threat Feeds', icon: Rss },
+        // Every action on the Sources screen (add / sync / pause / resume /
+        // delete) is Admin-only server-side (see server.ts) — a non-Admin
+        // has nothing to do there, so the tab is hidden rather than shown
+        // with every button 403-ing.
+        ...(userRole === 'Admin' ? [{ id: 'sources', label: 'Nguồn Threat Feeds', icon: Rss }] : []),
       ]
     },
     {

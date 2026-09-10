@@ -212,7 +212,20 @@ export async function listUsers() {
   }
 }
 
+// The only roles the app understands (see src/middleware/auth.ts's
+// requireRole call sites). `role` used to be a free-form string accepted
+// straight from the request body — a typo or a malicious value would just
+// be stored, silently granting nothing (or, worse, matching nothing so the
+// account can't do anything).
+export const VALID_ROLES = ['Analyst', 'Reviewer', 'Admin'] as const;
+function assertValidRole(role: string | undefined) {
+  if (role !== undefined && !VALID_ROLES.includes(role as (typeof VALID_ROLES)[number])) {
+    throw new Error(`Vai trò không hợp lệ: "${role}". Chỉ chấp nhận ${VALID_ROLES.join(', ')}.`);
+  }
+}
+
 export async function createUserAccount(data: { email: string; password: string; displayName?: string; role?: string }) {
+  assertValidRole(data.role);
   try {
     const passwordHash = await hashPassword(data.password);
     const result = await db
@@ -261,6 +274,7 @@ export async function updateUserAccount(
   id: number,
   patch: { role?: string; isActive?: boolean; displayName?: string; password?: string }
 ) {
+  assertValidRole(patch.role);
   try {
     return await db.transaction(async (tx) => {
       if (patch.role !== undefined && patch.role !== 'Admin') {
@@ -280,8 +294,12 @@ export async function updateUserAccount(
       if (!updated[0]) throw new Error(`User id ${id} not found`);
 
       // Revoking access kills existing sessions immediately instead of
-      // waiting for them to naturally expire over the next 30 days.
-      if (patch.isActive === false) {
+      // waiting for them to naturally expire over the next 30 days. A
+      // password change does the same: the whole reason to change a
+      // password is that the old one (and anything derived from a session
+      // opened with it) should stop working — see the new-IP alert email,
+      // which tells the user to "đổi mật khẩu ngay" (SEC-07).
+      if (patch.isActive === false || patch.password) {
         await tx.delete(sessions).where(eq(sessions.userId, id));
       }
 
@@ -2411,6 +2429,23 @@ export async function resolveReviewItem(
     // the item silently vanished from the pending queue with nothing to
     // retry (see the DB audit's own finding on this).
     return await db.transaction(async (tx) => {
+      // Read-then-write inside the transaction so we can reject a
+      // self-review and an already-resolved item BEFORE mutating anything.
+      const existing = await tx.select().from(reviewQueue).where(eq(reviewQueue.id, id)).limit(1);
+      const row = existing[0];
+      if (!row) {
+        throw new Error(`Mục duyệt id ${id} không tồn tại.`);
+      }
+      if (row.status !== 'pending') {
+        throw new Error(`Mục duyệt này đã được xử lý (${row.status === 'approved' ? 'đã duyệt' : 'đã từ chối'}).`);
+      }
+      // `reportedBy` embeds the proposer's email (e.g. "Thủ công: a@b.com",
+      // "Nhập hàng loạt: a@b.com"). A reviewer must not confirm their own
+      // proposal — a second pair of eyes is the whole point of the queue.
+      if (reviewerEmail && row.reportedBy && row.reportedBy.includes(reviewerEmail)) {
+        throw new Error('Bạn không thể tự duyệt đề xuất do chính mình gửi — cần một người khác xác nhận.');
+      }
+
       const item = await tx
         .update(reviewQueue)
         .set({
@@ -2418,8 +2453,33 @@ export async function resolveReviewItem(
           reviewedBy: reviewerEmail,
           reviewedAt: new Date(),
         })
-        .where(eq(reviewQueue.id, id))
+        // Re-assert `pending` in the WHERE so two reviewers racing on the
+        // same item can't both proceed.
+        .where(and(eq(reviewQueue.id, id), eq(reviewQueue.status, 'pending')))
         .returning();
+      if (!item[0]) {
+        throw new Error('Mục duyệt vừa bị người khác xử lý — vui lòng tải lại hàng đợi.');
+      }
+
+      if (decision === 'rejected') {
+        // Approvals get their audit trail via createDomain below; rejections
+        // had none — a decision that removes an IOC candidate should be just
+        // as traceable.
+        await tx.insert(auditLogs).values({
+          user: reviewerEmail || 'Reviewer',
+          role: reviewerRole || 'Reviewer',
+          action: 'reject',
+          targetCount: 1,
+          summary: `Từ chối đề xuất tên miền từ Hàng đợi duyệt: ${item[0].domain}`,
+          reason: item[0].reason || 'Từ chối đề xuất IOC',
+          canRollback: false,
+          details: [
+            `Tên miền: ${item[0].domain}`,
+            `Nhóm đề xuất: ${item[0].proposedCategory}`,
+            `Người đề xuất: ${item[0].reportedBy}`,
+          ],
+        });
+      }
 
       if (decision === 'approved' && item[0]) {
         // Add directly to domains — respects the reviewer's category override

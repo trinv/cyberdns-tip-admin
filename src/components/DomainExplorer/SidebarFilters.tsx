@@ -20,6 +20,9 @@ interface SidebarFiltersProps {
   onSelectSavedFilter: (filter: SavedFilter) => void;
   onOpenAddCategory: () => void;
   onSaveCurrentFilter: () => void;
+  // Creating/renaming/deleting a category is Admin-only server-side (see
+  // server.ts) — hide the "add category" affordances for everyone else.
+  canManageCategories?: boolean;
   // Real count across EVERY status AND every category (dashboardStats.
   // totalAll) — always global, regardless of which category is currently
   // selected. Backs ONLY the CATEGORY section's "Tất cả nhóm" badge. Each
@@ -57,6 +60,7 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
   activeSavedFilter,
   onSelectSavedFilter,
   onOpenAddCategory,
+  canManageCategories = true,
   onSaveCurrentFilter,
   allCategoriesCount,
   allStatusCount,
@@ -92,13 +96,15 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
           <span className="flex items-center space-x-1.5">
             <span>NHÓM DANH MỤC (CATEGORY)</span>
           </span>
-          <button
-            onClick={onOpenAddCategory}
-            title="Thêm nhóm mới"
-            className="text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors p-0.5 rounded cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" />
-          </button>
+          {canManageCategories && (
+            <button
+              onClick={onOpenAddCategory}
+              title="Thêm nhóm mới"
+              className="text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors p-0.5 rounded cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
         <div className="space-y-1">
@@ -168,13 +174,15 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
           })}
         </div>
 
-        <button
-          onClick={onOpenAddCategory}
-          className="w-full mt-2.5 px-3 py-2 text-slate-500 dark:text-slate-400 hover:text-emerald-700 dark:hover:text-emerald-300 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/30 border border-dashed border-slate-300 dark:border-slate-700 rounded-xl text-xs font-semibold flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          <span>Thêm nhóm mới</span>
-        </button>
+        {canManageCategories && (
+          <button
+            onClick={onOpenAddCategory}
+            className="w-full mt-2.5 px-3 py-2 text-slate-500 dark:text-slate-400 hover:text-emerald-700 dark:hover:text-emerald-300 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/30 border border-dashed border-slate-300 dark:border-slate-700 rounded-xl text-xs font-semibold flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Thêm nhóm mới</span>
+          </button>
+        )}
       </div>
 
       {/* TRẠNG THÁI SECTION — 4 real iOS-style toggle switches (pill track +
