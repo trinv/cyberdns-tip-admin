@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { burnPasswordCompare, generateSessionToken, generateTempPassword, hashPassword, verifyPassword } from './password.ts';
+import {
+  burnPasswordCompare,
+  generateSessionToken,
+  generateTempPassword,
+  hashPassword,
+  verifyPassword,
+} from './password.ts';
 
 describe('hashPassword / verifyPassword', () => {
   it('round-trips the correct password', async () => {

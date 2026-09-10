@@ -30,7 +30,11 @@ export const CyberDNSLogo: React.FC<LogoProps> = ({
   const isForcedDark = variant === 'dark';
 
   const cyberTextClass = isAuto ? 'text-foreground' : isForcedDark ? 'text-white' : 'text-slate-900';
-  const subtitleClass = isAuto ? 'text-slate-500 dark:text-slate-400' : isForcedDark ? 'text-slate-400' : 'text-slate-500';
+  const subtitleClass = isAuto
+    ? 'text-slate-500 dark:text-slate-400'
+    : isForcedDark
+      ? 'text-slate-400'
+      : 'text-slate-500';
 
   return (
     <div className={`inline-flex items-center gap-2.5 select-none ${className}`}>
@@ -90,7 +94,9 @@ export const CyberDNSLogo: React.FC<LogoProps> = ({
                 fixed brand color (emerald-600, matching every primary
                 button/action in the app) regardless of variant/theme —
                 it must read the same everywhere. */}
-            <span className={`font-bold tracking-tight transition-colors ${cyberTextClass} ${textClassName || 'text-lg'}`}>
+            <span
+              className={`font-bold tracking-tight transition-colors ${cyberTextClass} ${textClassName || 'text-lg'}`}
+            >
               Cyber<span style={{ color: '#059669' }}>DNS</span>
             </span>
           </div>

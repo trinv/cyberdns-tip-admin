@@ -31,7 +31,9 @@ export const AddEditDomainModal: React.FC<AddEditDomainModalProps> = ({
       setSelectedCat(categories[0].id);
     }
   }, [categories, isEditing, selectedCat]);
-  const [reason, setReason] = useState(isEditing ? 'Cập nhật phân loại theo bằng chứng mới' : 'Thêm mới domain phát hiện qua query log');
+  const [reason, setReason] = useState(
+    isEditing ? 'Cập nhật phân loại theo bằng chứng mới' : 'Thêm mới domain phát hiện qua query log',
+  );
   const [status, setStatus] = useState(domainToEdit ? domainToEdit.status : 'active');
 
   if (!isOpen) return null;
@@ -49,7 +51,7 @@ export const AddEditDomainModal: React.FC<AddEditDomainModalProps> = ({
         source: domainToEdit ? domainToEdit.source : 'Thủ công',
         sourceDetail: 'Admin / Manual entry',
       },
-      reason
+      reason,
     );
 
     onClose();
@@ -105,9 +107,7 @@ export const AddEditDomainModal: React.FC<AddEditDomainModalProps> = ({
             </div>
 
             <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
-                TRẠNG THÁI
-              </label>
+              <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">TRẠNG THÁI</label>
               <select
                 value={status}
                 onChange={(e: any) => setStatus(e.target.value)}

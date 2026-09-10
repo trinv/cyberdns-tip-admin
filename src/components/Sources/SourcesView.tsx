@@ -1,9 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { FeedSource, CategoryInfo } from '../../types';
 import {
-  RefreshCw, Plus, Globe, CheckCircle2, AlertTriangle,
-  Trash2, Edit3, Clock, ArrowRight, ShieldCheck, Activity, Pause, Play,
-  LayoutGrid, List
+  RefreshCw,
+  Plus,
+  Globe,
+  CheckCircle2,
+  AlertTriangle,
+  Trash2,
+  Edit3,
+  Clock,
+  ArrowRight,
+  ShieldCheck,
+  Activity,
+  Pause,
+  Play,
+  LayoutGrid,
+  List,
 } from 'lucide-react';
 import { ConfirmModal, ConfirmTone } from '../Modals/ConfirmModal';
 
@@ -140,7 +152,8 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
             <span>Quản lý nguồn cấp dữ liệu (Threat Intel Feeds)</span>
           </h1>
           <p className="text-slate-500 dark:text-slate-400 text-xs mt-1">
-            Cấu hình định kỳ đồng bộ danh sách chặn từ các nguồn uy tín toàn cầu (Hagezi, OISD) và Crawler nội bộ CyberDNS.
+            Cấu hình định kỳ đồng bộ danh sách chặn từ các nguồn uy tín toàn cầu (Hagezi, OISD) và Crawler nội
+            bộ CyberDNS.
           </p>
         </div>
 
@@ -201,187 +214,213 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
           onViewDomainsList={onViewDomainsList}
         />
       ) : (
-      /* Sources Grid */
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {sources.map((src) => (
-          <div
-            key={src.id}
-            className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-emerald-300 dark:hover:border-emerald-700 rounded-2xl p-5 space-y-4 shadow-xs flex flex-col justify-between transition-all"
-          >
-            <div className="space-y-3.5">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center space-x-2.5">
-                  <span
-                    className="w-3 h-3 rounded-full flex-shrink-0 shadow-xs"
-                    style={{ backgroundColor: src.color }}
-                  ></span>
-                  <h3 className="font-bold text-sm text-slate-900 dark:text-white font-sans">{src.name}</h3>
-                </div>
+        /* Sources Grid */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {sources.map((src) => (
+            <div
+              key={src.id}
+              className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-emerald-300 dark:hover:border-emerald-700 rounded-2xl p-5 space-y-4 shadow-xs flex flex-col justify-between transition-all"
+            >
+              <div className="space-y-3.5">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center space-x-2.5">
+                    <span
+                      className="w-3 h-3 rounded-full flex-shrink-0 shadow-xs"
+                      style={{ backgroundColor: src.color }}
+                    ></span>
+                    <h3 className="font-bold text-sm text-slate-900 dark:text-white font-sans">{src.name}</h3>
+                  </div>
 
-                {src.isPaused ? (
-                  <span className="px-2.5 py-0.5 rounded-full text-xs font-mono uppercase font-bold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-300 dark:border-slate-600">
-                    paused
-                  </span>
-                ) : (
-                  <span
-                    className={`px-2.5 py-0.5 rounded-full text-xs font-mono uppercase font-bold ${
-                      src.status === 'healthy'
-                        ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
-                        : src.status === 'warning'
-                        ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
-                        : src.status === 'error'
-                        ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
-                        : src.status === 'syncing'
-                        ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
-                    }`}
-                  >
-                    {src.status}
-                  </span>
-                )}
-              </div>
-
-              <div className="font-mono text-xs text-slate-500 dark:text-slate-400 truncate bg-slate-50 dark:bg-slate-800/60 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
-                {src.url}
-              </div>
-
-              <div className="space-y-2">
-                <div>
-                  <span className="text-slate-400 dark:text-slate-500 block text-xs uppercase font-sans font-bold mb-0.5">NHÓM</span>
-                  {(() => {
-                    const cat = getCategoryInfo(src.category);
-                    return cat ? (
-                      <span className="inline-flex items-center space-x-1.5 font-sans font-semibold text-slate-700 dark:text-slate-300">
-                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }}></span>
-                        <span className="truncate">{cat.name}</span>
-                      </span>
-                    ) : (
-                      <span className="font-sans italic text-slate-400 dark:text-slate-500">Không rõ nhóm</span>
-                    );
-                  })()}
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                  <div>
-                    <span className="text-slate-400 dark:text-slate-500 block text-xs uppercase font-sans font-bold mb-0.5">SỐ LƯỢNG TÊN MIỀN</span>
-                    <button
-                      onClick={() => onViewDomainsList(src.id)}
-                      title={`Xem danh sách tên miền đang thuộc nguồn "${src.name}"`}
-                      className="font-bold text-emerald-600 dark:text-emerald-400 text-sm font-mono hover:underline cursor-pointer"
+                  {src.isPaused ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-mono uppercase font-bold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-300 dark:border-slate-600">
+                      paused
+                    </span>
+                  ) : (
+                    <span
+                      className={`px-2.5 py-0.5 rounded-full text-xs font-mono uppercase font-bold ${
+                        src.status === 'healthy'
+                          ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                          : src.status === 'warning'
+                            ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
+                            : src.status === 'error'
+                              ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
+                              : src.status === 'syncing'
+                                ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                      }`}
                     >
-                      {src.domainCount.toLocaleString('vi-VN')}
-                    </button>
-                  </div>
+                      {src.status}
+                    </span>
+                  )}
+                </div>
+
+                <div className="font-mono text-xs text-slate-500 dark:text-slate-400 truncate bg-slate-50 dark:bg-slate-800/60 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                  {src.url}
+                </div>
+
+                <div className="space-y-2">
                   <div>
-                    <span className="text-slate-400 dark:text-slate-500 block text-xs uppercase font-sans font-bold mb-0.5">CHU KỲ</span>
-                    <span className="text-slate-700 dark:text-slate-300 font-semibold font-sans">{src.syncInterval}</span>
+                    <span className="text-slate-400 dark:text-slate-500 block text-xs uppercase font-sans font-bold mb-0.5">
+                      NHÓM
+                    </span>
+                    {(() => {
+                      const cat = getCategoryInfo(src.category);
+                      return cat ? (
+                        <span className="inline-flex items-center space-x-1.5 font-sans font-semibold text-slate-700 dark:text-slate-300">
+                          <span
+                            className="w-2 h-2 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: cat.color }}
+                          ></span>
+                          <span className="truncate">{cat.name}</span>
+                        </span>
+                      ) : (
+                        <span className="font-sans italic text-slate-400 dark:text-slate-500">
+                          Không rõ nhóm
+                        </span>
+                      );
+                    })()}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                    <div>
+                      <span className="text-slate-400 dark:text-slate-500 block text-xs uppercase font-sans font-bold mb-0.5">
+                        SỐ LƯỢNG TÊN MIỀN
+                      </span>
+                      <button
+                        onClick={() => onViewDomainsList(src.id)}
+                        title={`Xem danh sách tên miền đang thuộc nguồn "${src.name}"`}
+                        className="font-bold text-emerald-600 dark:text-emerald-400 text-sm font-mono hover:underline cursor-pointer"
+                      >
+                        {src.domainCount.toLocaleString('vi-VN')}
+                      </button>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 dark:text-slate-500 block text-xs uppercase font-sans font-bold mb-0.5">
+                        CHU KỲ
+                      </span>
+                      <span className="text-slate-700 dark:text-slate-300 font-semibold font-sans">
+                        {src.syncInterval}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Real progress bar — percent + current phase, both driven
+                {/* Real progress bar — percent + current phase, both driven
                   directly by the server-persisted syncProgress/syncPhase
                   (see runFeedSourceSyncJob), so it's accurate whether this
                   card was mounted the whole time or just got remounted after
                   a tab switch mid-sync. */}
-              {src.status === 'syncing' && (
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between text-xs font-mono">
-                    <span className="text-blue-700 dark:text-blue-300 font-semibold truncate pr-2">{src.syncPhase || 'Đang đồng bộ...'}</span>
-                    <span className="text-blue-600 dark:text-blue-400 font-bold flex-shrink-0">{src.syncProgress ?? 0}%</span>
+                {src.status === 'syncing' && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs font-mono">
+                      <span className="text-blue-700 dark:text-blue-300 font-semibold truncate pr-2">
+                        {src.syncPhase || 'Đang đồng bộ...'}
+                      </span>
+                      <span className="text-blue-600 dark:text-blue-400 font-bold flex-shrink-0">
+                        {src.syncProgress ?? 0}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                      <div
+                        className="bg-blue-500 h-full rounded-full transition-all duration-500"
+                        style={{ width: `${src.syncProgress ?? 0}%` }}
+                      ></div>
+                    </div>
                   </div>
-                  <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                    <div
-                      className="bg-blue-500 h-full rounded-full transition-all duration-500"
-                      style={{ width: `${src.syncProgress ?? 0}%` }}
-                    ></div>
-                  </div>
-                </div>
-              )}
-
-              {src.status === 'error' && src.errorMessage && (
-                <div className="bg-rose-50 dark:bg-rose-950/60 border border-rose-200/80 dark:border-rose-900 p-3 rounded-xl text-xs text-rose-800 dark:text-rose-200 leading-relaxed flex items-start space-x-1.5">
-                  <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 flex-shrink-0 mt-0.5" />
-                  <span>{src.errorMessage}</span>
-                </div>
-              )}
-
-              {src.status === 'warning' && src.errorMessage && (
-                <div className="bg-amber-50 dark:bg-amber-950/60 border border-amber-200/80 dark:border-amber-900 p-3 rounded-xl text-xs text-amber-800 dark:text-amber-200 leading-relaxed flex items-start space-x-1.5">
-                  <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-                  <span>{src.errorMessage}</span>
-                </div>
-              )}
-
-              {src.status === 'healthy' && src.lastSyncMessage && (
-                <div className="bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-900 p-3 rounded-xl text-xs text-emerald-800 dark:text-emerald-300 leading-relaxed flex items-start space-x-1.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5" />
-                  <span>{src.lastSyncMessage}</span>
-                </div>
-              )}
-
-              {src.isPaused && (
-                <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 p-3 rounded-xl text-xs text-slate-600 dark:text-slate-300 leading-relaxed flex items-start space-x-1.5">
-                  <Pause className="w-4 h-4 text-slate-500 dark:text-slate-400 flex-shrink-0 mt-0.5" />
-                  <span>Đã tạm dừng — mọi tên miền của nguồn này đã chuyển sang "Thôi chặn". Bấm "Tiếp tục" để đồng bộ lại và tự động chặn lại đúng những tên miền đó.</span>
-                </div>
-              )}
-            </div>
-
-            <div className="flex flex-col gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
-              <span className="text-slate-400 dark:text-slate-500 text-xs">
-                Lần đồng bộ: {src.lastSync ? src.lastSync : 'Chưa đồng bộ lần nào'}
-              </span>
-              <div className="flex items-center justify-between gap-2">
-                {src.isPaused ? (
-                  <button
-                    onClick={() => onResumeSource(src.id)}
-                    className="flex-1 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs font-bold flex items-center justify-center space-x-1 transition-colors cursor-pointer active-press"
-                  >
-                    <Play className="w-3.5 h-3.5" />
-                    <span>Tiếp tục</span>
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => handleSyncClick(src.id)}
-                    disabled={src.status === 'syncing'}
-                    className="flex-1 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs font-bold flex items-center justify-center space-x-1 transition-colors cursor-pointer active-press disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${src.status === 'syncing' ? 'animate-spin' : ''}`} />
-                    <span>{src.status === 'syncing' ? `Đang nạp... ${src.syncProgress ?? 0}%` : 'Đồng bộ'}</span>
-                  </button>
                 )}
 
-                {!src.isPaused && (
-                  <button
-                    onClick={() => setConfirmAction({ source: src, kind: 'pause' })}
-                    disabled={src.status === 'syncing'}
-                    title="Tạm dừng nguồn"
-                    className="p-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 rounded-xl transition-colors cursor-pointer active-press disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
-                  >
-                    <Pause className="w-3.5 h-3.5" />
-                  </button>
+                {src.status === 'error' && src.errorMessage && (
+                  <div className="bg-rose-50 dark:bg-rose-950/60 border border-rose-200/80 dark:border-rose-900 p-3 rounded-xl text-xs text-rose-800 dark:text-rose-200 leading-relaxed flex items-start space-x-1.5">
+                    <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 flex-shrink-0 mt-0.5" />
+                    <span>{src.errorMessage}</span>
+                  </div>
                 )}
 
-                <button
-                  onClick={() => setConfirmAction({ source: src, kind: 'delete' })}
-                  disabled={src.status === 'syncing'}
-                  title="Xoá nguồn"
-                  className="p-1.5 bg-white dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/60 text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-700 hover:border-rose-200 dark:hover:border-rose-800 rounded-xl transition-colors cursor-pointer active-press disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                {src.status === 'warning' && src.errorMessage && (
+                  <div className="bg-amber-50 dark:bg-amber-950/60 border border-amber-200/80 dark:border-amber-900 p-3 rounded-xl text-xs text-amber-800 dark:text-amber-200 leading-relaxed flex items-start space-x-1.5">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                    <span>{src.errorMessage}</span>
+                  </div>
+                )}
+
+                {src.status === 'healthy' && src.lastSyncMessage && (
+                  <div className="bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-900 p-3 rounded-xl text-xs text-emerald-800 dark:text-emerald-300 leading-relaxed flex items-start space-x-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5" />
+                    <span>{src.lastSyncMessage}</span>
+                  </div>
+                )}
+
+                {src.isPaused && (
+                  <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 p-3 rounded-xl text-xs text-slate-600 dark:text-slate-300 leading-relaxed flex items-start space-x-1.5">
+                    <Pause className="w-4 h-4 text-slate-500 dark:text-slate-400 flex-shrink-0 mt-0.5" />
+                    <span>
+                      Đã tạm dừng — mọi tên miền của nguồn này đã chuyển sang "Thôi chặn". Bấm "Tiếp tục" để
+                      đồng bộ lại và tự động chặn lại đúng những tên miền đó.
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <span className="text-slate-400 dark:text-slate-500 text-xs">
+                  Lần đồng bộ: {src.lastSync ? src.lastSync : 'Chưa đồng bộ lần nào'}
+                </span>
+                <div className="flex items-center justify-between gap-2">
+                  {src.isPaused ? (
+                    <button
+                      onClick={() => onResumeSource(src.id)}
+                      className="flex-1 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs font-bold flex items-center justify-center space-x-1 transition-colors cursor-pointer active-press"
+                    >
+                      <Play className="w-3.5 h-3.5" />
+                      <span>Tiếp tục</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleSyncClick(src.id)}
+                      disabled={src.status === 'syncing'}
+                      className="flex-1 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs font-bold flex items-center justify-center space-x-1 transition-colors cursor-pointer active-press disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      <RefreshCw
+                        className={`w-3.5 h-3.5 ${src.status === 'syncing' ? 'animate-spin' : ''}`}
+                      />
+                      <span>
+                        {src.status === 'syncing' ? `Đang nạp... ${src.syncProgress ?? 0}%` : 'Đồng bộ'}
+                      </span>
+                    </button>
+                  )}
+
+                  {!src.isPaused && (
+                    <button
+                      onClick={() => setConfirmAction({ source: src, kind: 'pause' })}
+                      disabled={src.status === 'syncing'}
+                      title="Tạm dừng nguồn"
+                      className="p-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 rounded-xl transition-colors cursor-pointer active-press disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+                    >
+                      <Pause className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => setConfirmAction({ source: src, kind: 'delete' })}
+                    disabled={src.status === 'syncing'}
+                    title="Xoá nguồn"
+                    className="p-1.5 bg-white dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/60 text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-700 hover:border-rose-200 dark:hover:border-rose-800 rounded-xl transition-colors cursor-pointer active-press disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
       )}
 
       {/* Modal Add Custom Feed Source */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl text-xs text-slate-700 dark:text-slate-300">
-            <h2 className="text-base font-bold text-slate-900 dark:text-white font-sans">Thêm nguồn Threat Feed mới</h2>
+            <h2 className="text-base font-bold text-slate-900 dark:text-white font-sans">
+              Thêm nguồn Threat Feed mới
+            </h2>
             <form onSubmit={handleAddSubmit} className="space-y-3.5">
               <div className="space-y-1">
                 <label className="block text-slate-800 dark:text-slate-200 font-bold">Tên nguồn</label>
@@ -396,7 +435,9 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
               </div>
 
               <div className="space-y-1">
-                <label className="block text-slate-800 dark:text-slate-200 font-bold">URL Feed (Raw txt/hosts)</label>
+                <label className="block text-slate-800 dark:text-slate-200 font-bold">
+                  URL Feed (Raw txt/hosts)
+                </label>
                 <input
                   type="url"
                   required
@@ -466,8 +507,8 @@ export const SourcesView: React.FC<SourcesViewProps> = ({
           confirmAction?.kind === 'delete'
             ? `Xoá vĩnh viễn nguồn "${confirmAction.source.name}"? Mọi tên miền đang chặn nhờ nguồn này sẽ chuyển sang "Thôi chặn". Không thể hoàn tác.`
             : confirmAction
-            ? `Tạm dừng nguồn "${confirmAction.source.name}"? Mọi tên miền đang chặn nhờ nguồn này sẽ chuyển sang "Thôi chặn" ngay lập tức.`
-            : ''
+              ? `Tạm dừng nguồn "${confirmAction.source.name}"? Mọi tên miền đang chặn nhờ nguồn này sẽ chuyển sang "Thôi chặn" ngay lập tức.`
+              : ''
         }
         confirmLabel={confirmAction?.kind === 'delete' ? 'Xoá vĩnh viễn' : 'Tạm dừng'}
         isProcessing={isConfirmProcessing}
@@ -491,7 +532,8 @@ const SourcesCompactList: React.FC<{
   onViewDomainsList: (feedSourceId: string) => void;
 }> = ({ sources, getCategoryInfo, onSyncSingle, onResumeSource, onPause, onDelete, onViewDomainsList }) => {
   const statusBadgeClass = (src: FeedSource) => {
-    if (src.isPaused) return 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600';
+    if (src.isPaused)
+      return 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600';
     switch (src.status) {
       case 'healthy':
         return 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800';
@@ -525,11 +567,20 @@ const SourcesCompactList: React.FC<{
             {sources.map((src) => {
               const cat = getCategoryInfo(src.category);
               return (
-                <tr key={src.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
+                <tr
+                  key={src.id}
+                  className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
+                >
                   <td className="px-4 py-3">
                     <div className="flex items-center space-x-2 min-w-0">
-                      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: src.color }}></span>
-                      <span className="font-bold text-slate-900 dark:text-white font-sans truncate max-w-[220px]" title={src.name}>
+                      <span
+                        className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: src.color }}
+                      ></span>
+                      <span
+                        className="font-bold text-slate-900 dark:text-white font-sans truncate max-w-[220px]"
+                        title={src.name}
+                      >
                         {src.name}
                       </span>
                     </div>
@@ -537,7 +588,10 @@ const SourcesCompactList: React.FC<{
                   <td className="px-4 py-3">
                     {cat ? (
                       <span className="inline-flex items-center space-x-1.5 font-sans">
-                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }}></span>
+                        <span
+                          className="w-2 h-2 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: cat.color }}
+                        ></span>
                         <span className="truncate max-w-[140px]">{cat.name}</span>
                       </span>
                     ) : (
@@ -553,10 +607,18 @@ const SourcesCompactList: React.FC<{
                       {src.domainCount.toLocaleString('vi-VN')}
                     </button>
                   </td>
-                  <td className="px-4 py-3 text-slate-600 dark:text-slate-400 font-sans whitespace-nowrap">{src.syncInterval}</td>
+                  <td className="px-4 py-3 text-slate-600 dark:text-slate-400 font-sans whitespace-nowrap">
+                    {src.syncInterval}
+                  </td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-mono uppercase font-bold border ${statusBadgeClass(src)}`}>
-                      {src.isPaused ? 'paused' : src.status === 'syncing' ? `${src.syncProgress ?? 0}%` : src.status}
+                    <span
+                      className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-mono uppercase font-bold border ${statusBadgeClass(src)}`}
+                    >
+                      {src.isPaused
+                        ? 'paused'
+                        : src.status === 'syncing'
+                          ? `${src.syncProgress ?? 0}%`
+                          : src.status}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-slate-400 dark:text-slate-500 whitespace-nowrap">
@@ -579,7 +641,9 @@ const SourcesCompactList: React.FC<{
                           title="Đồng bộ"
                           className="p-1.5 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-lg transition-colors cursor-pointer active-press disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
                         >
-                          <RefreshCw className={`w-3.5 h-3.5 ${src.status === 'syncing' ? 'animate-spin' : ''}`} />
+                          <RefreshCw
+                            className={`w-3.5 h-3.5 ${src.status === 'syncing' ? 'animate-spin' : ''}`}
+                          />
                         </button>
                       )}
                       {!src.isPaused && (

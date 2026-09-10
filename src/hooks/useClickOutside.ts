@@ -14,7 +14,11 @@ import { useEffect, RefObject } from 'react';
 // simultaneous onClick handler elsewhere on the page (e.g. clicking a
 // different dropdown's own toggle button) — using 'click' would race
 // against React's own click handlers in an order that isn't guaranteed.
-export function useClickOutside(ref: RefObject<HTMLElement | null>, onOutsideClick: () => void, enabled: boolean = true) {
+export function useClickOutside(
+  ref: RefObject<HTMLElement | null>,
+  onOutsideClick: () => void,
+  enabled: boolean = true,
+) {
   useEffect(() => {
     if (!enabled) return;
     const handlePointerDown = (e: MouseEvent) => {

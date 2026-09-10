@@ -101,7 +101,7 @@ function spreadOverlappingNodes(pinnedNodes: PinnedDnsNode[]): PinnedDnsNode[] {
 }
 
 function toFeatureCollection(
-  pinnedNodes: PinnedDnsNode[]
+  pinnedNodes: PinnedDnsNode[],
 ): GeoJSON.FeatureCollection<GeoJSON.Point, DnsNodePointProperties> {
   return {
     type: 'FeatureCollection',
@@ -139,12 +139,15 @@ function toFeatureCollection(
 // DOM); MapLibre's own controls don't exhibit that bug, but there's no
 // downside to keeping the container's stacking self-contained regardless
 // of which map library renders inside it.
-export const DnsNodeStatusMap: React.FC<DnsNodeStatusMapProps> = ({ nodes, heightClassName = 'h-[420px]' }) => {
+export const DnsNodeStatusMap: React.FC<DnsNodeStatusMapProps> = ({
+  nodes,
+  heightClassName = 'h-[420px]',
+}) => {
   const mapRef = useRef<MapRef>(null);
 
   const pinnedNodes = useMemo(
     () => nodes.filter((n): n is PinnedDnsNode => n.latitude != null && n.longitude != null),
-    [nodes]
+    [nodes],
   );
 
   // Default view: the WHOLE world, fit exactly to this container's real
@@ -159,7 +162,7 @@ export const DnsNodeStatusMap: React.FC<DnsNodeStatusMapProps> = ({ nodes, heigh
         [-180, -85],
         [180, 85],
       ],
-      { padding: 20, duration: 0 }
+      { padding: 20, duration: 0 },
     );
   }, [pinnedNodes]);
 
@@ -188,7 +191,7 @@ export const DnsNodeStatusMap: React.FC<DnsNodeStatusMapProps> = ({ nodes, heigh
         [Math.min(...lngs), Math.min(...lats)],
         [Math.max(...lngs), Math.max(...lats)],
       ],
-      { padding: 48, maxZoom: 10, duration: 400 }
+      { padding: 48, maxZoom: 10, duration: 400 },
     );
   }, [pinnedNodes]);
 
@@ -217,11 +220,11 @@ export const DnsNodeStatusMap: React.FC<DnsNodeStatusMapProps> = ({ nodes, heigh
   const spreadNodes = useMemo(() => spreadOverlappingNodes(pinnedNodes), [pinnedNodes]);
   const activeFeatures = useMemo(
     () => toFeatureCollection(spreadNodes.filter((n) => n.status === 'active')),
-    [spreadNodes]
+    [spreadNodes],
   );
   const inactiveFeatures = useMemo(
     () => toFeatureCollection(spreadNodes.filter((n) => n.status !== 'active')),
-    [spreadNodes]
+    [spreadNodes],
   );
 
   const [selectedPoint, setSelectedPoint] = useState<{
@@ -231,13 +234,15 @@ export const DnsNodeStatusMap: React.FC<DnsNodeStatusMapProps> = ({ nodes, heigh
 
   const handlePointClick = (
     feature: GeoJSON.Feature<GeoJSON.Point, DnsNodePointProperties>,
-    coordinates: [number, number]
+    coordinates: [number, number],
   ) => {
     setSelectedPoint({ coordinates, properties: feature.properties });
   };
 
   return (
-    <div className={`w-full ${heightClassName} isolate rounded-xl overflow-hidden border border-slate-100 dark:border-slate-800`}>
+    <div
+      className={`w-full ${heightClassName} isolate rounded-xl overflow-hidden border border-slate-100 dark:border-slate-800`}
+    >
       <Map
         ref={mapRef}
         center={[106.0, 16.0]} // [lng, lat] — initial placement only, roughly Việt Nam; the effects above take over immediately
@@ -299,13 +304,18 @@ export const DnsNodeStatusMap: React.FC<DnsNodeStatusMapProps> = ({ nodes, heigh
           >
             <div className="font-bold pr-4">{selectedPoint.properties.name}</div>
             <div className="text-slate-500 dark:text-slate-400">
-              {selectedPoint.properties.tier} · {selectedPoint.properties.status === 'active' ? 'Active' : 'Inactive'}
+              {selectedPoint.properties.tier} ·{' '}
+              {selectedPoint.properties.status === 'active' ? 'Active' : 'Inactive'}
             </div>
             {selectedPoint.properties.ipAddress && (
-              <div className="font-mono text-slate-500 dark:text-slate-400">{selectedPoint.properties.ipAddress}</div>
+              <div className="font-mono text-slate-500 dark:text-slate-400">
+                {selectedPoint.properties.ipAddress}
+              </div>
             )}
             {selectedPoint.properties.ipv6Address && (
-              <div className="font-mono text-slate-500 dark:text-slate-400">{selectedPoint.properties.ipv6Address}</div>
+              <div className="font-mono text-slate-500 dark:text-slate-400">
+                {selectedPoint.properties.ipv6Address}
+              </div>
             )}
             {selectedPoint.properties.location && (
               <div className="text-slate-400 dark:text-slate-500">{selectedPoint.properties.location}</div>

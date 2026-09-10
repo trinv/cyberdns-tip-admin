@@ -1,8 +1,15 @@
 import React, { useState } from 'react';
 import { AuditLog } from '../../types';
 import {
-  History, CheckCircle2, User, Clock,
-  ShieldAlert, Database, Search, FileText, Sparkles
+  History,
+  CheckCircle2,
+  User,
+  Clock,
+  ShieldAlert,
+  Database,
+  Search,
+  FileText,
+  Sparkles,
 } from 'lucide-react';
 
 interface AuditLogsViewProps {
@@ -26,10 +33,11 @@ function getInitials(user: string): string {
 export const AuditLogsView: React.FC<AuditLogsViewProps> = ({ logs }) => {
   const [searchTerm, setSearchTerm] = useState('');
 
-  const filteredLogs = logs.filter((l) =>
-    l.summary.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    l.user.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    l.reason.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredLogs = logs.filter(
+    (l) =>
+      l.summary.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      l.user.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      l.reason.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   return (
@@ -66,7 +74,10 @@ export const AuditLogsView: React.FC<AuditLogsViewProps> = ({ logs }) => {
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono text-slate-700 dark:text-slate-300">
               {filteredLogs.map((log) => (
-                <tr key={log.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
+                <tr
+                  key={log.id}
+                  className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
+                >
                   <td className="px-5 py-3.5 text-slate-400 dark:text-slate-500 whitespace-nowrap">
                     {new Date(log.timestamp).toLocaleString('vi-VN')}
                   </td>
@@ -77,7 +88,9 @@ export const AuditLogsView: React.FC<AuditLogsViewProps> = ({ logs }) => {
                         {getInitials(log.user)}
                       </div>
                       <div>
-                        <div className="text-slate-800 dark:text-slate-200 font-bold font-sans text-xs">{log.user}</div>
+                        <div className="text-slate-800 dark:text-slate-200 font-bold font-sans text-xs">
+                          {log.user}
+                        </div>
                         <div className="text-xs text-slate-400 dark:text-slate-500 font-sans">{log.role}</div>
                       </div>
                     </div>
@@ -87,7 +100,10 @@ export const AuditLogsView: React.FC<AuditLogsViewProps> = ({ logs }) => {
                     <div className="font-semibold text-xs">{log.summary}</div>
                   </td>
 
-                  <td className="px-5 py-3.5 font-sans text-slate-500 dark:text-slate-400 max-w-xs truncate text-xs" title={log.reason}>
+                  <td
+                    className="px-5 py-3.5 font-sans text-slate-500 dark:text-slate-400 max-w-xs truncate text-xs"
+                    title={log.reason}
+                  >
                     {log.reason}
                   </td>
                 </tr>

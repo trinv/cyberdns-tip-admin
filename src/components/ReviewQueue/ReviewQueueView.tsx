@@ -41,7 +41,8 @@ export const ReviewQueueView: React.FC<ReviewQueueViewProps> = ({
             </span>
           </h1>
           <p className="text-slate-500 dark:text-slate-400 text-xs mt-1">
-            Các tên miền có dấu hiệu độc hại / cờ bạc do AI Crawler và hệ thống giám sát bất thường DNS phát hiện tự động.
+            Các tên miền có dấu hiệu độc hại / cờ bạc do AI Crawler và hệ thống giám sát bất thường DNS phát
+            hiện tự động.
           </p>
         </div>
 
@@ -63,7 +64,9 @@ export const ReviewQueueView: React.FC<ReviewQueueViewProps> = ({
 
       {/* Filter Chips */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-slate-400 dark:text-slate-500 text-xs font-bold uppercase tracking-wider">Lọc theo:</span>
+        <span className="text-slate-400 dark:text-slate-500 text-xs font-bold uppercase tracking-wider">
+          Lọc theo:
+        </span>
         <button
           onClick={() => setSelectedFilter('all')}
           className={`px-3 py-1 rounded-xl text-xs font-semibold cursor-pointer transition-all ${
@@ -98,7 +101,9 @@ export const ReviewQueueView: React.FC<ReviewQueueViewProps> = ({
         <div className="text-center py-16 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl space-y-2 shadow-xs transition-colors">
           <CheckCircle2 className="w-12 h-12 text-emerald-600 dark:text-emerald-400 mx-auto" />
           <p className="font-bold text-slate-800 dark:text-slate-200 text-base">Hàng đợi trống</p>
-          <p className="text-slate-400 dark:text-slate-500 text-xs">Tất cả tên miền nghi vấn đã được duyệt hoặc xử lý an toàn!</p>
+          <p className="text-slate-400 dark:text-slate-500 text-xs">
+            Tất cả tên miền nghi vấn đã được duyệt hoặc xử lý an toàn!
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

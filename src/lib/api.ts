@@ -1,4 +1,19 @@
-import { DomainItem, CategoryInfo, FeedSource, AuditLog, ReviewDomainItem, DashboardStats, CategoryStatusBreakdown, AppUser, LoginLog, DnsNode, BlocklistAclSettings, BlocklistUnknownRequester, GeoCountry, GeoProvince } from '../types';
+import {
+  DomainItem,
+  CategoryInfo,
+  FeedSource,
+  AuditLog,
+  ReviewDomainItem,
+  DashboardStats,
+  CategoryStatusBreakdown,
+  AppUser,
+  LoginLog,
+  DnsNode,
+  BlocklistAclSettings,
+  BlocklistUnknownRequester,
+  GeoCountry,
+  GeoProvince,
+} from '../types';
 
 export const API_BASE = '/api';
 
@@ -88,7 +103,10 @@ export async function fetchStatusBreakdown(category?: string): Promise<CategoryS
   return res.json();
 }
 
-export async function loginApi(email: string, password: string): Promise<{ token: string; user: AppUser; isNewIp?: boolean }> {
+export async function loginApi(
+  email: string,
+  password: string,
+): Promise<{ token: string; user: AppUser; isNewIp?: boolean }> {
   const res = await fetch(`${API_BASE}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -158,7 +176,7 @@ export async function createUserApi(data: {
 
 export async function updateUserApi(
   id: number,
-  patch: { role?: string; isActive?: boolean; displayName?: string; password?: string }
+  patch: { role?: string; isActive?: boolean; displayName?: string; password?: string },
 ): Promise<AppUser> {
   const res = await fetch(`${API_BASE}/users/${id}`, {
     method: 'PATCH',
@@ -224,7 +242,7 @@ export async function fetchDomains(params: {
 export async function updateDomainApi(
   id: number | string,
   patch: Partial<DomainItem>,
-  reason?: string
+  reason?: string,
 ): Promise<DomainItem> {
   const res = await fetch(`${API_BASE}/domains/${id}`, {
     method: 'PATCH',
@@ -336,13 +354,21 @@ export async function syncFeedSourceApi(id: string): Promise<FeedSource> {
 }
 
 export async function pauseFeedSourceApi(id: string): Promise<{ source: FeedSource; affectedCount: number }> {
-  const res = await fetch(`${API_BASE}/sources/${id}/pause`, { method: 'POST', headers: await authHeaders() });
+  const res = await fetch(`${API_BASE}/sources/${id}/pause`, {
+    method: 'POST',
+    headers: await authHeaders(),
+  });
   await checkResponse(res, 'Failed to pause feed source');
   return res.json();
 }
 
-export async function resumeFeedSourceApi(id: string): Promise<{ source: FeedSource; affectedCount: number }> {
-  const res = await fetch(`${API_BASE}/sources/${id}/resume`, { method: 'POST', headers: await authHeaders() });
+export async function resumeFeedSourceApi(
+  id: string,
+): Promise<{ source: FeedSource; affectedCount: number }> {
+  const res = await fetch(`${API_BASE}/sources/${id}/resume`, {
+    method: 'POST',
+    headers: await authHeaders(),
+  });
   await checkResponse(res, 'Failed to resume feed source');
   return res.json();
 }
@@ -362,7 +388,7 @@ export async function fetchReviewQueue(status: string = 'pending'): Promise<Revi
 export async function resolveReviewItemApi(
   id: number | string,
   decision: 'approved' | 'rejected',
-  category?: string
+  category?: string,
 ): Promise<ReviewDomainItem> {
   const res = await fetch(`${API_BASE}/reviews/${id}/resolve`, {
     method: 'POST',
@@ -380,7 +406,10 @@ export async function fetchAuditLogs(): Promise<AuditLog[]> {
   return res.json();
 }
 
-export async function rollbackAuditLogApi(logId: string, reason?: string): Promise<{ success: boolean; summary: string }> {
+export async function rollbackAuditLogApi(
+  logId: string,
+  reason?: string,
+): Promise<{ success: boolean; summary: string }> {
   const res = await fetch(`${API_BASE}/audit-logs/${encodeURIComponent(logId)}/rollback`, {
     method: 'POST',
     headers: await authHeaders(),

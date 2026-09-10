@@ -1,8 +1,5 @@
 import React from 'react';
-import { 
-  LayoutDashboard, Globe, CheckSquare, Rocket, Menu, 
-  Sparkles, ShieldAlert 
-} from 'lucide-react';
+import { LayoutDashboard, Globe, CheckSquare, Rocket, Menu, Sparkles, ShieldAlert } from 'lucide-react';
 
 interface MobileBottomNavProps {
   currentTab: string;
@@ -66,19 +63,21 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
               }`}
             >
               <div className="relative">
-                <Icon className={`w-5 h-5 transition-transform ${isActive ? 'scale-110 stroke-[2.4]' : 'stroke-[1.8]'}`} />
-                
+                <Icon
+                  className={`w-5 h-5 transition-transform ${isActive ? 'scale-110 stroke-[2.4]' : 'stroke-[1.8]'}`}
+                />
+
                 {/* Notification Badge */}
                 {tab.badge !== undefined && tab.badge > 0 && (
-                  <span className={`absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 rounded-full text-xs font-bold text-white flex items-center justify-center ${tab.badgeColor || 'bg-blue-600'} animate-pulse`}>
+                  <span
+                    className={`absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 rounded-full text-xs font-bold text-white flex items-center justify-center ${tab.badgeColor || 'bg-blue-600'} animate-pulse`}
+                  >
                     {tab.badge}
                   </span>
                 )}
               </div>
 
-              <span className="text-xs mt-1 tracking-tight leading-none">
-                {tab.label}
-              </span>
+              <span className="text-xs mt-1 tracking-tight leading-none">{tab.label}</span>
 
               {/* Active Indicator Dot */}
               {isActive && (
@@ -96,9 +95,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           <div className="relative">
             <Menu className="w-5 h-5 stroke-[1.8]" />
           </div>
-          <span className="text-xs mt-1 tracking-tight leading-none">
-            Menu
-          </span>
+          <span className="text-xs mt-1 tracking-tight leading-none">Menu</span>
         </button>
       </div>
     </div>

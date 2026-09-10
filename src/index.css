@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 @custom-variant dark (&:is(.dark, .dark *));
 
 /* ============================================================================
@@ -37,7 +37,7 @@
 
 @theme {
   /* --- Primary (blue) — replaces Tailwind's built-in emerald-* scale --- */
-  --color-emerald-50:  #eff6ff;
+  --color-emerald-50: #eff6ff;
   --color-emerald-100: #dbeafe;
   --color-emerald-200: #bfdbfe;
   --color-emerald-300: #93c5fd;
@@ -51,7 +51,7 @@
 
   /* --- Info (teal) — replaces Tailwind's built-in blue-* scale, so it
      never collides visually with the new primary blue above --- */
-  --color-blue-50:  #f0fdfa;
+  --color-blue-50: #f0fdfa;
   --color-blue-100: #ccfbf1;
   --color-blue-200: #99f6e4;
   --color-blue-300: #5eead4;
@@ -144,7 +144,7 @@
 
     --color-primary: hsl(var(--brand-h) var(--brand-s) var(--brand-l));
     --color-primary-hover: hsl(var(--brand-h) var(--brand-s) calc(var(--brand-l) - 8%));
-    --color-primary-soft: hsl(var(--brand-h) var(--brand-s) var(--brand-l) / 0.10);
+    --color-primary-soft: hsl(var(--brand-h) var(--brand-s) var(--brand-l) / 0.1);
     --color-primary-fg: #ffffff;
 
     /* semantic — do NOT vary by tenant/brand. Values match the exact
@@ -203,9 +203,9 @@
 
     /* rgba coefficients matched to the reference template's own
        --shadow-card/--shadow-lg. */
-    --shadow-sm: 0 1px 3px rgb(15 23 42 / .06), 0 1px 2px -1px rgb(15 23 42 / .04);
-    --shadow-md: 0 4px 16px rgb(15 23 42 / .08);
-    --shadow-lg: 0 10px 15px -3px rgb(15 23 42 / .08), 0 4px 6px -4px rgb(15 23 42 / .05);
+    --shadow-sm: 0 1px 3px rgb(15 23 42 / 0.06), 0 1px 2px -1px rgb(15 23 42 / 0.04);
+    --shadow-md: 0 4px 16px rgb(15 23 42 / 0.08);
+    --shadow-lg: 0 10px 15px -3px rgb(15 23 42 / 0.08), 0 4px 6px -4px rgb(15 23 42 / 0.05);
   }
 
   .dark {
@@ -247,9 +247,9 @@
     --color-primary-soft: hsl(var(--brand-h) var(--brand-s) var(--brand-l) / 0.16);
     --color-primary-ring: rgba(96, 165, 250, 0.24);
 
-    --shadow-sm: 0 1px 2px rgb(0 0 0 / .30);
-    --shadow-md: 0 4px 16px rgb(0 0 0 / .40);
-    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / .5), 0 4px 6px -4px rgb(0 0 0 / .4);
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+    --shadow-md: 0 4px 16px rgb(0 0 0 / 0.4);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.4);
   }
 
   /* Typography / spacing / radius / motion scale — admin-portal-style §2.4.
@@ -258,19 +258,37 @@
      directly as var(...) by new/rewritten components (Sidebar, Header,
      Dashboard, etc.) instead of hardcoding pixel values inline. */
   :root {
-    --fs-display: 28px; --lh-display: 36px;
-    --fs-h1: 24px; --fs-h2: 20px; --fs-h3: 16px;
-    --fs-body: 14px; --lh-body: 22px;
-    --fs-sm: 13px; --fs-xs: 12px; --fs-eyebrow: 11px;
-    --fw-regular: 400; --fw-medium: 500; --fw-semibold: 600; --fw-bold: 700;
+    --fs-display: 28px;
+    --lh-display: 36px;
+    --fs-h1: 24px;
+    --fs-h2: 20px;
+    --fs-h3: 16px;
+    --fs-body: 14px;
+    --lh-body: 22px;
+    --fs-sm: 13px;
+    --fs-xs: 12px;
+    --fs-eyebrow: 11px;
+    --fw-regular: 400;
+    --fw-medium: 500;
+    --fw-semibold: 600;
+    --fw-bold: 700;
 
-    --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
-    --sp-5: 20px; --sp-6: 24px; --sp-8: 32px; --sp-10: 40px;
+    --sp-1: 4px;
+    --sp-2: 8px;
+    --sp-3: 12px;
+    --sp-4: 16px;
+    --sp-5: 20px;
+    --sp-6: 24px;
+    --sp-8: 32px;
+    --sp-10: 40px;
 
     /* --radius-lg matches the reference template's own card radius (14px,
        inspected in its compiled CSS) — was 12px per admin-portal-style's
        generic default; the concrete reference takes precedence here. */
-    --radius-sm: 6px; --radius-md: 8px; --radius-lg: 14px; --radius-xl: 16px;
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 14px;
+    --radius-xl: 16px;
     --radius-pill: 999px;
 
     --layout-sidebar: 260px;
@@ -278,12 +296,18 @@
     --layout-header: 72px;
     --layout-content-pad: var(--sp-6);
 
-    --dur-fast: 120ms; --dur-base: 220ms; --dur-slow: 320ms;
-    --ease-out: cubic-bezier(.22,1,.36,1);
-    --ease-spring: cubic-bezier(.34,1.4,.64,1);
+    --dur-fast: 120ms;
+    --dur-base: 220ms;
+    --dur-slow: 320ms;
+    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
 
-    --z-header: 100; --z-sidebar: 200; --z-tabbar: 300;
-    --z-sheet: 400; --z-modal: 500; --z-toast: 600;
+    --z-header: 100;
+    --z-sidebar: 200;
+    --z-tabbar: 300;
+    --z-sheet: 400;
+    --z-modal: 500;
+    --z-toast: 600;
   }
 
   /* `body` below is the ONLY place the concrete font stack is declared —
@@ -300,7 +324,7 @@
   body {
     background-color: var(--bg-canvas);
     color: var(--text-primary);
-    font-family: "Inter", "Arial", "Segoe UI", sans-serif;
+    font-family: 'Inter', 'Arial', 'Segoe UI', sans-serif;
     font-size: 15px;
     line-height: 1.55;
     -webkit-font-smoothing: antialiased;
@@ -308,7 +332,10 @@
     overflow-x: hidden;
   }
 
-  button, input, textarea, select {
+  button,
+  input,
+  textarea,
+  select {
     font: inherit;
   }
 
@@ -395,19 +422,26 @@
    tokens (see the file-level note above for why the color-family redefinition
    technique above doesn't apply here: slate itself isn't being recolored,
    only specific semantic uses of a couple of its shades are). */
-.bg-white, .bg-slate-50, .bg-slate-100\/90 {
+.bg-white,
+.bg-slate-50,
+.bg-slate-100\/90 {
   background-color: var(--bg-surface);
 }
-.border-slate-200, .border-slate-200\/80, .border-slate-200\/60 {
+.border-slate-200,
+.border-slate-200\/80,
+.border-slate-200\/60 {
   border-color: var(--border);
 }
-.text-slate-900, .text-slate-800 {
+.text-slate-900,
+.text-slate-800 {
   color: var(--text-primary);
 }
-.text-slate-600, .text-slate-500 {
+.text-slate-600,
+.text-slate-500 {
   color: var(--text-secondary);
 }
-.text-slate-400, .text-slate-300 {
+.text-slate-400,
+.text-slate-300 {
   color: var(--text-muted);
 }
 
@@ -452,12 +486,30 @@
   line-height: 1;
   padding: 3px 9px;
 }
-.tag.t-new { background: var(--color-purple-soft); color: var(--color-purple); }
-.tag.t-used { background: var(--color-orange-soft); color: var(--color-orange); }
-.tag.t-old { background: var(--color-warning-soft); color: var(--color-warning); }
-.tag.t-unavail { background: var(--color-danger-soft); color: var(--color-danger); }
-.tag.t-active { background: var(--color-success-soft); color: var(--color-success); }
-.tag.t-info { background: var(--color-info-soft); color: var(--color-info); }
+.tag.t-new {
+  background: var(--color-purple-soft);
+  color: var(--color-purple);
+}
+.tag.t-used {
+  background: var(--color-orange-soft);
+  color: var(--color-orange);
+}
+.tag.t-old {
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+.tag.t-unavail {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+.tag.t-active {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+.tag.t-info {
+  background: var(--color-info-soft);
+  color: var(--color-info);
+}
 
 /* Card header divider — border-bottom in --border-soft with the reference
    template's own spacing (16px bottom padding, 20px margin before the
@@ -470,7 +522,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }

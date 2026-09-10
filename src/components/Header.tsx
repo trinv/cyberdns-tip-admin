@@ -1,11 +1,35 @@
 import React from 'react';
 import {
-  Search, Plus, Bell, ChevronDown,
-  Menu, Settings, Zap, Grid, Sparkles,
-  GitBranch, CheckCircle2, Shield, ArrowUpRight,
-  Sun, Moon, ShieldCheck, Keyboard, HelpCircle,
-  LayoutDashboard, Globe, CheckSquare, Rocket, Upload, Rss, History,
-  LogIn, LogOut, UserCircle2, Users, Server
+  Search,
+  Plus,
+  Bell,
+  ChevronDown,
+  Menu,
+  Settings,
+  Zap,
+  Grid,
+  Sparkles,
+  GitBranch,
+  CheckCircle2,
+  Shield,
+  ArrowUpRight,
+  Sun,
+  Moon,
+  ShieldCheck,
+  Keyboard,
+  HelpCircle,
+  LayoutDashboard,
+  Globe,
+  CheckSquare,
+  Rocket,
+  Upload,
+  Rss,
+  History,
+  LogIn,
+  LogOut,
+  UserCircle2,
+  Users,
+  Server,
 } from 'lucide-react';
 import { CyberDNSLogo } from './CyberDNSLogo';
 import { AppUser } from '../types';
@@ -66,15 +90,27 @@ export const Header: React.FC<HeaderProps> = ({
       case 'domain':
         return { title: 'Quản trị Danh mục Tên miền (Domain Explorer)', icon: Globe, category: 'Khám phá' };
       case 'review':
-        return { title: 'Hàng đợi Phê duyệt Tên miền (Review Queue)', icon: CheckSquare, category: 'Kiểm duyệt' };
+        return {
+          title: 'Hàng đợi Phê duyệt Tên miền (Review Queue)',
+          icon: CheckSquare,
+          category: 'Kiểm duyệt',
+        };
       case 'release':
         return { title: 'Blocklist URL Đã Phát Hành', icon: Rocket, category: 'Phát hành' };
       case 'import':
         return { title: 'Nhập & Xử lý Tên miền Hàng loạt (Batch Import)', icon: Upload, category: 'Công cụ' };
       case 'sources':
-        return { title: 'Nguồn Cấp Dữ liệu Tình báo Mối đe dọa (Threat Feeds)', icon: Rss, category: 'Hệ thống' };
+        return {
+          title: 'Nguồn Cấp Dữ liệu Tình báo Mối đe dọa (Threat Feeds)',
+          icon: Rss,
+          category: 'Hệ thống',
+        };
       case 'logs':
-        return { title: 'Nhật ký Kiểm toán & Khôi phục Giao dịch (Audit Logs)', icon: History, category: 'Kiểm toán' };
+        return {
+          title: 'Nhật ký Kiểm toán & Khôi phục Giao dịch (Audit Logs)',
+          icon: History,
+          category: 'Kiểm toán',
+        };
       case 'users':
         return { title: 'Quản lý Người dùng & Phân quyền', icon: Users, category: 'Hệ thống' };
       case 'dns-nodes':
@@ -107,7 +143,9 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="flex items-center space-x-1.5 text-xs text-slate-400 dark:text-slate-500 font-medium">
               <span>CyberDNS</span>
               <span>/</span>
-              <span className="text-slate-600 dark:text-slate-400 font-semibold">{activeTabInfo.category}</span>
+              <span className="text-slate-600 dark:text-slate-400 font-semibold">
+                {activeTabInfo.category}
+              </span>
               <span>/</span>
             </div>
             <div className="flex items-center space-x-1.5 text-xs font-bold text-slate-900 dark:text-white truncate">
@@ -123,7 +161,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           {/* Quick Search Box */}
-          <div 
+          <div
             onClick={onOpenSearch}
             className="hidden md:flex relative max-w-xs w-64 cursor-pointer group ml-2"
           >
@@ -137,7 +175,9 @@ export const Header: React.FC<HeaderProps> = ({
               className="w-full pl-8 pr-8 py-1.5 text-xs bg-slate-100/90 dark:bg-slate-800/80 hover:bg-slate-200/60 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 placeholder-slate-400 rounded-xl border border-slate-200/60 dark:border-slate-700/60 transition-all outline-none cursor-pointer"
             />
             <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
-              <kbd className="px-1.5 py-0.5 rounded bg-white dark:bg-slate-700 text-xs text-slate-500 dark:text-slate-300 font-mono shadow-xs border border-slate-200 dark:border-slate-600">⌘K</kbd>
+              <kbd className="px-1.5 py-0.5 rounded bg-white dark:bg-slate-700 text-xs text-slate-500 dark:text-slate-300 font-mono shadow-xs border border-slate-200 dark:border-slate-600">
+                ⌘K
+              </kbd>
             </div>
           </div>
         </div>
@@ -148,14 +188,10 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             onClick={toggleTheme}
             id="btn-toggle-theme"
-            title={isDarkMode ? "Chuyển sang giao diện Sáng" : "Chuyển sang giao diện Tối"}
+            title={isDarkMode ? 'Chuyển sang giao diện Sáng' : 'Chuyển sang giao diện Tối'}
             className="w-9 h-9 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-muted rounded-full transition-colors cursor-pointer active-press"
           >
-            {isDarkMode ? (
-              <Sun className="w-4 h-4 text-amber-400" />
-            ) : (
-              <Moon className="w-4 h-4" />
-            )}
+            {isDarkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
           </button>
 
           {/* Notification Bell */}
@@ -176,7 +212,9 @@ export const Header: React.FC<HeaderProps> = ({
             {notificationsOpen && (
               <div className="absolute right-0 mt-3 w-80 bg-white dark:bg-slate-900 text-slate-800 dark:text-white rounded-2xl shadow-2xl border border-slate-200/80 dark:border-slate-800 py-3 z-50 animate-in fade-in zoom-in-95 duration-100">
                 <div className="px-4 pb-2.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                  <span className="font-bold text-xs text-slate-800 dark:text-white font-sans">Thông báo SOC</span>
+                  <span className="font-bold text-xs text-slate-800 dark:text-white font-sans">
+                    Thông báo SOC
+                  </span>
                   {notifications.length > 0 && (
                     <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200/60 dark:border-emerald-800/60">
                       {notifications.length} Mới
@@ -185,16 +223,25 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
                 <div className="py-2 divide-y divide-slate-100 dark:divide-slate-800 text-xs max-h-72 overflow-y-auto">
                   {notifications.length === 0 ? (
-                    <div className="px-4 py-6 text-center text-slate-400 dark:text-slate-500">Không có thông báo mới.</div>
+                    <div className="px-4 py-6 text-center text-slate-400 dark:text-slate-500">
+                      Không có thông báo mới.
+                    </div>
                   ) : (
                     notifications.map((n) => (
                       <div
                         key={n.id}
-                        onClick={() => { setCurrentTab(n.tab); setNotificationsOpen(false); }}
+                        onClick={() => {
+                          setCurrentTab(n.tab);
+                          setNotificationsOpen(false);
+                        }}
                         className="px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer transition-colors"
                       >
-                        <div className="font-semibold text-slate-800 dark:text-slate-200 font-sans">{n.title}</div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{n.description}</div>
+                        <div className="font-semibold text-slate-800 dark:text-slate-200 font-sans">
+                          {n.title}
+                        </div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                          {n.description}
+                        </div>
                       </div>
                     ))
                   )}
@@ -237,7 +284,9 @@ export const Header: React.FC<HeaderProps> = ({
                   <span className="font-bold text-slate-700 dark:text-slate-200 text-xs leading-tight font-sans tracking-tight truncate max-w-[120px]">
                     {currentUser.displayName || currentUser.email}
                   </span>
-                  <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold leading-tight">{userRole}</span>
+                  <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold leading-tight">
+                    {userRole}
+                  </span>
                 </div>
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400 ml-1" />
               </button>
@@ -248,8 +297,12 @@ export const Header: React.FC<HeaderProps> = ({
                     <div className="font-bold text-xs text-slate-900 dark:text-white font-sans truncate">
                       {currentUser.displayName || 'Người dùng'}
                     </div>
-                    <div className="text-xs text-slate-500 font-mono mt-0.5 truncate">{currentUser.email}</div>
-                    <div className="text-xs text-emerald-600 dark:text-emerald-400 font-bold mt-1">Vai trò: {userRole}</div>
+                    <div className="text-xs text-slate-500 font-mono mt-0.5 truncate">
+                      {currentUser.email}
+                    </div>
+                    <div className="text-xs text-emerald-600 dark:text-emerald-400 font-bold mt-1">
+                      Vai trò: {userRole}
+                    </div>
                   </div>
                   {userRole === 'Admin' && (
                     <button

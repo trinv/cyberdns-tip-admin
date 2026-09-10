@@ -267,9 +267,7 @@ export const AddEditDnsNodeModal: React.FC<AddEditDnsNodeModalProps> = ({
           </div>
 
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
-              HOSTNAME
-            </label>
+            <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">HOSTNAME</label>
             <input
               type="text"
               value={hostname}
@@ -288,7 +286,9 @@ export const AddEditDnsNodeModal: React.FC<AddEditDnsNodeModalProps> = ({
                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-emerald-500 rounded-xl px-3 py-2 font-bold text-xs text-emerald-700 dark:text-emerald-300 focus:outline-none cursor-pointer"
               >
                 {TIERS.map((t) => (
-                  <option key={t} value={t}>{t}</option>
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
                 ))}
               </select>
             </div>
@@ -338,13 +338,15 @@ export const AddEditDnsNodeModal: React.FC<AddEditDnsNodeModalProps> = ({
                     {!countryIso
                       ? 'Chọn quốc gia trước'
                       : isLoadingProvinces
-                      ? 'Đang tải...'
-                      : provinces.length === 0
-                      ? 'Không có dữ liệu tỉnh/thành'
-                      : '— Tỉnh/Thành phố —'}
+                        ? 'Đang tải...'
+                        : provinces.length === 0
+                          ? 'Không có dữ liệu tỉnh/thành'
+                          : '— Tỉnh/Thành phố —'}
                   </option>
                   {provinces.map((p) => (
-                    <option key={p.name} value={p.name}>{p.name}</option>
+                    <option key={p.name} value={p.name}>
+                      {p.name}
+                    </option>
                   ))}
                 </select>
                 {isLoadingProvinces && (
@@ -357,13 +359,15 @@ export const AddEditDnsNodeModal: React.FC<AddEditDnsNodeModalProps> = ({
 
             {countryIso && !isLoadingProvinces && provinces.length === 0 && (
               <p className="text-amber-600 dark:text-amber-400">
-                Quốc gia này không có danh sách tỉnh/thành trong dữ liệu — vui lòng nhập toạ độ thủ công bên dưới.
+                Quốc gia này không có danh sách tỉnh/thành trong dữ liệu — vui lòng nhập toạ độ thủ công bên
+                dưới.
               </p>
             )}
 
             {location && (
               <p className="text-slate-500 dark:text-slate-400">
-                Vị trí đã chọn: <span className="font-semibold text-slate-700 dark:text-slate-300">{location}</span>
+                Vị trí đã chọn:{' '}
+                <span className="font-semibold text-slate-700 dark:text-slate-300">{location}</span>
               </p>
             )}
 
@@ -385,13 +389,17 @@ export const AddEditDnsNodeModal: React.FC<AddEditDnsNodeModalProps> = ({
                 </Map>
               </div>
             ) : (
-              <p className="text-slate-400 dark:text-slate-500">Chọn Quốc gia và Tỉnh/Thành phố để hiển thị chính xác vị trí trên bản đồ.</p>
+              <p className="text-slate-400 dark:text-slate-500">
+                Chọn Quốc gia và Tỉnh/Thành phố để hiển thị chính xác vị trí trên bản đồ.
+              </p>
             )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">NHÀ CUNG CẤP</label>
+              <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
+                NHÀ CUNG CẤP
+              </label>
               <input
                 type="text"
                 value={provider}
@@ -401,9 +409,7 @@ export const AddEditDnsNodeModal: React.FC<AddEditDnsNodeModalProps> = ({
               />
             </div>
             <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
-                TOẠ ĐỘ
-              </label>
+              <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">TOẠ ĐỘ</label>
               <div className="grid grid-cols-2 gap-2">
                 <input
                   type="number"

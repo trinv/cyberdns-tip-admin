@@ -38,11 +38,11 @@ const ADBLOCK_DOMAIN_RULE = /^\|\|([a-z0-9.-]+)\^/i;
 export function normalizeDomain(raw: string): string | null {
   let host = (raw ?? '').trim();
   if (!host) return null;
-  host = host.replace(/^(https?:\/\/)/i, '');   // scheme
-  host = host.split('/')[0].split('?')[0];      // path / query
-  host = host.split(':')[0];                    // port
-  host = host.replace(/^\*\./, '');             // leading wildcard label
-  host = host.replace(/\.$/, '');               // trailing FQDN root dot
+  host = host.replace(/^(https?:\/\/)/i, ''); // scheme
+  host = host.split('/')[0].split('?')[0]; // path / query
+  host = host.split(':')[0]; // port
+  host = host.replace(/^\*\./, ''); // leading wildcard label
+  host = host.replace(/\.$/, ''); // trailing FQDN root dot
   host = host.toLowerCase().trim();
   if (!DOMAIN_REGEX.test(host) || IPV4_REGEX.test(host)) return null;
   return host;
@@ -52,7 +52,12 @@ function parseFeedLine(line: string): string | null {
   let cleaned = line.trim();
   if (!cleaned) return null;
   // Comment lines (#, !, ;) and an AdBlock list's "[Adblock Plus]" header.
-  if (cleaned.startsWith('#') || cleaned.startsWith('!') || cleaned.startsWith(';') || cleaned.startsWith('[')) {
+  if (
+    cleaned.startsWith('#') ||
+    cleaned.startsWith('!') ||
+    cleaned.startsWith(';') ||
+    cleaned.startsWith('[')
+  ) {
     return null;
   }
   // "@@||domain^" is an EXCEPTION (unblock) rule — including it as a block

@@ -17,11 +17,19 @@ function run(mw: ReturnType<typeof parseBody>, body: unknown) {
   let statusCode = 200;
   let payload: any;
   const res = {
-    status(c: number) { statusCode = c; return this; },
-    json(p: any) { payload = p; return this; },
+    status(c: number) {
+      statusCode = c;
+      return this;
+    },
+    json(p: any) {
+      payload = p;
+      return this;
+    },
   } as unknown as Response;
   let nexted = false;
-  mw(req, res, () => { nexted = true; });
+  mw(req, res, () => {
+    nexted = true;
+  });
   return { statusCode, payload, nexted, body: req.body };
 }
 
@@ -44,8 +52,12 @@ describe('parseBody', () => {
 
 describe('createUserSchema', () => {
   it('accepts a known role, rejects an unknown one', () => {
-    expect(createUserSchema.safeParse({ email: 'a@b.co', password: '12345678', role: 'Reviewer' }).success).toBe(true);
-    expect(createUserSchema.safeParse({ email: 'a@b.co', password: '12345678', role: 'root' }).success).toBe(false);
+    expect(
+      createUserSchema.safeParse({ email: 'a@b.co', password: '12345678', role: 'Reviewer' }).success,
+    ).toBe(true);
+    expect(createUserSchema.safeParse({ email: 'a@b.co', password: '12345678', role: 'root' }).success).toBe(
+      false,
+    );
   });
 });
 
@@ -94,9 +106,15 @@ describe('createCategorySchema', () => {
 
 describe('createFeedSourceSchema', () => {
   it('accepts http(s) URLs only', () => {
-    expect(createFeedSourceSchema.safeParse({ name: 'oisd', url: 'https://big.oisd.nl', category: 'ads' }).success).toBe(true);
-    expect(createFeedSourceSchema.safeParse({ name: 'x', url: 'ftp://x.test/f', category: 'ads' }).success).toBe(false);
-    expect(createFeedSourceSchema.safeParse({ name: 'x', url: 'not a url', category: 'ads' }).success).toBe(false);
+    expect(
+      createFeedSourceSchema.safeParse({ name: 'oisd', url: 'https://big.oisd.nl', category: 'ads' }).success,
+    ).toBe(true);
+    expect(
+      createFeedSourceSchema.safeParse({ name: 'x', url: 'ftp://x.test/f', category: 'ads' }).success,
+    ).toBe(false);
+    expect(createFeedSourceSchema.safeParse({ name: 'x', url: 'not a url', category: 'ads' }).success).toBe(
+      false,
+    );
   });
 });
 

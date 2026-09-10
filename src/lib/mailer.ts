@@ -19,7 +19,9 @@ function getTransporter() {
     host: process.env.SMTP_HOST,
     port: Number(process.env.SMTP_PORT) || 587,
     secure: process.env.SMTP_SECURE === 'true', // true = implicit TLS (port 465), false = STARTTLS (port 587, the common case)
-    auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD } : undefined,
+    auth: process.env.SMTP_USER
+      ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD }
+      : undefined,
   });
   return transporter;
 }

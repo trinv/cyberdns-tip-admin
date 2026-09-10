@@ -1,7 +1,7 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { defineConfig } from "drizzle-kit";
-import * as dotenv from "dotenv";
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { defineConfig } from 'drizzle-kit';
+import * as dotenv from 'dotenv';
 
 // Load environment variables from .env file.
 dotenv.config();
@@ -11,11 +11,11 @@ dotenv.config();
 // DB_SSL=true verifies the cert (system CAs, or DB_CA_CERT if set),
 // DB_SSL=no-verify encrypts without verifying.
 const caPath = process.env.DB_CA_CERT;
-const ca = caPath ? readFileSync(resolve(caPath), "utf8") : undefined;
+const ca = caPath ? readFileSync(resolve(caPath), 'utf8') : undefined;
 const ssl =
-  process.env.DB_SSL === "no-verify"
+  process.env.DB_SSL === 'no-verify'
     ? { rejectUnauthorized: false }
-    : process.env.DB_SSL === "true"
+    : process.env.DB_SSL === 'true'
       ? { rejectUnauthorized: true, ca }
       : false;
 
@@ -33,8 +33,8 @@ const dbCredentials = process.env.DATABASE_URL
 
       if (!sqlHost || !sqlDbName || !user || !password) {
         throw new Error(
-          "Missing PostgreSQL migration credentials: set DATABASE_URL, or all of " +
-            "SQL_HOST / SQL_DB_NAME / SQL_ADMIN_USER / SQL_ADMIN_PASSWORD, in your environment (see .env.example)."
+          'Missing PostgreSQL migration credentials: set DATABASE_URL, or all of ' +
+            'SQL_HOST / SQL_DB_NAME / SQL_ADMIN_USER / SQL_ADMIN_PASSWORD, in your environment (see .env.example).',
         );
       }
 
@@ -49,10 +49,10 @@ const dbCredentials = process.env.DATABASE_URL
     })();
 
 export default defineConfig({
-  schema: "./src/db/schema.ts",
-  out: "./drizzle",
-  dialect: "postgresql",
-  schemaFilter: ["public"],
+  schema: './src/db/schema.ts',
+  out: './drizzle',
+  dialect: 'postgresql',
+  schemaFilter: ['public'],
   dbCredentials,
   verbose: true,
 });

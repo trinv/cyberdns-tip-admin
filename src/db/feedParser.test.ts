@@ -48,13 +48,22 @@ describe('parseFeedText', () => {
 
   it('ignores comments, headers, exception rules and cosmetic filters', () => {
     const { domains } = parseFeedText(
-      ['# comment', '! adblock comment', '[Adblock Plus 2.0]', '@@||allowed.example^', 'example.com##.ad', ';win-hosts comment'].join('\n')
+      [
+        '# comment',
+        '! adblock comment',
+        '[Adblock Plus 2.0]',
+        '@@||allowed.example^',
+        'example.com##.ad',
+        ';win-hosts comment',
+      ].join('\n'),
     );
     expect(domains).toEqual([]);
   });
 
   it('deduplicates across formats and normalizes', () => {
-    const { domains } = parseFeedText(['evil.com', '0.0.0.0 evil.com', '||evil.com^', '*.evil.com', 'EVIL.com.'].join('\n'));
+    const { domains } = parseFeedText(
+      ['evil.com', '0.0.0.0 evil.com', '||evil.com^', '*.evil.com', 'EVIL.com.'].join('\n'),
+    );
     expect(domains).toEqual(['evil.com']);
   });
 

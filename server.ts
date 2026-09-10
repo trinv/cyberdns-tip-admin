@@ -206,7 +206,9 @@ async function startServer() {
           success: false,
           failureReason: 'Sai email/mật khẩu hoặc tài khoản đã bị thu hồi',
         });
-        return res.status(401).json({ error: 'Email hoặc mật khẩu không đúng, hoặc tài khoản đã bị thu hồi.' });
+        return res
+          .status(401)
+          .json({ error: 'Email hoặc mật khẩu không đúng, hoặc tài khoản đã bị thu hồi.' });
       }
 
       loginLimiter.recordSuccess(req);
@@ -263,17 +265,23 @@ async function startServer() {
     }
   });
 
-  app.patch('/api/users/:id', requireAuth, requireRole('Admin'), parseBody(updateUserSchema), async (req, res) => {
-    try {
-      const id = parseInt(req.params.id, 10);
-      if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid user id' });
-      const { role, isActive, displayName, password } = req.body;
-      const updated = await updateUserAccount(id, { role, isActive, displayName, password });
-      res.json({ success: true, user: updated });
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
-  });
+  app.patch(
+    '/api/users/:id',
+    requireAuth,
+    requireRole('Admin'),
+    parseBody(updateUserSchema),
+    async (req, res) => {
+      try {
+        const id = parseInt(req.params.id, 10);
+        if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid user id' });
+        const { role, isActive, displayName, password } = req.body;
+        const updated = await updateUserAccount(id, { role, isActive, displayName, password });
+        res.json({ success: true, user: updated });
+      } catch (error: any) {
+        res.status(400).json({ error: error.message });
+      }
+    },
+  );
 
   // Login history (Admin-only) — every real login attempt, success and
   // failure, with the real client IP/User-Agent (see recordLoginAttempt).
@@ -299,28 +307,40 @@ async function startServer() {
     }
   });
 
-  app.post('/api/dns-nodes', requireAuth, requireRole('Admin'), parseBody(createDnsNodeSchema), async (req: AuthRequest, res) => {
-    try {
-      // Shape / enum / range / "≥1 address" now enforced by parseBody; the
-      // per-field net.isIPv4/isIPv6 format check + friendly errors stay in
-      // createDnsNode (src/db/queries.ts).
-      const created = await createDnsNode(req.body, { email: req.user?.email, role: req.user?.role });
-      res.status(201).json({ success: true, node: created });
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
-  });
+  app.post(
+    '/api/dns-nodes',
+    requireAuth,
+    requireRole('Admin'),
+    parseBody(createDnsNodeSchema),
+    async (req: AuthRequest, res) => {
+      try {
+        // Shape / enum / range / "≥1 address" now enforced by parseBody; the
+        // per-field net.isIPv4/isIPv6 format check + friendly errors stay in
+        // createDnsNode (src/db/queries.ts).
+        const created = await createDnsNode(req.body, { email: req.user?.email, role: req.user?.role });
+        res.status(201).json({ success: true, node: created });
+      } catch (error: any) {
+        res.status(400).json({ error: error.message });
+      }
+    },
+  );
 
-  app.patch('/api/dns-nodes/:id', requireAuth, requireRole('Admin'), parseBody(updateDnsNodeSchema), async (req: AuthRequest, res) => {
-    try {
-      const id = parseInt(req.params.id, 10);
-      if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid node id' });
-      const updated = await updateDnsNode(id, req.body, { email: req.user?.email, role: req.user?.role });
-      res.json({ success: true, node: updated });
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
-  });
+  app.patch(
+    '/api/dns-nodes/:id',
+    requireAuth,
+    requireRole('Admin'),
+    parseBody(updateDnsNodeSchema),
+    async (req: AuthRequest, res) => {
+      try {
+        const id = parseInt(req.params.id, 10);
+        if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid node id' });
+        const updated = await updateDnsNode(id, req.body, { email: req.user?.email, role: req.user?.role });
+        res.json({ success: true, node: updated });
+      } catch (error: any) {
+        res.status(400).json({ error: error.message });
+      }
+    },
+  );
 
   app.delete('/api/dns-nodes/:id', requireAuth, requireRole('Admin'), async (req: AuthRequest, res) => {
     try {
@@ -345,14 +365,20 @@ async function startServer() {
     }
   });
 
-  app.post('/api/blocklist-acl', requireAuth, requireRole('Admin'), parseBody(aclSchema), async (req: AuthRequest, res) => {
-    try {
-      const updated = await setAclEnforceEnabled(req.body.enforceEnabled, req.user?.email || 'Admin');
-      res.json({ success: true, settings: updated });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+  app.post(
+    '/api/blocklist-acl',
+    requireAuth,
+    requireRole('Admin'),
+    parseBody(aclSchema),
+    async (req: AuthRequest, res) => {
+      try {
+        const updated = await setAclEnforceEnabled(req.body.enforceEnabled, req.user?.email || 'Admin');
+        res.json({ success: true, settings: updated });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
 
   app.get('/api/blocklist-acl/unknown-requesters', requireAuth, requireRole('Admin'), async (req, res) => {
     try {
@@ -416,7 +442,8 @@ async function startServer() {
   // Domains Explorer API
   app.get('/api/domains', requireAuth, async (req, res) => {
     try {
-      const { search, category, status, tld, feedSourceId, limit, offset, sortField, sortDirection } = req.query;
+      const { search, category, status, tld, feedSourceId, limit, offset, sortField, sortDirection } =
+        req.query;
       // Always cap the page size. The Domain Explorer always sends an
       // explicit limit, and the "export entire category" flow pages through
       // in EXPORT_PAGE_SIZE (5000) chunks — nothing legitimately needs an
@@ -465,73 +492,88 @@ async function startServer() {
   // Manual single add — goes to review_queue, not straight to domains
   // (see proposeDomain: an individual analyst's own, unverified judgment
   // call, unlike a feed sync).
-  app.post('/api/domains/propose', requireAuth, parseBody(proposeDomainSchema), async (req: AuthRequest, res) => {
-    try {
-      const { domain, categories, reason } = req.body;
-      const result = await proposeDomain({
-        domain,
-        category: categories[0],
-        reason,
-        userEmail: req.user?.email,
-        userRole: req.user?.role,
-      });
-      res.status(201).json({ success: true, ...result });
-    } catch (error: any) {
-      console.error('API POST /api/domains/propose error:', error);
-      const isValidation = error instanceof Error && !(error as any).cause;
-      res.status(isValidation ? 400 : 500).json({ error: error.message });
-    }
-  });
+  app.post(
+    '/api/domains/propose',
+    requireAuth,
+    parseBody(proposeDomainSchema),
+    async (req: AuthRequest, res) => {
+      try {
+        const { domain, categories, reason } = req.body;
+        const result = await proposeDomain({
+          domain,
+          category: categories[0],
+          reason,
+          userEmail: req.user?.email,
+          userRole: req.user?.role,
+        });
+        res.status(201).json({ success: true, ...result });
+      } catch (error: any) {
+        console.error('API POST /api/domains/propose error:', error);
+        const isValidation = error instanceof Error && !(error as any).cause;
+        res.status(isValidation ? 400 : 500).json({ error: error.message });
+      }
+    },
+  );
 
   // Batch/paste import — same reasoning as /api/domains/propose, many
   // domains at once (Import tab). Goes to review_queue, not straight to
   // domains.
-  app.post('/api/domains/bulk-propose', requireAuth, parseBody(bulkProposeSchema), async (req: AuthRequest, res) => {
-    try {
-      const { domains: domainList, categories: cats, reason } = req.body;
-      const result = await proposeDomainsBulk({
-        domains: domainList,
-        category: cats[0],
-        reason,
-        userEmail: req.user?.email,
-        userRole: req.user?.role,
-      });
-      res.status(201).json({ success: true, ...result });
-    } catch (error: any) {
-      console.error('API POST /api/domains/bulk-propose error:', error);
-      const isValidation = error instanceof Error && !(error as any).cause;
-      res.status(isValidation ? 400 : 500).json({ error: error.message });
-    }
-  });
+  app.post(
+    '/api/domains/bulk-propose',
+    requireAuth,
+    parseBody(bulkProposeSchema),
+    async (req: AuthRequest, res) => {
+      try {
+        const { domains: domainList, categories: cats, reason } = req.body;
+        const result = await proposeDomainsBulk({
+          domains: domainList,
+          category: cats[0],
+          reason,
+          userEmail: req.user?.email,
+          userRole: req.user?.role,
+        });
+        res.status(201).json({ success: true, ...result });
+      } catch (error: any) {
+        console.error('API POST /api/domains/bulk-propose error:', error);
+        const isValidation = error instanceof Error && !(error as any).cause;
+        res.status(isValidation ? 400 : 500).json({ error: error.message });
+      }
+    },
+  );
 
   // Reviewer/Admin only: a single bulk-action call can allowlist or unblock
   // the entire blocklist at once. An Analyst proposes domains; confirming a
   // decision (here and at /reviews/:id/resolve) is the Reviewer's job.
-  app.post('/api/domains/bulk-action', requireAuth, requireRole('Reviewer', 'Admin'), async (req: AuthRequest, res) => {
-    try {
-      const { action, domainIds, category, reason } = req.body;
-      // bulkUpdateDomains itself now also rejects an unrecognized action
-      // (defense in depth — see its own comment), but validating here first
-      // gives a proper 400 instead of a 500 for the common case of a bad
-      // request, matching the same pattern already used for /resolve's
-      // `decision` below.
-      if (!['add_group', 'allowlist', 'unblock', 'block'].includes(action)) {
-        return res.status(400).json({ error: 'Invalid action' });
+  app.post(
+    '/api/domains/bulk-action',
+    requireAuth,
+    requireRole('Reviewer', 'Admin'),
+    async (req: AuthRequest, res) => {
+      try {
+        const { action, domainIds, category, reason } = req.body;
+        // bulkUpdateDomains itself now also rejects an unrecognized action
+        // (defense in depth — see its own comment), but validating here first
+        // gives a proper 400 instead of a 500 for the common case of a bad
+        // request, matching the same pattern already used for /resolve's
+        // `decision` below.
+        if (!['add_group', 'allowlist', 'unblock', 'block'].includes(action)) {
+          return res.status(400).json({ error: 'Invalid action' });
+        }
+        const result = await bulkUpdateDomains({
+          action,
+          domainIds,
+          category,
+          reason,
+          userEmail: req.user?.email || 'SOC Team',
+          userRole: req.user?.role,
+        });
+        res.json(result);
+      } catch (error: any) {
+        console.error('API POST /api/domains/bulk-action error:', error);
+        res.status(500).json({ error: error.message });
       }
-      const result = await bulkUpdateDomains({
-        action,
-        domainIds,
-        category,
-        reason,
-        userEmail: req.user?.email || 'SOC Team',
-        userRole: req.user?.role,
-      });
-      res.json(result);
-    } catch (error: any) {
-      console.error('API POST /api/domains/bulk-action error:', error);
-      res.status(500).json({ error: error.message });
-    }
-  });
+    },
+  );
 
   // Categories API
   app.get('/api/categories', requireAuth, async (req, res) => {
@@ -549,26 +591,38 @@ async function startServer() {
   // PATCH below).
   // Admin only: creating/renaming a category is a structural config change
   // (DELETE already required Admin — this closes that inconsistency).
-  app.post('/api/categories', requireAuth, requireRole('Admin'), parseBody(createCategorySchema), async (req: AuthRequest, res) => {
-    try {
-      const { name, description, color, deltaThreshold } = req.body;
-      const created = await createCategory({ name, description, color, deltaThreshold });
-      res.status(201).json({ success: true, category: created });
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
-  });
+  app.post(
+    '/api/categories',
+    requireAuth,
+    requireRole('Admin'),
+    parseBody(createCategorySchema),
+    async (req: AuthRequest, res) => {
+      try {
+        const { name, description, color, deltaThreshold } = req.body;
+        const created = await createCategory({ name, description, color, deltaThreshold });
+        res.status(201).json({ success: true, category: created });
+      } catch (error: any) {
+        res.status(400).json({ error: error.message });
+      }
+    },
+  );
 
-  app.patch('/api/categories/:id', requireAuth, requireRole('Admin'), parseBody(updateCategorySchema), async (req: AuthRequest, res) => {
-    try {
-      const updated = await updateCategory(req.params.id, req.body);
-      res.json({ success: true, category: updated });
-    } catch (error: any) {
-      console.error('API PATCH /api/categories/:id error:', error);
-      const isValidation = error instanceof Error && !(error as any).cause;
-      res.status(isValidation ? 400 : 500).json({ error: error.message });
-    }
-  });
+  app.patch(
+    '/api/categories/:id',
+    requireAuth,
+    requireRole('Admin'),
+    parseBody(updateCategorySchema),
+    async (req: AuthRequest, res) => {
+      try {
+        const updated = await updateCategory(req.params.id, req.body);
+        res.json({ success: true, category: updated });
+      } catch (error: any) {
+        console.error('API PATCH /api/categories/:id error:', error);
+        const isValidation = error instanceof Error && !(error as any).cause;
+        res.status(isValidation ? 400 : 500).json({ error: error.message });
+      }
+    },
+  );
 
   app.delete('/api/categories/:id', requireAuth, requireRole('Admin'), async (req: AuthRequest, res) => {
     try {
@@ -600,7 +654,10 @@ async function startServer() {
       const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
       const { allowed } = await evaluateBlocklistAccess(ipAddress, req.params.category);
       if (!allowed) {
-        return res.status(403).type('text/plain').send('# Forbidden: this IP is not a registered CyberDNS node\n');
+        return res
+          .status(403)
+          .type('text/plain')
+          .send('# Forbidden: this IP is not a registered CyberDNS node\n');
       }
 
       const text = await getBlocklistTextForCategory(req.params.category);
@@ -634,15 +691,21 @@ async function startServer() {
   // Admin only: registering a feed URL is config, and it's the SSRF surface
   // — runFeedSourceSyncJob fetches whatever URL is stored here. pause/resume/
   // delete were already Admin; add + sync now match.
-  app.post('/api/sources', requireAuth, requireRole('Admin'), parseBody(createFeedSourceSchema), async (req: AuthRequest, res) => {
-    try {
-      const created = await createFeedSource(req.body);
-      res.status(201).json({ success: true, source: created });
-    } catch (error: any) {
-      console.error('API POST /api/sources error:', error);
-      res.status(400).json({ error: error.message });
-    }
-  });
+  app.post(
+    '/api/sources',
+    requireAuth,
+    requireRole('Admin'),
+    parseBody(createFeedSourceSchema),
+    async (req: AuthRequest, res) => {
+      try {
+        const created = await createFeedSource(req.body);
+        res.status(201).json({ success: true, source: created });
+      } catch (error: any) {
+        console.error('API POST /api/sources error:', error);
+        res.status(400).json({ error: error.message });
+      }
+    },
+  );
 
   // Fire-and-forget: this returns as soon as the source flips to 'syncing'
   // (a few ms), NOT when the sync itself finishes — the actual download +
@@ -652,7 +715,10 @@ async function startServer() {
   // away (see startFeedSourceSync / runFeedSourceSyncJob in queries.ts).
   app.post('/api/sources/:id/sync', requireAuth, requireRole('Admin'), async (req: AuthRequest, res) => {
     try {
-      const started = await startFeedSourceSync(req.params.id, { email: req.user?.email, role: req.user?.role });
+      const started = await startFeedSourceSync(req.params.id, {
+        email: req.user?.email,
+        role: req.user?.role,
+      });
       res.status(202).json({ success: true, source: started });
     } catch (error: any) {
       console.error('API POST /api/sources/:id/sync error:', error);
@@ -710,24 +776,35 @@ async function startServer() {
   // bulk-propose above); a *different* person with the Reviewer role
   // confirms the decision. resolveReviewItem itself also rejects a
   // self-review and an already-resolved item.
-  app.post('/api/reviews/:id/resolve', requireAuth, requireRole('Reviewer', 'Admin'), async (req: AuthRequest, res) => {
-    try {
-      const id = parseInt(req.params.id, 10);
-      if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid review id' });
-      const { decision, category } = req.body; // decision: 'approved' | 'rejected'; category: optional override
-      if (!decision || !['approved', 'rejected'].includes(decision)) {
-        return res.status(400).json({ error: 'Invalid decision' });
+  app.post(
+    '/api/reviews/:id/resolve',
+    requireAuth,
+    requireRole('Reviewer', 'Admin'),
+    async (req: AuthRequest, res) => {
+      try {
+        const id = parseInt(req.params.id, 10);
+        if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid review id' });
+        const { decision, category } = req.body; // decision: 'approved' | 'rejected'; category: optional override
+        if (!decision || !['approved', 'rejected'].includes(decision)) {
+          return res.status(400).json({ error: 'Invalid decision' });
+        }
+        const resolved = await resolveReviewItem(
+          id,
+          decision,
+          req.user?.email || 'SOC Approver',
+          category,
+          req.user?.role,
+        );
+        res.json({ success: true, item: resolved });
+      } catch (error: any) {
+        // resolveReviewItem throws deliberately-clear validation messages
+        // (self-review, already resolved, bad category override) — surface
+        // those as 400, not 500.
+        const isValidation = error instanceof Error && !(error as any).cause;
+        res.status(isValidation ? 400 : 500).json({ error: error.message });
       }
-      const resolved = await resolveReviewItem(id, decision, req.user?.email || 'SOC Approver', category, req.user?.role);
-      res.json({ success: true, item: resolved });
-    } catch (error: any) {
-      // resolveReviewItem throws deliberately-clear validation messages
-      // (self-review, already resolved, bad category override) — surface
-      // those as 400, not 500.
-      const isValidation = error instanceof Error && !(error as any).cause;
-      res.status(isValidation ? 400 : 500).json({ error: error.message });
-    }
-  });
+    },
+  );
 
   // (Releases Pipeline API removed — see schema.ts/queries.ts notes. The
   // real published-blocklist endpoint is GET /v1/blocklist/:category.txt
@@ -743,25 +820,30 @@ async function startServer() {
     }
   });
 
-  app.post('/api/audit-logs/:id/rollback', requireAuth, requireRole('Admin'), async (req: AuthRequest, res) => {
-    try {
-      const { reason } = req.body;
-      const logId = parseInt(req.params.id, 10);
-      if (!Number.isInteger(logId)) {
-        res.status(400).json({ error: 'ID giao dịch không hợp lệ' });
-        return;
+  app.post(
+    '/api/audit-logs/:id/rollback',
+    requireAuth,
+    requireRole('Admin'),
+    async (req: AuthRequest, res) => {
+      try {
+        const { reason } = req.body;
+        const logId = parseInt(req.params.id, 10);
+        if (!Number.isInteger(logId)) {
+          res.status(400).json({ error: 'ID giao dịch không hợp lệ' });
+          return;
+        }
+        const result = await rollbackAuditLog(logId, req.user?.email || 'Admin', reason);
+        res.json(result);
+      } catch (error: any) {
+        console.error('API POST /api/audit-logs/:id/rollback error:', error);
+        // rollbackAuditLog throws a clear, no-`cause` Error for the expected
+        // cases (not found, expired, already undone, unsupported type) — those
+        // are 400s, not 500s.
+        const isValidation = error instanceof Error && !(error as any).cause;
+        res.status(isValidation ? 400 : 500).json({ error: error.message });
       }
-      const result = await rollbackAuditLog(logId, req.user?.email || 'Admin', reason);
-      res.json(result);
-    } catch (error: any) {
-      console.error('API POST /api/audit-logs/:id/rollback error:', error);
-      // rollbackAuditLog throws a clear, no-`cause` Error for the expected
-      // cases (not found, expired, already undone, unsupported type) — those
-      // are 400s, not 500s.
-      const isValidation = error instanceof Error && !(error as any).cause;
-      res.status(isValidation ? 400 : 500).json({ error: error.message });
-    }
-  });
+    },
+  );
 
   // ===================== VITE MIDDLEWARE SETUP =====================
   if (process.env.NODE_ENV !== 'production') {
@@ -783,10 +865,7 @@ async function startServer() {
     // index-jxn5V6Zz.js) — a changed file always gets a new name, so a
     // cached copy of one can never go stale under that name. Cache these
     // as aggressively as possible.
-    app.use(
-      '/assets',
-      express.static(path.join(distPath, 'assets'), { immutable: true, maxAge: '1y' })
-    );
+    app.use('/assets', express.static(path.join(distPath, 'assets'), { immutable: true, maxAge: '1y' }));
     // index: false — otherwise express.static auto-serves dist/index.html
     // for GET / itself (with ITS OWN default "Cache-Control: public,
     // max-age=0" header), bypassing the no-store route below entirely.
@@ -868,7 +947,10 @@ async function startServer() {
       // tear them down at the OS level. Best-effort: never let a pool
       // shutdown hiccup delay the process exit itself — the 3s force-exit
       // timeout below is still the real safety net either way.
-      pool.end().catch(() => {}).finally(() => process.exit(0));
+      pool
+        .end()
+        .catch(() => {})
+        .finally(() => process.exit(0));
     });
     // Force-exit if something (e.g. an open DB connection) keeps the event
     // loop alive longer than expected.

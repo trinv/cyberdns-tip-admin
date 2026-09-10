@@ -25,7 +25,10 @@ export const DnsNodeStatusCard: React.FC = () => {
     fetchDnsNodes()
       .then(setNodes)
       .catch((err) => {
-        console.warn('DnsNodeStatusCard: fetchDnsNodes failed, hiding card:', err instanceof ApiError ? err.status : err);
+        console.warn(
+          'DnsNodeStatusCard: fetchDnsNodes failed, hiding card:',
+          err instanceof ApiError ? err.status : err,
+        );
         setIsHidden(true);
       });
   }, []);

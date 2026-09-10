@@ -3,13 +3,20 @@ import { assertPublicFeedUrl, assertResolvesToPublic, SsrfBlockedError } from '.
 
 describe('assertPublicFeedUrl', () => {
   it('accepts a plain public https URL and returns a URL', () => {
-    const u = assertPublicFeedUrl('https://raw.githubusercontent.com/hagezi/dns-blocklists/main/domains/pro.txt');
+    const u = assertPublicFeedUrl(
+      'https://raw.githubusercontent.com/hagezi/dns-blocklists/main/domains/pro.txt',
+    );
     expect(u).toBeInstanceOf(URL);
     expect(u.hostname).toBe('raw.githubusercontent.com');
   });
 
   it('rejects non-http(s) schemes', () => {
-    for (const bad of ['ftp://example.com/x', 'file:///etc/passwd', 'gopher://example.com', 'data:text/plain,hi']) {
+    for (const bad of [
+      'ftp://example.com/x',
+      'file:///etc/passwd',
+      'gopher://example.com',
+      'data:text/plain,hi',
+    ]) {
       expect(() => assertPublicFeedUrl(bad)).toThrow(SsrfBlockedError);
     }
   });
@@ -42,8 +49,12 @@ describe('assertPublicFeedUrl', () => {
 describe('assertResolvesToPublic (IP-literal hosts, no real DNS)', () => {
   it('rejects the loopback and metadata addresses (by range, not by DNS failure)', async () => {
     await expect(assertResolvesToPublic(new URL('http://127.0.0.1/'))).rejects.toThrow(/nội bộ|dành riêng/);
-    await expect(assertResolvesToPublic(new URL('http://169.254.169.254/'))).rejects.toThrow(/nội bộ|dành riêng/);
-    await expect(assertResolvesToPublic(new URL('http://[::ffff:127.0.0.1]/'))).rejects.toThrow(/nội bộ|dành riêng/);
+    await expect(assertResolvesToPublic(new URL('http://169.254.169.254/'))).rejects.toThrow(
+      /nội bộ|dành riêng/,
+    );
+    await expect(assertResolvesToPublic(new URL('http://[::ffff:127.0.0.1]/'))).rejects.toThrow(
+      /nội bộ|dành riêng/,
+    );
     await expect(assertResolvesToPublic(new URL('http://[::1]/'))).rejects.toThrow(SsrfBlockedError);
   });
 

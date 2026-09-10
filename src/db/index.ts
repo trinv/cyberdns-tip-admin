@@ -74,7 +74,7 @@ function resolvePoolConfig(): PoolConfig {
 
   throw new Error(
     'Missing PostgreSQL connection settings: set DATABASE_URL, or all of ' +
-      'SQL_HOST / SQL_DB_NAME / SQL_USER / SQL_PASSWORD, in your environment (see .env.example).'
+      'SQL_HOST / SQL_DB_NAME / SQL_USER / SQL_PASSWORD, in your environment (see .env.example).',
   );
 }
 

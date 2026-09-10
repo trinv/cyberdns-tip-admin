@@ -29,7 +29,8 @@ import {
 const TIER_BADGE: Record<string, string> = {
   LITE: 'bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800',
   PRO: 'bg-violet-50 dark:bg-violet-950/60 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800',
-  FAMILY: 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+  FAMILY:
+    'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
 };
 
 // Build-time only (see .env.example) — Uptime Kuma isn't run by this app,
@@ -106,8 +107,10 @@ export const DnsNodesView: React.FC = () => {
       const updated = await updateDnsNodeApi(node.id, { status: nextStatus });
       setNodes((prev) => prev.map((n) => (n.id === updated.id ? updated : n)));
       showMessage(
-        nextStatus === 'active' ? `Đã kích hoạt lại node "${updated.name}".` : `Đã tạm ngưng node "${updated.name}".`,
-        nextStatus === 'active' ? 'success' : 'warning'
+        nextStatus === 'active'
+          ? `Đã kích hoạt lại node "${updated.name}".`
+          : `Đã tạm ngưng node "${updated.name}".`,
+        nextStatus === 'active' ? 'success' : 'warning',
       );
     } catch (err: any) {
       showMessage(err?.message || 'Không thể đổi trạng thái node — vui lòng thử lại.', 'warning');
@@ -139,7 +142,7 @@ export const DnsNodesView: React.FC = () => {
         aclConfirmMode === 'enable'
           ? 'Đã BẬT chặn ACL — chỉ DNS node đang Active mới gọi được Blocklist URL từ bây giờ.'
           : 'Đã TẮT chặn ACL — Blocklist URL phục vụ mọi request như trước, chỉ ghi log IP lạ.',
-        aclConfirmMode === 'enable' ? 'warning' : 'success'
+        aclConfirmMode === 'enable' ? 'warning' : 'success',
       );
       setAclConfirmMode(null);
     } catch (err: any) {
@@ -164,7 +167,8 @@ export const DnsNodesView: React.FC = () => {
             </span>
           </h1>
           <p className="text-slate-500 dark:text-slate-400 text-xs mt-1">
-            Danh sách các máy chủ DNS của CyberDNS, phục vụ giám sát hạ tầng và kiểm soát quyền truy cập Blocklist URL.
+            Danh sách các máy chủ DNS của CyberDNS, phục vụ giám sát hạ tầng và kiểm soát quyền truy cập
+            Blocklist URL.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -174,7 +178,9 @@ export const DnsNodesView: React.FC = () => {
             rel="noreferrer"
             title={UPTIME_KUMA_URL ? undefined : 'Chưa cấu hình VITE_UPTIME_KUMA_URL'}
             aria-disabled={!UPTIME_KUMA_URL}
-            onClick={(e) => { if (!UPTIME_KUMA_URL) e.preventDefault(); }}
+            onClick={(e) => {
+              if (!UPTIME_KUMA_URL) e.preventDefault();
+            }}
             className={`px-4 py-2 rounded-xl font-bold flex items-center space-x-1.5 shadow-xs transition-all ${
               UPTIME_KUMA_URL
                 ? 'bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white cursor-pointer active-press'
@@ -193,7 +199,10 @@ export const DnsNodesView: React.FC = () => {
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
           </button>
           <button
-            onClick={() => { setNodeToEdit(null); setIsAddModalOpen(true); }}
+            onClick={() => {
+              setNodeToEdit(null);
+              setIsAddModalOpen(true);
+            }}
             className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all flex items-center space-x-1.5 cursor-pointer shadow-xs active-press"
           >
             <Plus className="w-4 h-4" />
@@ -237,11 +246,16 @@ export const DnsNodesView: React.FC = () => {
                   : 'bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400'
               }`}
             >
-              {aclSettings?.enforceEnabled ? <ShieldCheck className="w-5 h-5" /> : <ShieldAlert className="w-5 h-5" />}
+              {aclSettings?.enforceEnabled ? (
+                <ShieldCheck className="w-5 h-5" />
+              ) : (
+                <ShieldAlert className="w-5 h-5" />
+              )}
             </div>
             <div>
               <h2 className="text-sm font-bold text-slate-900 dark:text-white font-sans">
-                ACL Blocklist URL: {aclSettings?.enforceEnabled ? 'ĐANG BẬT (đã chặn IP lạ)' : 'ĐANG TẮT (chỉ ghi log)'}
+                ACL Blocklist URL:{' '}
+                {aclSettings?.enforceEnabled ? 'ĐANG BẬT (đã chặn IP lạ)' : 'ĐANG TẮT (chỉ ghi log)'}
               </h2>
               <p className="text-slate-500 dark:text-slate-400 mt-0.5">
                 {aclSettings?.enforceEnabled
@@ -249,7 +263,8 @@ export const DnsNodesView: React.FC = () => {
                   : 'Blocklist URL vẫn cho phép mọi request như bình thường ở chế độ chỉ ghi log. Rà soát các IP lạ gần đây trước khi kích hoạt ACL chặn.'}
                 {aclSettings?.updatedBy && (
                   <span className="block mt-0.5 text-slate-400 dark:text-slate-500">
-                    Cập nhật lần cuối bởi {aclSettings.updatedBy} · {new Date(aclSettings.updatedAt).toLocaleString('vi-VN')}
+                    Cập nhật lần cuối bởi {aclSettings.updatedBy} ·{' '}
+                    {new Date(aclSettings.updatedAt).toLocaleString('vi-VN')}
                   </span>
                 )}
               </p>
@@ -334,26 +349,44 @@ export const DnsNodesView: React.FC = () => {
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {nodes.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-5 py-8 text-center text-slate-400 dark:text-slate-500 font-sans">
+                  <td
+                    colSpan={7}
+                    className="px-5 py-8 text-center text-slate-400 dark:text-slate-500 font-sans"
+                  >
                     {isLoading ? 'Đang tải...' : 'Chưa có DNS node nào — bấm "Thêm node mới" để bắt đầu.'}
                   </td>
                 </tr>
               )}
               {nodes.map((n) => (
                 <tr key={n.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
-                  <td className="px-5 py-3.5 font-sans font-semibold text-slate-800 dark:text-slate-200">{n.name}</td>
+                  <td className="px-5 py-3.5 font-sans font-semibold text-slate-800 dark:text-slate-200">
+                    {n.name}
+                  </td>
                   <td className="px-5 py-3.5 font-mono">
                     {n.ipAddress && <div className="text-slate-800 dark:text-slate-200">{n.ipAddress}</div>}
-                    {n.ipv6Address && <div className="text-slate-800 dark:text-slate-200 truncate max-w-[200px]" title={n.ipv6Address}>{n.ipv6Address}</div>}
+                    {n.ipv6Address && (
+                      <div
+                        className="text-slate-800 dark:text-slate-200 truncate max-w-[200px]"
+                        title={n.ipv6Address}
+                      >
+                        {n.ipv6Address}
+                      </div>
+                    )}
                     {n.hostname && <div className="text-slate-400 dark:text-slate-500">{n.hostname}</div>}
                   </td>
                   <td className="px-5 py-3.5">
-                    <span className={`inline-block px-2 py-0.5 rounded-full font-bold border font-sans ${TIER_BADGE[n.tier] || TIER_BADGE.LITE}`}>
+                    <span
+                      className={`inline-block px-2 py-0.5 rounded-full font-bold border font-sans ${TIER_BADGE[n.tier] || TIER_BADGE.LITE}`}
+                    >
                       {n.tier}
                     </span>
                   </td>
-                  <td className="px-5 py-3.5 font-sans text-slate-600 dark:text-slate-400">{n.location || '—'}</td>
-                  <td className="px-5 py-3.5 font-sans text-slate-600 dark:text-slate-400">{n.provider || '—'}</td>
+                  <td className="px-5 py-3.5 font-sans text-slate-600 dark:text-slate-400">
+                    {n.location || '—'}
+                  </td>
+                  <td className="px-5 py-3.5 font-sans text-slate-600 dark:text-slate-400">
+                    {n.provider || '—'}
+                  </td>
                   <td className="px-5 py-3.5">
                     <button
                       onClick={() => handleToggleNodeStatus(n)}
@@ -364,14 +397,19 @@ export const DnsNodesView: React.FC = () => {
                           : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700'
                       }`}
                     >
-                      <span className={`w-2 h-2 rounded-full ${n.status === 'active' ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
+                      <span
+                        className={`w-2 h-2 rounded-full ${n.status === 'active' ? 'bg-emerald-500' : 'bg-slate-400'}`}
+                      ></span>
                       <span>{n.status === 'active' ? 'Active' : 'Inactive'}</span>
                     </button>
                   </td>
                   <td className="px-5 py-3.5">
                     <div className="flex items-center justify-end space-x-1.5">
                       <button
-                        onClick={() => { setNodeToEdit(n); setIsAddModalOpen(true); }}
+                        onClick={() => {
+                          setNodeToEdit(n);
+                          setIsAddModalOpen(true);
+                        }}
                         title="Sửa node"
                         className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
                       >
@@ -395,7 +433,10 @@ export const DnsNodesView: React.FC = () => {
 
       <AddEditDnsNodeModal
         isOpen={isAddModalOpen}
-        onClose={() => { setIsAddModalOpen(false); setNodeToEdit(null); }}
+        onClose={() => {
+          setIsAddModalOpen(false);
+          setNodeToEdit(null);
+        }}
         nodeToEdit={nodeToEdit}
         onSave={handleSaveNode}
       />

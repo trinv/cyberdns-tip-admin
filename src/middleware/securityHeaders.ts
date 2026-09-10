@@ -51,7 +51,7 @@ export function securityHeaders() {
     res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
     res.setHeader(
       'Permissions-Policy',
-      'accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()'
+      'accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()',
     );
     if (sendCsp) res.setHeader('Content-Security-Policy', CSP);
     next();

@@ -1,5 +1,16 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
-import { DomainItem, CategoryInfo, FeedSource, AuditLog, ReviewDomainItem, SavedFilter, DomainStatus, DashboardStats, CategoryStatusBreakdown, AppUser } from './types';
+import {
+  DomainItem,
+  CategoryInfo,
+  FeedSource,
+  AuditLog,
+  ReviewDomainItem,
+  SavedFilter,
+  DomainStatus,
+  DashboardStats,
+  CategoryStatusBreakdown,
+  AppUser,
+} from './types';
 import {
   fetchDashboardStats,
   fetchStatusBreakdown,
@@ -58,7 +69,7 @@ import { LoginHistoryView } from './components/LoginHistory/LoginHistoryView';
 // DNS Node map itself. AddEditDnsNodeModal.tsx (also map-heavy) is imported
 // BY DnsNodesView.tsx, so it rides along in this same lazy chunk for free.
 const DnsNodesView = lazy(() =>
-  import('./components/DnsNodes/DnsNodesView').then((m) => ({ default: m.DnsNodesView }))
+  import('./components/DnsNodes/DnsNodesView').then((m) => ({ default: m.DnsNodesView })),
 );
 import { LoginPage } from './components/LoginPage';
 import { CyberDNSLogo } from './components/CyberDNSLogo';
@@ -95,7 +106,10 @@ export default function App() {
     // after the success toast rather than silently logged only server-side.
     if (isNewIp) {
       setTimeout(() => {
-        showToast('⚠️ Đăng nhập từ một địa chỉ IP mới chưa từng dùng trước đây. Nếu không phải bạn, hãy đổi mật khẩu ngay trong phần Người dùng & Phân quyền.', 'warning');
+        showToast(
+          '⚠️ Đăng nhập từ một địa chỉ IP mới chưa từng dùng trước đây. Nếu không phải bạn, hãy đổi mật khẩu ngay trong phần Người dùng & Phân quyền.',
+          'warning',
+        );
       }, 600);
     }
   };
@@ -121,7 +135,7 @@ export default function App() {
           status === 401
             ? 'Vui lòng đăng nhập để thao tác này được lưu vào CyberDNSTIP-DB.'
             : 'Tài khoản của bạn không có quyền thực hiện thao tác này.',
-          'warning'
+          'warning',
         );
       }, 0);
     });
@@ -153,7 +167,12 @@ export default function App() {
     }
   }, [currentTab, userRole]);
 
-  const handleCreateUser = async (data: { email: string; password: string; displayName?: string; role?: string }) => {
+  const handleCreateUser = async (data: {
+    email: string;
+    password: string;
+    displayName?: string;
+    role?: string;
+  }) => {
     try {
       const created = await createUserApi(data);
       setManagedUsers((prev) => [created, ...prev]);
@@ -165,7 +184,7 @@ export default function App() {
 
   const handleUpdateUser = async (
     id: number,
-    patch: { role?: string; isActive?: boolean; displayName?: string; password?: string }
+    patch: { role?: string; isActive?: boolean; displayName?: string; password?: string },
   ) => {
     try {
       const updated = await updateUserApi(id, patch);
@@ -175,7 +194,7 @@ export default function App() {
         patch.isActive === false
           ? `Đã thu hồi tài khoản ${updated.email}`
           : `Đã cập nhật tài khoản ${updated.email}`,
-        patch.isActive === false ? 'warning' : 'success'
+        patch.isActive === false ? 'warning' : 'success',
       );
     } catch (err: any) {
       // Surfaces the last-active-admin guard message (see updateUserAccount
@@ -246,7 +265,9 @@ export default function App() {
   // below), unlike dashboardStats' own statusBreakdown, which is always
   // global and drives the Dashboard tab's KPI cards instead. null until it
   // has loaded at least once for the current category.
-  const [categoryStatusBreakdown, setCategoryStatusBreakdown] = useState<CategoryStatusBreakdown | null>(null);
+  const [categoryStatusBreakdown, setCategoryStatusBreakdown] = useState<CategoryStatusBreakdown | null>(
+    null,
+  );
 
   // Real per-status domain counts (drives the sidebar's "TRẠNG THÁI
   // BLOCKLIST" checklist) — null until stats have loaded at least once.
@@ -340,7 +361,9 @@ export default function App() {
   // Modals States
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState<boolean>(false);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState<boolean>(false);
-  const [bulkActionType, setBulkActionType] = useState<'add_group' | 'allowlist' | 'unblock' | 'block'>('add_group');
+  const [bulkActionType, setBulkActionType] = useState<'add_group' | 'allowlist' | 'unblock' | 'block'>(
+    'add_group',
+  );
   const [isAddDomainModalOpen, setIsAddDomainModalOpen] = useState<boolean>(false);
   const [domainToEdit, setDomainToEdit] = useState<DomainItem | null>(null);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState<boolean>(false);
@@ -361,11 +384,26 @@ export default function App() {
   // than silently reverting to fake demo numbers that look real.
   const refreshAllData = useCallback(async () => {
     const [cats, srcList, logsList, revsList, stats] = await Promise.all([
-      fetchCategories().catch((e) => { console.warn('fetchCategories failed:', e); return null; }),
-      fetchFeedSources().catch((e) => { console.warn('fetchFeedSources failed:', e); return null; }),
-      fetchAuditLogs().catch((e) => { console.warn('fetchAuditLogs failed:', e); return null; }),
-      fetchReviewQueue().catch((e) => { console.warn('fetchReviewQueue failed:', e); return null; }),
-      fetchDashboardStats().catch((e) => { console.warn('fetchDashboardStats failed:', e); return null; }),
+      fetchCategories().catch((e) => {
+        console.warn('fetchCategories failed:', e);
+        return null;
+      }),
+      fetchFeedSources().catch((e) => {
+        console.warn('fetchFeedSources failed:', e);
+        return null;
+      }),
+      fetchAuditLogs().catch((e) => {
+        console.warn('fetchAuditLogs failed:', e);
+        return null;
+      }),
+      fetchReviewQueue().catch((e) => {
+        console.warn('fetchReviewQueue failed:', e);
+        return null;
+      }),
+      fetchDashboardStats().catch((e) => {
+        console.warn('fetchDashboardStats failed:', e);
+        return null;
+      }),
     ]);
 
     // Guard every setter the same way: a transient failure of ONE fetch
@@ -414,7 +452,17 @@ export default function App() {
     } finally {
       if (seq === domainsReqSeq.current) setIsDomainsLoading(false);
     }
-  }, [selectedCategory, selectedStatus, selectedTld, selectedSource, debouncedSearchQuery, domainsPage, domainsPageSize, sortField, sortDirection]);
+  }, [
+    selectedCategory,
+    selectedStatus,
+    selectedTld,
+    selectedSource,
+    debouncedSearchQuery,
+    domainsPage,
+    domainsPageSize,
+    sortField,
+    sortDirection,
+  ]);
 
   // Sidebar "TRẠNG THÁI BLOCKLIST" counts — scoped to selectedCategory only
   // (not status/tld/source/search: this section IS the status filter, and
@@ -459,7 +507,10 @@ export default function App() {
       sortDirection,
     };
 
-    const fetchPageWithRetry = async (offset: number, attempt = 1): Promise<{ domains: DomainItem[]; total: number }> => {
+    const fetchPageWithRetry = async (
+      offset: number,
+      attempt = 1,
+    ): Promise<{ domains: DomainItem[]; total: number }> => {
       try {
         return await fetchDomains({ ...baseParams, limit: EXPORT_PAGE_SIZE, offset });
       } catch (err) {
@@ -478,7 +529,15 @@ export default function App() {
       offset += EXPORT_PAGE_SIZE;
     }
     return all;
-  }, [selectedCategory, selectedStatus, selectedTld, selectedSource, debouncedSearchQuery, sortField, sortDirection]);
+  }, [
+    selectedCategory,
+    selectedStatus,
+    selectedTld,
+    selectedSource,
+    debouncedSearchQuery,
+    sortField,
+    sortDirection,
+  ]);
 
   // All of the app's data endpoints now require a signed-in session (see
   // server.ts — the dashboard/domains/categories/sources/reviews/audit-logs
@@ -527,13 +586,19 @@ export default function App() {
           if (prev?.status === 'syncing' && freshSrc.status !== 'syncing') {
             anyCompleted = true;
             if (freshSrc.status === 'error') {
-              showToast(`Đồng bộ "${freshSrc.name}" thất bại: ${freshSrc.errorMessage || 'Lỗi không xác định'}`, 'warning');
+              showToast(
+                `Đồng bộ "${freshSrc.name}" thất bại: ${freshSrc.errorMessage || 'Lỗi không xác định'}`,
+                'warning',
+              );
             } else if (freshSrc.status === 'warning') {
-              showToast(`Đồng bộ "${freshSrc.name}" hoàn tất kèm cảnh báo: ${freshSrc.errorMessage || ''}`, 'warning');
+              showToast(
+                `Đồng bộ "${freshSrc.name}" hoàn tất kèm cảnh báo: ${freshSrc.errorMessage || ''}`,
+                'warning',
+              );
             } else {
               showToast(
                 `Đồng bộ "${freshSrc.name}" hoàn tất — ${freshSrc.lastSyncMessage || `đã nạp ${freshSrc.domainCount.toLocaleString('vi-VN')} domain`}`,
-                'success'
+                'success',
               );
             }
           }
@@ -573,7 +638,15 @@ export default function App() {
   // every count and payload agree.
   useEffect(() => {
     setSelectedDomainIds(new Set());
-  }, [selectedCategory, selectedStatus, selectedTld, selectedSource, debouncedSearchQuery, domainsPage, domainsPageSize]);
+  }, [
+    selectedCategory,
+    selectedStatus,
+    selectedTld,
+    selectedSource,
+    debouncedSearchQuery,
+    domainsPage,
+    domainsPageSize,
+  ]);
 
   // Keyboard shortcut listener
   useEffect(() => {
@@ -648,7 +721,7 @@ export default function App() {
   const handleConfirmBulkAction = async (
     action: 'add_group' | 'allowlist' | 'unblock' | 'block',
     targetCategories: string[],
-    reason: string
+    reason: string,
   ) => {
     const selectedIdsArray: string[] = Array.from(selectedDomainIds);
     try {
@@ -665,11 +738,14 @@ export default function App() {
       await Promise.all([refreshDomains(), refreshAllData()]);
       const n = result.updatedCount;
       showToast(
-        action === 'add_group' ? `Đã thêm ${n} tên miền vào nhóm!` :
-        action === 'allowlist' ? `Đã chuyển ${n} tên miền vào Allowlist!` :
-        action === 'block' ? `Đã chặn lại ${n} tên miền vào Blocklist!` :
-        `Đã gỡ chặn hoàn toàn cho ${n} tên miền!`,
-        action === 'allowlist' ? 'warning' : 'success'
+        action === 'add_group'
+          ? `Đã thêm ${n} tên miền vào nhóm!`
+          : action === 'allowlist'
+            ? `Đã chuyển ${n} tên miền vào Allowlist!`
+            : action === 'block'
+              ? `Đã chặn lại ${n} tên miền vào Blocklist!`
+              : `Đã gỡ chặn hoàn toàn cho ${n} tên miền!`,
+        action === 'allowlist' ? 'warning' : 'success',
       );
     } catch (err: any) {
       console.warn('Backend bulk action notice:', err);
@@ -748,7 +824,7 @@ export default function App() {
       }
     }
 
-    const content = targetList.map(d => d.domain).join('\n');
+    const content = targetList.map((d) => d.domain).join('\n');
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -776,14 +852,9 @@ export default function App() {
     }
 
     const headers = ['domain', 'primaryCategory', 'categories', 'status', 'source', 'firstSeen'];
-    const rows = targetList.map(d => [
-      d.domain,
-      d.primaryCategory,
-      `"${d.categories.join(';')}"`,
-      d.status,
-      d.source,
-      d.firstSeen
-    ].join(','));
+    const rows = targetList.map((d) =>
+      [d.domain, d.primaryCategory, `"${d.categories.join(';')}"`, d.status, d.source, d.firstSeen].join(','),
+    );
     const content = [headers.join(','), ...rows].join('\n');
     const blob = new Blob([content], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -808,7 +879,10 @@ export default function App() {
         categories: [category],
         reason,
       });
-      showToast(`Đã gửi ${result.insertedCount} tên miền vào Hàng đợi duyệt — chờ xác nhận trước khi chặn (${result.skippedCount} đã bỏ qua vì trùng/đang chờ duyệt)`, 'success');
+      showToast(
+        `Đã gửi ${result.insertedCount} tên miền vào Hàng đợi duyệt — chờ xác nhận trước khi chặn (${result.skippedCount} đã bỏ qua vì trùng/đang chờ duyệt)`,
+        'success',
+      );
       // Same reasoning as handleSaveDomain's propose branch above.
       await refreshAllData();
     } catch (err) {
@@ -827,7 +901,10 @@ export default function App() {
     try {
       await resolveReviewItemApi(id, 'approved', customCategory);
       setReviewItems((prev) => prev.filter((r) => r.id !== id));
-      showToast(`Đã duyệt chặn tên miền ${item.domain} vào nhóm ${customCategory || item.proposedCategory}`, 'success');
+      showToast(
+        `Đã duyệt chặn tên miền ${item.domain} vào nhóm ${customCategory || item.proposedCategory}`,
+        'success',
+      );
       // Approval creates a real domain (writes an audit log entry) and
       // changes the SOC queue/blocked counts Dashboard shows.
       await Promise.all([refreshDomains(), refreshAllData()]);
@@ -848,7 +925,9 @@ export default function App() {
       setReviewItems((prev) => prev.filter((r) => r.id !== id));
       showToast(`Đã từ chối tên miền ${item?.domain || ''}`, 'info');
       // Changes the SOC queue count Dashboard's KPI card shows.
-      await fetchDashboardStats().then(setDashboardStats).catch(() => {});
+      await fetchDashboardStats()
+        .then(setDashboardStats)
+        .catch(() => {});
     } catch (err) {
       console.warn('Backend reject review notice:', err);
       showToast(`Từ chối thất bại cho ${item?.domain || ''} — vui lòng thử lại.`, 'warning');
@@ -870,7 +949,7 @@ export default function App() {
       failed > 0
         ? `Đã duyệt ${succeeded}/${items.length} tên miền — ${failed} thất bại, vui lòng thử lại.`
         : `Đã duyệt ${succeeded} tên miền!`,
-      failed > 0 ? 'warning' : 'success'
+      failed > 0 ? 'warning' : 'success',
     );
   };
 
@@ -886,13 +965,22 @@ export default function App() {
       return;
     }
     try {
-      const { summary } = await rollbackAuditLogApi(log.id, `Hoàn tác thủ công từ Nhật ký thao tác — giao dịch: ${log.summary}`);
+      const { summary } = await rollbackAuditLogApi(
+        log.id,
+        `Hoàn tác thủ công từ Nhật ký thao tác — giao dịch: ${log.summary}`,
+      );
       showToast(summary, 'success');
       await Promise.all([
         refreshDomains(),
-        fetchDashboardStats().then(setDashboardStats).catch(() => {}),
-        fetchCategories().then(setCategories).catch(() => {}),
-        fetchAuditLogs().then(setAuditLogs).catch(() => {}),
+        fetchDashboardStats()
+          .then(setDashboardStats)
+          .catch(() => {}),
+        fetchCategories()
+          .then(setCategories)
+          .catch(() => {}),
+        fetchAuditLogs()
+          .then(setAuditLogs)
+          .catch(() => {}),
       ]);
     } catch (err: any) {
       console.warn('Backend rollback transaction notice:', err);
@@ -905,16 +993,27 @@ export default function App() {
   // without duplicating this markup.
   const toastNode = toast && (
     <div className="fixed top-14 right-6 z-50 animate-in fade-in slide-in-from-top-4 duration-200">
-      <div className={`px-4 py-3 rounded-2xl shadow-xl flex items-center space-x-3 text-xs font-bold border ${
-        toast.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-950/90 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200' :
-        toast.type === 'warning' ? 'bg-amber-50 dark:bg-amber-950/90 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200' :
-        'bg-blue-50 dark:bg-blue-950/90 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-200'
-      }`}>
-        {toast.type === 'success' && <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />}
-        {toast.type === 'warning' && <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />}
+      <div
+        className={`px-4 py-3 rounded-2xl shadow-xl flex items-center space-x-3 text-xs font-bold border ${
+          toast.type === 'success'
+            ? 'bg-emerald-50 dark:bg-emerald-950/90 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200'
+            : toast.type === 'warning'
+              ? 'bg-amber-50 dark:bg-amber-950/90 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200'
+              : 'bg-blue-50 dark:bg-blue-950/90 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-200'
+        }`}
+      >
+        {toast.type === 'success' && (
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+        )}
+        {toast.type === 'warning' && (
+          <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+        )}
         {toast.type === 'info' && <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />}
         <span>{toast.message}</span>
-        <button onClick={() => setToast(null)} className="hover:text-slate-900 dark:hover:text-white ml-2 cursor-pointer">
+        <button
+          onClick={() => setToast(null)}
+          className="hover:text-slate-900 dark:hover:text-white ml-2 cursor-pointer"
+        >
           <X className="w-3.5 h-3.5" />
         </button>
       </div>
@@ -1016,7 +1115,9 @@ export default function App() {
                 onSelectSavedFilter={handleSelectSavedFilter}
                 onOpenAddCategory={() => setIsCategoryModalOpen(true)}
                 canManageCategories={isAdmin}
-                onSaveCurrentFilter={() => showToast('Đã lưu bộ lọc tìm kiếm hiện tại vào danh sách!', 'info')}
+                onSaveCurrentFilter={() =>
+                  showToast('Đã lưu bộ lọc tìm kiếm hiện tại vào danh sách!', 'info')
+                }
                 allCategoriesCount={dashboardStats?.totalAll ?? 0}
                 allStatusCount={categoryStatusBreakdown?.totalAll ?? 0}
                 statusCounts={statusCountsMap}
@@ -1037,10 +1138,16 @@ export default function App() {
                 pageSize={domainsPageSize}
                 totalCount={domainsTotal}
                 onPageChange={setDomainsPage}
-                onPageSizeChange={(size) => { setDomainsPageSize(size); setDomainsPage(1); }}
+                onPageSizeChange={(size) => {
+                  setDomainsPageSize(size);
+                  setDomainsPage(1);
+                }}
                 sortField={sortField}
                 sortDirection={sortDirection}
-                onSortChange={(field, direction) => { setSortField(field); setSortDirection(direction); }}
+                onSortChange={(field, direction) => {
+                  setSortField(field);
+                  setSortDirection(direction);
+                }}
                 searchQuery={searchQuery}
                 setSearchQuery={setSearchQuery}
                 selectedCategory={selectedCategory}
@@ -1085,10 +1192,7 @@ export default function App() {
 
           {/* TAB 3: NHẬP (Batch Import & Parser) */}
           {currentTab === 'import' && (
-            <ImportView
-              categories={categories}
-              onImportDomains={handleImportDomains}
-            />
+            <ImportView categories={categories} onImportDomains={handleImportDomains} />
           )}
 
           {/* TAB 4: DUYỆT (Review Queue) */}
@@ -1146,8 +1250,8 @@ export default function App() {
                       syncFeedSourceApi(s.id).catch((e) => {
                         console.warn(`Bắt đầu đồng bộ nguồn ${s.id} thất bại:`, e);
                         return null;
-                      })
-                    )
+                      }),
+                    ),
                   );
                   setSources((prev) => prev.map((s) => started.find((u) => u?.id === s.id) || s));
                   const failedToStart = started.filter((r) => !r).length;
@@ -1155,7 +1259,7 @@ export default function App() {
                     failedToStart > 0
                       ? `Đã bắt đầu đồng bộ — ${failedToStart} nguồn không khởi động được, xem chi tiết ở từng thẻ.`
                       : `Đã bắt đầu đồng bộ ${syncable.length} nguồn feed — tiến trình sẽ cập nhật trực tiếp trên từng thẻ.`,
-                    failedToStart > 0 ? 'warning' : 'info'
+                    failedToStart > 0 ? 'warning' : 'info',
                   );
                 } catch (err) {
                   console.warn('Backend sync-all sources notice:', err);
@@ -1166,7 +1270,10 @@ export default function App() {
                 try {
                   const started = await syncFeedSourceApi(id);
                   setSources((prev) => prev.map((s) => (s.id === id ? started : s)));
-                  showToast(`Đã bắt đầu đồng bộ "${started.name}" — tiến trình sẽ cập nhật trực tiếp trên thẻ nguồn.`, 'info');
+                  showToast(
+                    `Đã bắt đầu đồng bộ "${started.name}" — tiến trình sẽ cập nhật trực tiếp trên thẻ nguồn.`,
+                    'info',
+                  );
                 } catch (err) {
                   console.warn('Backend sync source notice:', err);
                   showToast('Không thể bắt đầu đồng bộ — vui lòng thử lại.', 'warning');
@@ -1180,21 +1287,33 @@ export default function App() {
                 try {
                   const created = await createFeedSourceApi(newSrc);
                   setSources((prev) => [...prev, created]);
-                  showToast(`Đã thêm nguồn feed ${created.name} (đã lưu vào CyberDNSTIP-DB) — bấm "Đồng bộ" để nạp dữ liệu.`);
+                  showToast(
+                    `Đã thêm nguồn feed ${created.name} (đã lưu vào CyberDNSTIP-DB) — bấm "Đồng bộ" để nạp dữ liệu.`,
+                  );
                 } catch (err: any) {
                   console.warn('Backend create source notice:', err);
-                  showToast(err?.message || `Không thể thêm nguồn feed "${newSrc.name}" — vui lòng thử lại.`, 'warning');
+                  showToast(
+                    err?.message || `Không thể thêm nguồn feed "${newSrc.name}" — vui lòng thử lại.`,
+                    'warning',
+                  );
                 }
               }}
               onPauseSource={async (id) => {
                 try {
                   const { source: updated, affectedCount } = await pauseFeedSourceApi(id);
                   setSources((prev) => prev.map((s) => (s.id === id ? updated : s)));
-                  showToast(`Đã tạm dừng "${updated.name}" — ${affectedCount.toLocaleString('vi-VN')} tên miền chuyển sang Thôi chặn.`, 'warning');
+                  showToast(
+                    `Đã tạm dừng "${updated.name}" — ${affectedCount.toLocaleString('vi-VN')} tên miền chuyển sang Thôi chặn.`,
+                    'warning',
+                  );
                   await Promise.all([
                     refreshDomains(),
-                    fetchDashboardStats().then(setDashboardStats).catch(() => {}),
-                    fetchAuditLogs().then(setAuditLogs).catch(() => {}),
+                    fetchDashboardStats()
+                      .then(setDashboardStats)
+                      .catch(() => {}),
+                    fetchAuditLogs()
+                      .then(setAuditLogs)
+                      .catch(() => {}),
                   ]);
                 } catch (err: any) {
                   console.warn('Backend pause source notice:', err);
@@ -1205,11 +1324,18 @@ export default function App() {
                 try {
                   const { source: updated, affectedCount } = await resumeFeedSourceApi(id);
                   setSources((prev) => prev.map((s) => (s.id === id ? updated : s)));
-                  showToast(`Đã tiếp tục "${updated.name}" — ${affectedCount.toLocaleString('vi-VN')} tên miền chuyển lại Đang chặn.`, 'success');
+                  showToast(
+                    `Đã tiếp tục "${updated.name}" — ${affectedCount.toLocaleString('vi-VN')} tên miền chuyển lại Đang chặn.`,
+                    'success',
+                  );
                   await Promise.all([
                     refreshDomains(),
-                    fetchDashboardStats().then(setDashboardStats).catch(() => {}),
-                    fetchAuditLogs().then(setAuditLogs).catch(() => {}),
+                    fetchDashboardStats()
+                      .then(setDashboardStats)
+                      .catch(() => {}),
+                    fetchAuditLogs()
+                      .then(setAuditLogs)
+                      .catch(() => {}),
                   ]);
                 } catch (err: any) {
                   console.warn('Backend resume source notice:', err);
@@ -1221,11 +1347,18 @@ export default function App() {
                 try {
                   const { affectedCount } = await deleteFeedSourceApi(id);
                   setSources((prev) => prev.filter((s) => s.id !== id));
-                  showToast(`Đã xoá nguồn "${target?.name || id}" — ${affectedCount.toLocaleString('vi-VN')} tên miền chuyển sang Thôi chặn.`, 'warning');
+                  showToast(
+                    `Đã xoá nguồn "${target?.name || id}" — ${affectedCount.toLocaleString('vi-VN')} tên miền chuyển sang Thôi chặn.`,
+                    'warning',
+                  );
                   await Promise.all([
                     refreshDomains(),
-                    fetchDashboardStats().then(setDashboardStats).catch(() => {}),
-                    fetchAuditLogs().then(setAuditLogs).catch(() => {}),
+                    fetchDashboardStats()
+                      .then(setDashboardStats)
+                      .catch(() => {}),
+                    fetchAuditLogs()
+                      .then(setAuditLogs)
+                      .catch(() => {}),
                   ]);
                 } catch (err: any) {
                   console.warn('Backend delete source notice:', err);
@@ -1241,26 +1374,22 @@ export default function App() {
 
           {/* TAB 7: NHẬT KÝ (Audit Logs & Rollback) */}
           {currentTab === 'logs' && (
-            <AuditLogsView
-              logs={auditLogs}
-              onRollbackTransaction={handleRollbackTransaction}
-            />
+            <AuditLogsView logs={auditLogs} onRollbackTransaction={handleRollbackTransaction} />
           )}
 
           {/* TAB 8: NHẬT KÝ ĐĂNG NHẬP (Login History — Admin only) */}
-          {currentTab === 'login-logs' && (
-            userRole === 'Admin' ? (
+          {currentTab === 'login-logs' &&
+            (userRole === 'Admin' ? (
               <LoginHistoryView />
             ) : (
               <div className="flex-1 flex items-center justify-center text-sm text-slate-500 dark:text-slate-400">
                 Chỉ tài khoản Admin mới có quyền truy cập nhật ký đăng nhập.
               </div>
-            )
-          )}
+            ))}
 
           {/* TAB 9b: DNS NODES (CyberDNS resolver fleet + Blocklist ACL — Admin only) */}
-          {currentTab === 'dns-nodes' && (
-            userRole === 'Admin' ? (
+          {currentTab === 'dns-nodes' &&
+            (userRole === 'Admin' ? (
               <Suspense
                 fallback={
                   <div className="flex-1 flex items-center justify-center text-sm text-slate-500 dark:text-slate-400">
@@ -1274,12 +1403,11 @@ export default function App() {
               <div className="flex-1 flex items-center justify-center text-sm text-slate-500 dark:text-slate-400">
                 Chỉ tài khoản Admin mới có quyền truy cập trang quản lý DNS Node.
               </div>
-            )
-          )}
+            ))}
 
           {/* TAB 9: NGƯỜI DÙNG (User Management — Admin only) */}
-          {currentTab === 'users' && (
-            userRole === 'Admin' ? (
+          {currentTab === 'users' &&
+            (userRole === 'Admin' ? (
               <UserManagementView
                 users={managedUsers}
                 currentUserId={currentUser?.id ?? null}
@@ -1290,8 +1418,7 @@ export default function App() {
               <div className="flex-1 flex items-center justify-center text-sm text-slate-500 dark:text-slate-400">
                 Chỉ tài khoản Admin mới có quyền truy cập trang quản lý người dùng.
               </div>
-            )
-          )}
+            ))}
         </main>
       </div>
 
@@ -1328,7 +1455,10 @@ export default function App() {
             showToast(`Đã tạo nhóm danh mục mới: ${created.name} (đã lưu vào CyberDNSTIP-DB)`);
           } catch (err: any) {
             console.warn('Backend create category notice:', err);
-            showToast(err?.message || `Không thể tạo nhóm danh mục "${cat.name}" — vui lòng thử lại.`, 'warning');
+            showToast(
+              err?.message || `Không thể tạo nhóm danh mục "${cat.name}" — vui lòng thử lại.`,
+              'warning',
+            );
           }
         }}
         onUpdateCategory={async (id, patch) => {
@@ -1338,7 +1468,10 @@ export default function App() {
             showToast(`Đã cập nhật nhóm danh mục ${id}`);
           } catch (err: any) {
             console.warn('Backend update category notice:', err);
-            showToast(err?.message || `Không thể cập nhật nhóm danh mục ${id} — vui lòng thử lại.`, 'warning');
+            showToast(
+              err?.message || `Không thể cập nhật nhóm danh mục ${id} — vui lòng thử lại.`,
+              'warning',
+            );
           }
         }}
         onDeleteCategory={async (id) => {
@@ -1353,10 +1486,7 @@ export default function App() {
         }}
       />
 
-      <KeyboardShortcutsModal
-        isOpen={isKeyboardHelpOpen}
-        onClose={() => setIsKeyboardHelpOpen(false)}
-      />
+      <KeyboardShortcutsModal isOpen={isKeyboardHelpOpen} onClose={() => setIsKeyboardHelpOpen(false)} />
 
       <ExportModal
         isOpen={isExportModalOpen}

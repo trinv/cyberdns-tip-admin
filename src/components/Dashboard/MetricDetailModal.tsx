@@ -1,8 +1,15 @@
 import React from 'react';
 import {
-  X, Shield, AlertTriangle, Layers, ArrowUpRight,
-  CheckCircle2, Clock,
-  ExternalLink, PieChart, AlertOctagon
+  X,
+  Shield,
+  AlertTriangle,
+  Layers,
+  ArrowUpRight,
+  CheckCircle2,
+  Clock,
+  ExternalLink,
+  PieChart,
+  AlertOctagon,
 } from 'lucide-react';
 import { FeedSource, CategoryInfo, DashboardStats, ReviewDomainItem } from '../../types';
 
@@ -61,7 +68,6 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-
         {/* Modal Header */}
         <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/70 dark:bg-slate-800/40">
           <div className="flex items-center space-x-3">
@@ -88,9 +94,12 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
                 {metricType === 'sources_coverage' && 'Chi Tiết & Phân Tích: Nguồn Cấp Threat & Danh Mục'}
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                {metricType === 'total_blocked' && `Phân tích ${(stats?.totalAll ?? 0).toLocaleString('vi-VN')} tên miền trong hệ thống, theo trạng thái xử lý thực tế`}
-                {metricType === 'soc_queue' && `${reviewItems.length} tên miền đang chờ kiểm duyệt và cấp phát nhãn rủi ro`}
-                {metricType === 'sources_coverage' && `${sources.length} nguồn feed & ${categories.length} nhóm danh mục`}
+                {metricType === 'total_blocked' &&
+                  `Phân tích ${(stats?.totalAll ?? 0).toLocaleString('vi-VN')} tên miền trong hệ thống, theo trạng thái xử lý thực tế`}
+                {metricType === 'soc_queue' &&
+                  `${reviewItems.length} tên miền đang chờ kiểm duyệt và cấp phát nhãn rủi ro`}
+                {metricType === 'sources_coverage' &&
+                  `${sources.length} nguồn feed & ${categories.length} nhóm danh mục`}
               </p>
             </div>
           </div>
@@ -105,50 +114,65 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
 
         {/* Modal Body */}
         <div className="p-5 overflow-y-auto space-y-5 flex-1 text-slate-800 dark:text-slate-200 text-xs">
-
           {/* 1. TOP STATS ROW — every number here comes straight from
               GET /api/dashboard/stats or the props passed in; nothing is
               fabricated or estimated. */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {metricType === 'total_blocked' && (
-              stats ? (
+            {metricType === 'total_blocked' &&
+              (stats ? (
                 (['active', 'allowlist', 'unblocked'] as const).map((statusKey) => {
                   const row = stats.statusBreakdown.find((s) => s.status === statusKey);
                   return (
-                    <div key={statusKey} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-800">
-                      <span className="text-xs text-slate-400 font-bold uppercase">{STATUS_LABELS[statusKey]}</span>
+                    <div
+                      key={statusKey}
+                      className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-800"
+                    >
+                      <span className="text-xs text-slate-400 font-bold uppercase">
+                        {STATUS_LABELS[statusKey]}
+                      </span>
                       <div className="text-lg font-extrabold font-mono text-slate-800 dark:text-slate-100 mt-0.5">
                         {(row?.count ?? 0).toLocaleString('vi-VN')}
                       </div>
-                      <span className="text-xs text-slate-400">{(row?.percent ?? 0).toFixed(1)}% tổng số</span>
+                      <span className="text-xs text-slate-400">
+                        {(row?.percent ?? 0).toFixed(1)}% tổng số
+                      </span>
                     </div>
                   );
                 })
               ) : (
-                <div className="col-span-4 text-center py-4 text-slate-400">Đang tải dữ liệu từ CyberDNSTIP-DB...</div>
-              )
-            )}
+                <div className="col-span-4 text-center py-4 text-slate-400">
+                  Đang tải dữ liệu từ CyberDNSTIP-DB...
+                </div>
+              ))}
 
             {metricType === 'soc_queue' && (
               <>
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-800">
                   <span className="text-xs text-slate-400 font-bold uppercase">Chờ Xử Lý</span>
-                  <div className="text-lg font-extrabold font-mono text-rose-600 dark:text-rose-400 mt-0.5">{reviewItems.length} Tên miền</div>
+                  <div className="text-lg font-extrabold font-mono text-rose-600 dark:text-rose-400 mt-0.5">
+                    {reviewItems.length} Tên miền
+                  </div>
                   <span className="text-xs text-rose-600 font-semibold">Cần phân loại</span>
                 </div>
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-800">
                   <span className="text-xs text-slate-400 font-bold uppercase">Critical (Threat ≥ 90%)</span>
-                  <div className="text-lg font-extrabold font-mono text-rose-600 dark:text-rose-400 mt-0.5">{severityCounts.Critical}</div>
+                  <div className="text-lg font-extrabold font-mono text-rose-600 dark:text-rose-400 mt-0.5">
+                    {severityCounts.Critical}
+                  </div>
                   <span className="text-xs text-slate-400">Theo threat score thực</span>
                 </div>
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-800">
                   <span className="text-xs text-slate-400 font-bold uppercase">High (70–89%)</span>
-                  <div className="text-lg font-extrabold font-mono text-amber-600 dark:text-amber-400 mt-0.5">{severityCounts.High}</div>
+                  <div className="text-lg font-extrabold font-mono text-amber-600 dark:text-amber-400 mt-0.5">
+                    {severityCounts.High}
+                  </div>
                   <span className="text-xs text-slate-400">Theo threat score thực</span>
                 </div>
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-800">
                   <span className="text-xs text-slate-400 font-bold uppercase">Medium (&lt;70%)</span>
-                  <div className="text-lg font-extrabold font-mono text-slate-800 dark:text-slate-100 mt-0.5">{severityCounts.Medium}</div>
+                  <div className="text-lg font-extrabold font-mono text-slate-800 dark:text-slate-100 mt-0.5">
+                    {severityCounts.Medium}
+                  </div>
                   <span className="text-xs text-slate-400">Theo threat score thực</span>
                 </div>
               </>
@@ -158,22 +182,32 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
               <>
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-800">
                   <span className="text-xs text-slate-400 font-bold uppercase">Nguồn Cấp Feed</span>
-                  <div className="text-lg font-extrabold font-mono text-indigo-600 dark:text-indigo-400 mt-0.5">{sources.length}</div>
-                  <span className="text-xs text-emerald-600 font-semibold">{healthySources}/{sources.length || 0} hoạt động tốt</span>
+                  <div className="text-lg font-extrabold font-mono text-indigo-600 dark:text-indigo-400 mt-0.5">
+                    {sources.length}
+                  </div>
+                  <span className="text-xs text-emerald-600 font-semibold">
+                    {healthySources}/{sources.length || 0} hoạt động tốt
+                  </span>
                 </div>
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-800">
                   <span className="text-xs text-slate-400 font-bold uppercase">Nhóm Danh Mục</span>
-                  <div className="text-lg font-extrabold font-mono text-slate-800 dark:text-slate-100 mt-0.5">{categories.length}</div>
+                  <div className="text-lg font-extrabold font-mono text-slate-800 dark:text-slate-100 mt-0.5">
+                    {categories.length}
+                  </div>
                   <span className="text-xs text-slate-400">Cấu hình phân loại</span>
                 </div>
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-800">
                   <span className="text-xs text-slate-400 font-bold uppercase">Tổng IOC Từ Nguồn</span>
-                  <div className="text-lg font-extrabold font-mono text-slate-800 dark:text-slate-100 mt-0.5">{totalSourceDomains.toLocaleString('vi-VN')}</div>
+                  <div className="text-lg font-extrabold font-mono text-slate-800 dark:text-slate-100 mt-0.5">
+                    {totalSourceDomains.toLocaleString('vi-VN')}
+                  </div>
                   <span className="text-xs text-slate-400">Cộng dồn domainCount mỗi nguồn</span>
                 </div>
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-800">
                   <span className="text-xs text-slate-400 font-bold uppercase">Tổng Domain (DB)</span>
-                  <div className="text-lg font-extrabold font-mono text-emerald-600 dark:text-emerald-400 mt-0.5">{(stats?.totalAll ?? 0).toLocaleString('vi-VN')}</div>
+                  <div className="text-lg font-extrabold font-mono text-emerald-600 dark:text-emerald-400 mt-0.5">
+                    {(stats?.totalAll ?? 0).toLocaleString('vi-VN')}
+                  </div>
                   <span className="text-xs text-slate-400">Sau khi loại trùng theo danh mục</span>
                 </div>
               </>
@@ -194,15 +228,27 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
                   {stats.categoryBreakdown.map((c) => {
                     const meta = categories.find((cat) => cat.id === c.category);
                     return (
-                      <div key={c.category} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                      <div
+                        key={c.category}
+                        className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex justify-between items-center"
+                      >
                         <div className="flex items-center space-x-2 min-w-0">
-                          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: meta?.color || '#64748b' }}></span>
+                          <span
+                            className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: meta?.color || '#64748b' }}
+                          ></span>
                           <div className="min-w-0">
-                            <div className="font-bold text-slate-800 dark:text-slate-200 font-sans truncate">{meta?.name || c.category}</div>
-                            <div className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">{c.count.toLocaleString('vi-VN')} domain</div>
+                            <div className="font-bold text-slate-800 dark:text-slate-200 font-sans truncate">
+                              {meta?.name || c.category}
+                            </div>
+                            <div className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">
+                              {c.count.toLocaleString('vi-VN')} domain
+                            </div>
                           </div>
                         </div>
-                        <span className="text-sm font-extrabold font-mono text-slate-700 dark:text-slate-300 flex-shrink-0">{c.percent.toFixed(1)}%</span>
+                        <span className="text-sm font-extrabold font-mono text-slate-700 dark:text-slate-300 flex-shrink-0">
+                          {c.percent.toFixed(1)}%
+                        </span>
                       </div>
                     );
                   })}
@@ -224,23 +270,36 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
                   {reviewItems.slice(0, 20).map((item) => {
                     const band = getSeverityBand(item.threatScore ?? 0);
                     const bandClass =
-                      band === 'Critical' ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800' :
-                      band === 'High' ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800' :
-                      'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700';
+                      band === 'Critical'
+                        ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800'
+                        : band === 'High'
+                          ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700';
                     return (
-                      <div key={item.id} className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+                      <div
+                        key={item.id}
+                        className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2"
+                      >
                         <div className="min-w-0">
-                          <div className="font-mono font-bold text-slate-800 dark:text-slate-200 truncate">{item.domain}</div>
-                          <div className="text-xs text-slate-400 dark:text-slate-500">Đề xuất: {item.proposedCategory} · Nguồn: {item.reportedBy}</div>
+                          <div className="font-mono font-bold text-slate-800 dark:text-slate-200 truncate">
+                            {item.domain}
+                          </div>
+                          <div className="text-xs text-slate-400 dark:text-slate-500">
+                            Đề xuất: {item.proposedCategory} · Nguồn: {item.reportedBy}
+                          </div>
                         </div>
-                        <span className={`px-2 py-0.5 rounded text-xs font-bold border flex-shrink-0 ${bandClass}`}>
+                        <span
+                          className={`px-2 py-0.5 rounded text-xs font-bold border flex-shrink-0 ${bandClass}`}
+                        >
                           {((item.threatScore ?? 0) * 100).toFixed(0)}% ({band})
                         </span>
                       </div>
                     );
                   })}
                   {reviewItems.length > 20 && (
-                    <div className="text-center text-xs text-slate-400 pt-1">... và còn {reviewItems.length - 20} mục nữa</div>
+                    <div className="text-center text-xs text-slate-400 pt-1">
+                      ... và còn {reviewItems.length - 20} mục nữa
+                    </div>
                   )}
                 </div>
               )}
@@ -259,17 +318,29 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {sources.map((src) => (
-                    <div key={src.id} className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800">
+                    <div
+                      key={src.id}
+                      className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800"
+                    >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-2 min-w-0">
-                          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: src.color }}></span>
-                          <span className="font-bold text-slate-900 dark:text-slate-100 truncate">{src.name}</span>
+                          <span
+                            className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: src.color }}
+                          ></span>
+                          <span className="font-bold text-slate-900 dark:text-slate-100 truncate">
+                            {src.name}
+                          </span>
                         </div>
-                        <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase flex-shrink-0">{src.status}</span>
+                        <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase flex-shrink-0">
+                          {src.status}
+                        </span>
                       </div>
                       <div className="flex items-center justify-between mt-2 font-mono text-xs">
                         <span className="text-slate-500">Quy mô IOCs:</span>
-                        <strong className="text-slate-800 dark:text-slate-200">{src.domainCount.toLocaleString('vi-VN')}</strong>
+                        <strong className="text-slate-800 dark:text-slate-200">
+                          {src.domainCount.toLocaleString('vi-VN')}
+                        </strong>
                       </div>
                       <div className="flex items-center justify-between mt-1.5 text-xs text-slate-400">
                         <span>Đồng bộ gần nhất:</span>
@@ -337,7 +408,6 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
             )}
           </div>
         </div>
-
       </div>
     </div>
   );

@@ -30,7 +30,7 @@ services:
     volumes:
       - cyberdns_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U cyberdns_app -d cyberdns_tip"]
+      test: ['CMD-SHELL', 'pg_isready -U cyberdns_app -d cyberdns_tip']
       interval: 5s
       timeout: 5s
       retries: 20
@@ -54,16 +54,16 @@ services:
       # hostname, over plain TCP (no TLS between containers on the same
       # Docker network).
       DATABASE_URL: postgres://cyberdns_app:${POSTGRES_PASSWORD}@db:5432/cyberdns_tip
-      DB_SSL: "false"
+      DB_SSL: 'false'
       # Fixed regardless of PORT in .env — that PORT only controls the
       # HOST-side published port below; the app must keep listening on 3000
       # *inside* its own container for the "<host-port>:3000" mapping to
       # still point at the right place.
-      PORT: "3000"
+      PORT: '3000'
       # Bind all interfaces inside the container — required for the
       # "127.0.0.1:<port>:3000" host mapping below to reach it. Overrides any
       # HOST=127.0.0.1 a native-install .env might carry (see .env.example).
-      HOST: "0.0.0.0"
+      HOST: '0.0.0.0'
     ports:
       # Bound to 127.0.0.1 only — not reachable from outside this VPS at
       # all, Docker-level, regardless of firewall rules. Put Nginx in front
@@ -72,7 +72,7 @@ services:
       # logging/new-IP detection to be meaningful: server.ts trusts
       # X-Forwarded-For from whoever connects to it, so if this port were
       # reachable directly, anyone could spoof their client IP.
-      - "127.0.0.1:${PORT:-3000}:3000"
+      - '127.0.0.1:${PORT:-3000}:3000'
 
 volumes:
   cyberdns_pgdata:

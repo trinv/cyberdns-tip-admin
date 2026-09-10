@@ -22,7 +22,13 @@ import { eq, desc, asc, sql, ilike, and, or, inArray } from 'drizzle-orm';
 import { isIPv4, isIPv6 } from 'node:net';
 import { parseFeedText, normalizeDomain } from './feedParser.ts';
 import { assertValidRole } from './roles.ts';
-import { hashPassword, verifyPassword, burnPasswordCompare, generateSessionToken, generateTempPassword } from '../lib/password.ts';
+import {
+  hashPassword,
+  verifyPassword,
+  burnPasswordCompare,
+  generateSessionToken,
+  generateTempPassword,
+} from '../lib/password.ts';
 import { sendNewIpLoginAlert } from '../lib/mailer.ts';
 import { assertPublicFeedUrl, safeFeedFetch } from '../lib/ssrfGuard.ts';
 // bulkCreateDomains' bulk load uses the real COPY wire protocol — the one
@@ -78,7 +84,11 @@ export async function authenticateUser(email: string, password: string) {
 // a generic "email or password incorrect" either way).
 export async function findUserIdByEmail(email: string): Promise<number | null> {
   try {
-    const rows = await db.select({ id: users.id }).from(users).where(eq(users.email, email.toLowerCase().trim())).limit(1);
+    const rows = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, email.toLowerCase().trim()))
+      .limit(1);
     return rows[0]?.id ?? null;
   } catch (error) {
     console.error('findUserIdByEmail failed:', error);
@@ -132,8 +142,8 @@ export async function recordLoginAttempt(params: {
           and(
             eq(loginLogs.userId, params.userId),
             eq(loginLogs.ipAddress, params.ipAddress),
-            eq(loginLogs.success, true)
-          )
+            eq(loginLogs.success, true),
+          ),
         )
         .limit(1);
       isNewIp = priorFromThisIp.length === 0;
@@ -225,7 +235,12 @@ export async function listUsers() {
 // importers.
 export { VALID_ROLES } from './roles.ts';
 
-export async function createUserAccount(data: { email: string; password: string; displayName?: string; role?: string }) {
+export async function createUserAccount(data: {
+  email: string;
+  password: string;
+  displayName?: string;
+  role?: string;
+}) {
   assertValidRole(data.role);
   try {
     const passwordHash = await hashPassword(data.password);
@@ -273,7 +288,7 @@ async function assertNotLastActiveAdmin(tx: Executor, excludingUserId: number) {
 
 export async function updateUserAccount(
   id: number,
-  patch: { role?: string; isActive?: boolean; displayName?: string; password?: string }
+  patch: { role?: string; isActive?: boolean; displayName?: string; password?: string },
 ) {
   assertValidRole(patch.role);
   try {
@@ -325,7 +340,9 @@ function configuredSuperadminPassword(): string | null {
   const raw = process.env.SUPERADMIN_PASSWORD;
   if (!raw) return null;
   if (raw === SUPERADMIN_PW_PLACEHOLDER) {
-    console.warn('[ensureSuperAdmin] SUPERADMIN_PASSWORD is still the .env.example placeholder — ignoring it and generating a random password instead.');
+    console.warn(
+      '[ensureSuperAdmin] SUPERADMIN_PASSWORD is still the .env.example placeholder — ignoring it and generating a random password instead.',
+    );
     return null;
   }
   return raw;
@@ -409,7 +426,7 @@ export async function ensureSuperAdmin() {
 // every touched category's live count accurate automatically.
 async function addDomainCategoryMemberships(
   executor: Executor,
-  rows: { domainId: number; categoryId: string; sourceLabel?: string | null; feedSourceId?: string | null }[]
+  rows: { domainId: number; categoryId: string; sourceLabel?: string | null; feedSourceId?: string | null }[],
 ) {
   if (rows.length === 0) return;
   // 4 params/row -> 5000/chunk = 20,000 params, well under Postgres' bound-
@@ -438,7 +455,7 @@ async function addDomainCategoryMemberships(
             categoryId: r.categoryId,
             sourceLabel: r.sourceLabel || null,
             feedSourceId: r.feedSourceId || null,
-          }))
+          })),
         )
         .onConflictDoUpdate({
           target: [domainCategories.domainId, domainCategories.categoryId, domainCategories.feedSourceId],
@@ -463,12 +480,12 @@ async function addDomainCategoryMemberships(
         const realCategories = await db.select({ id: categories.id }).from(categories);
         const validIds = new Set(realCategories.map((c) => c.id));
         const badIds = Array.from(new Set(Array.from(byTriple.values()).map((r) => r.categoryId))).filter(
-          (id) => !validIds.has(id)
+          (id) => !validIds.has(id),
         );
         throw new Error(
           badIds.length > 0
             ? `Nhóm danh mục không tồn tại: ${badIds.join(', ')}. Vui lòng chọn lại nhóm hợp lệ.`
-            : 'Nhóm danh mục không hợp lệ (đã bị xoá hoặc đổi tên).'
+            : 'Nhóm danh mục không hợp lệ (đã bị xoá hoặc đổi tên).',
         );
       }
       throw error;
@@ -489,13 +506,18 @@ async function removeDomainCategoryMemberships(
   executor: Executor,
   domainIds: number[],
   categoryId: string,
-  feedSourceId?: string | null
+  feedSourceId?: string | null,
 ) {
   if (domainIds.length === 0) return;
-  const conditions = [inArray(domainCategories.domainId, domainIds), eq(domainCategories.categoryId, categoryId)];
+  const conditions = [
+    inArray(domainCategories.domainId, domainIds),
+    eq(domainCategories.categoryId, categoryId),
+  ];
   if (feedSourceId !== undefined) {
     conditions.push(
-      feedSourceId === null ? sql`${domainCategories.feedSourceId} IS NULL` : eq(domainCategories.feedSourceId, feedSourceId)
+      feedSourceId === null
+        ? sql`${domainCategories.feedSourceId} IS NULL`
+        : eq(domainCategories.feedSourceId, feedSourceId),
     );
   }
   await executor.delete(domainCategories).where(and(...conditions));
@@ -512,17 +534,21 @@ export async function getDashboardStats() {
   try {
     const activeFilter = eq(domains.status, 'active');
 
-    const [totalActiveRows, totalAllRows, categoryResult, tldRows, statusRows, recentActive, growthRows] = await Promise.all([
-      db.select({ count: sql<number>`count(*)` }).from(domains).where(activeFilter),
-      db.select({ count: sql<number>`count(*)` }).from(domains),
-      // Unnests the jsonb `categories` array rather than grouping by
-      // primaryCategory — a domain can now belong to several categories at
-      // once (see schema.ts's note on domain_categories' composite unique
-      // constraint), so a domain tagged both 'malware' and 'phishing' must
-      // count toward BOTH breakdowns here, not just whichever it was added
-      // to first. jsonb_array_elements_text needs raw SQL — not expressible
-      // via the query builder.
-      db.execute<{ category: string; count: number }>(sql`
+    const [totalActiveRows, totalAllRows, categoryResult, tldRows, statusRows, recentActive, growthRows] =
+      await Promise.all([
+        db
+          .select({ count: sql<number>`count(*)` })
+          .from(domains)
+          .where(activeFilter),
+        db.select({ count: sql<number>`count(*)` }).from(domains),
+        // Unnests the jsonb `categories` array rather than grouping by
+        // primaryCategory — a domain can now belong to several categories at
+        // once (see schema.ts's note on domain_categories' composite unique
+        // constraint), so a domain tagged both 'malware' and 'phishing' must
+        // count toward BOTH breakdowns here, not just whichever it was added
+        // to first. jsonb_array_elements_text needs raw SQL — not expressible
+        // via the query builder.
+        db.execute<{ category: string; count: number }>(sql`
         SELECT cat AS category, count(*)::int AS count
         FROM domains, jsonb_array_elements_text(categories) AS cat
         WHERE status = 'active'
@@ -530,48 +556,43 @@ export async function getDashboardStats() {
         ORDER BY count(*) DESC
         LIMIT 8
       `),
-      // Top 20 TLDs by blocked-domain count (per explicit request — was
-      // top 6) — still capped, not every TLD ever seen: with potentially
-      // hundreds of distinct TLDs across a large blocklist, the chart needs
-      // a bound, and the long tail past the top 20 is not meaningfully
-      // "high density" data anyway.
-      db
-        .select({ tld: domains.tld, count: sql<number>`count(*)` })
-        .from(domains)
-        .where(activeFilter)
-        .groupBy(domains.tld)
-        .orderBy(desc(sql`count(*)`))
-        .limit(20),
-      // Every status, not just 'active' — this is what backs the real
-      // "Active / Allowlist / Đã thôi chặn" breakdown in the dashboard's
-      // total-blocked detail modal (see MetricDetailModal.tsx).
-      db
-        .select({ status: domains.status, count: sql<number>`count(*)` })
-        .from(domains)
-        .groupBy(domains.status),
-      // Most recently detected active domains — real data (lastSeen), unlike
-      // the old "ranked by threatScore" version: threatScore was never a
-      // real computed score (see schema.ts), so sorting by it was ranking on
-      // a fixed constant, not a genuine signal.
-      db
-        .select()
-        .from(domains)
-        .where(activeFilter)
-        .orderBy(desc(domains.lastSeen))
-        .limit(6),
-      // Real daily count of newly-detected domains for the Dashboard's growth
-      // trend chart. The 30-day axis is generated *in SQL* (generate_series
-      // off current_date) and LEFT JOINed to the per-day counts, so:
-      //   - every day in the window is present with a real 0 (no GROUP BY gap);
-      //   - the axis and the buckets share one single clock — the Postgres
-      //     session calendar, the same one `now()`/`defaultNow()` used to
-      //     stamp first_seen — instead of the old split where SQL bucketed on
-      //     first_seen::date and JS gap-filled on UTC (toISOString), which
-      //     drifted a day and could pin "today" to 0 (LOGIC-05).
-      // to_char keeps `day` a plain 'YYYY-MM-DD' string regardless of the pg
-      // driver's date parsing. Every domain carries its own firstSeen forever,
-      // so this needs no history table.
-      db.execute<{ day: string; count: number }>(sql`
+        // Top 20 TLDs by blocked-domain count (per explicit request — was
+        // top 6) — still capped, not every TLD ever seen: with potentially
+        // hundreds of distinct TLDs across a large blocklist, the chart needs
+        // a bound, and the long tail past the top 20 is not meaningfully
+        // "high density" data anyway.
+        db
+          .select({ tld: domains.tld, count: sql<number>`count(*)` })
+          .from(domains)
+          .where(activeFilter)
+          .groupBy(domains.tld)
+          .orderBy(desc(sql`count(*)`))
+          .limit(20),
+        // Every status, not just 'active' — this is what backs the real
+        // "Active / Allowlist / Đã thôi chặn" breakdown in the dashboard's
+        // total-blocked detail modal (see MetricDetailModal.tsx).
+        db
+          .select({ status: domains.status, count: sql<number>`count(*)` })
+          .from(domains)
+          .groupBy(domains.status),
+        // Most recently detected active domains — real data (lastSeen), unlike
+        // the old "ranked by threatScore" version: threatScore was never a
+        // real computed score (see schema.ts), so sorting by it was ranking on
+        // a fixed constant, not a genuine signal.
+        db.select().from(domains).where(activeFilter).orderBy(desc(domains.lastSeen)).limit(6),
+        // Real daily count of newly-detected domains for the Dashboard's growth
+        // trend chart. The 30-day axis is generated *in SQL* (generate_series
+        // off current_date) and LEFT JOINed to the per-day counts, so:
+        //   - every day in the window is present with a real 0 (no GROUP BY gap);
+        //   - the axis and the buckets share one single clock — the Postgres
+        //     session calendar, the same one `now()`/`defaultNow()` used to
+        //     stamp first_seen — instead of the old split where SQL bucketed on
+        //     first_seen::date and JS gap-filled on UTC (toISOString), which
+        //     drifted a day and could pin "today" to 0 (LOGIC-05).
+        // to_char keeps `day` a plain 'YYYY-MM-DD' string regardless of the pg
+        // driver's date parsing. Every domain carries its own firstSeen forever,
+        // so this needs no history table.
+        db.execute<{ day: string; count: number }>(sql`
         WITH recent AS (
           SELECT first_seen::date AS day
           FROM domains
@@ -583,7 +604,7 @@ export async function getDashboardStats() {
         GROUP BY gs.day
         ORDER BY gs.day
       `),
-    ]);
+      ]);
 
     const totalActive = Number(totalActiveRows[0]?.count || 0);
     const totalAll = Number(totalAllRows[0]?.count || 0);
@@ -651,11 +672,20 @@ export async function getStatusBreakdownForCategory(categoryId?: string) {
     // this must check containment in the array, not equality against a
     // single primaryCategory column.
     const categoryFilter =
-      categoryId && categoryId !== 'all' ? sql`${domains.categories} @> ${JSON.stringify([categoryId])}::jsonb` : undefined;
+      categoryId && categoryId !== 'all'
+        ? sql`${domains.categories} @> ${JSON.stringify([categoryId])}::jsonb`
+        : undefined;
 
     const [totalAllRows, statusRows] = await Promise.all([
-      db.select({ count: sql<number>`count(*)` }).from(domains).where(categoryFilter),
-      db.select({ status: domains.status, count: sql<number>`count(*)` }).from(domains).where(categoryFilter).groupBy(domains.status),
+      db
+        .select({ count: sql<number>`count(*)` })
+        .from(domains)
+        .where(categoryFilter),
+      db
+        .select({ status: domains.status, count: sql<number>`count(*)` })
+        .from(domains)
+        .where(categoryFilter)
+        .groupBy(domains.status),
     ]);
 
     const totalAll = Number(totalAllRows[0]?.count || 0);
@@ -713,7 +743,17 @@ export async function getDomains(params: {
   sortDirection?: 'asc' | 'desc';
 }) {
   try {
-    const { search, category, status, tld, feedSourceId, limit, offset = 0, sortField, sortDirection } = params;
+    const {
+      search,
+      category,
+      status,
+      tld,
+      feedSourceId,
+      limit,
+      offset = 0,
+      sortField,
+      sortDirection,
+    } = params;
 
     const conditions = [];
 
@@ -739,7 +779,10 @@ export async function getDomains(params: {
       conditions.push(sql`${domains.categories} @> ${JSON.stringify([category])}::jsonb`);
     }
     if (status && status.trim() !== '') {
-      const statusList = status.split(',').map((s) => s.trim()).filter(Boolean);
+      const statusList = status
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
       if (statusList.length === 1) conditions.push(eq(domains.status, statusList[0]));
       else if (statusList.length > 1) conditions.push(inArray(domains.status, statusList));
     }
@@ -763,11 +806,11 @@ export async function getDomains(params: {
     // result rows.
     if (feedSourceId === MANUAL_SOURCE_FILTER) {
       conditions.push(
-        sql`NOT EXISTS (SELECT 1 FROM ${domainCategories} dc WHERE dc.domain_id = ${domains.id} AND dc.feed_source_id IS NOT NULL)`
+        sql`NOT EXISTS (SELECT 1 FROM ${domainCategories} dc WHERE dc.domain_id = ${domains.id} AND dc.feed_source_id IS NOT NULL)`,
       );
     } else if (feedSourceId) {
       conditions.push(
-        sql`EXISTS (SELECT 1 FROM ${domainCategories} dc WHERE dc.domain_id = ${domains.id} AND dc.feed_source_id = ${feedSourceId})`
+        sql`EXISTS (SELECT 1 FROM ${domainCategories} dc WHERE dc.domain_id = ${domains.id} AND dc.feed_source_id = ${feedSourceId})`,
       );
     }
 
@@ -803,7 +846,7 @@ export async function updateDomain(
     tags?: string[];
     isProtected?: boolean;
   },
-  meta: { userEmail?: string; userRole?: string; reason?: string } = {}
+  meta: { userEmail?: string; userRole?: string; reason?: string } = {},
 ) {
   try {
     // Whole edit — status/tag/etc. update, category reconciliation, and the
@@ -823,7 +866,10 @@ export async function updateDomain(
       // Any explicit status change here is a human decision — clear the
       // "auto-unblocked by a paused source" marker regardless of which status
       // it's changing to, so a later resumeFeedSource never second-guesses it.
-      if (patch.status !== undefined) { setValues.status = patch.status; setValues.unblockedBySourcePause = false; }
+      if (patch.status !== undefined) {
+        setValues.status = patch.status;
+        setValues.unblockedBySourcePause = false;
+      }
       if (patch.sourceDetail !== undefined) setValues.sourceDetail = patch.sourceDetail;
       if (patch.tags !== undefined) setValues.tags = patch.tags;
       if (patch.isProtected !== undefined) setValues.isProtected = patch.isProtected;
@@ -845,7 +891,11 @@ export async function updateDomain(
         if (toAdd.length > 0) {
           await addDomainCategoryMemberships(
             tx,
-            toAdd.map((categoryId) => ({ domainId: id, categoryId, sourceLabel: meta.reason || 'Manual edit' }))
+            toAdd.map((categoryId) => ({
+              domainId: id,
+              categoryId,
+              sourceLabel: meta.reason || 'Manual edit',
+            })),
           );
         }
         for (const categoryId of toRemove) {
@@ -893,26 +943,27 @@ export async function updateDomain(
   }
 }
 
-export async function createDomain(data: {
-  domain: string;
-  categories: string[];
-  source?: string;
-  reason?: string;
-  userEmail?: string;
-  userRole?: string;
-  // Set when this call originates from a feed (directly, or via an
-  // approved review-queue item that was itself reported by a feed — see
-  // resolveReviewItem) so the resulting domain_categories row stays
-  // traceable to its source, same as a directly-auto-blocked domain.
-  feedSourceId?: string;
-},
+export async function createDomain(
+  data: {
+    domain: string;
+    categories: string[];
+    source?: string;
+    reason?: string;
+    userEmail?: string;
+    userRole?: string;
+    // Set when this call originates from a feed (directly, or via an
+    // approved review-queue item that was itself reported by a feed — see
+    // resolveReviewItem) so the resulting domain_categories row stays
+    // traceable to its source, same as a directly-auto-blocked domain.
+    feedSourceId?: string;
+  },
   // Optional: pass a caller's own `tx` (e.g. resolveReviewItem, which needs
   // its own reviewQueue.status update and this call to succeed/fail as one
   // atomic unit) so this function's writes join that SAME transaction —
   // opened as a SAVEPOINT via `executor.transaction` below, not a second,
   // independent transaction on a different pooled connection. Defaults to
   // the shared `db` for every other, standalone caller.
-  executor: Executor = db
+  executor: Executor = db,
 ) {
   try {
     // Defensive: every real caller (resolveReviewItem) now passes a domain
@@ -986,7 +1037,12 @@ export async function createDomain(data: {
       // silent no-op (DB-enforced), never a duplicate membership row.
       await addDomainCategoryMemberships(
         tx,
-        data.categories.map((categoryId) => ({ domainId, categoryId, sourceLabel, feedSourceId: data.feedSourceId }))
+        data.categories.map((categoryId) => ({
+          domainId,
+          categoryId,
+          sourceLabel,
+          feedSourceId: data.feedSourceId,
+        })),
       );
 
       // Re-select so the caller gets the trigger-updated categories/primaryCategory.
@@ -1129,7 +1185,14 @@ export async function bulkCreateDomains(data: {
   onPhaseProgress?: (fraction: number, label: string) => void | Promise<void>;
 }) {
   const cleanDomains = Array.from(new Set(data.domains.map((d) => d.toLowerCase().trim()).filter(Boolean)));
-  if (cleanDomains.length === 0) return { insertedCount: 0, newCount: 0, existingCount: 0, soleOwnerCount: 0, stillBackedElsewhereCount: 0 };
+  if (cleanDomains.length === 0)
+    return {
+      insertedCount: 0,
+      newCount: 0,
+      existingCount: 0,
+      soleOwnerCount: 0,
+      stillBackedElsewhereCount: 0,
+    };
 
   const categoryId = data.categories[0];
   if (!categoryId) throw new Error('bulkCreateDomains requires at least one category.');
@@ -1157,9 +1220,12 @@ export async function bulkCreateDomains(data: {
 
     await pipeline(
       domainCopyStream(cleanDomains),
-      client.query(copyFrom('COPY tmp_sync_domains (domain) FROM STDIN WITH (FORMAT csv)'))
+      client.query(copyFrom('COPY tmp_sync_domains (domain) FROM STDIN WITH (FORMAT csv)')),
     );
-    await data.onPhaseProgress?.(0.4, `Đã tải ${cleanDomains.length.toLocaleString('vi-VN')} domain vào bảng tạm — đang ghi vào bảng domains...`);
+    await data.onPhaseProgress?.(
+      0.4,
+      `Đã tải ${cleanDomains.length.toLocaleString('vi-VN')} domain vào bảng tạm — đang ghi vào bảng domains...`,
+    );
 
     // "Existing" now means "already in THIS category, FROM THIS SOURCE" —
     // not just "the domain row already exists" or even "already in this
@@ -1175,7 +1241,7 @@ export async function bulkCreateDomains(data: {
          JOIN domain_categories dc ON dc.domain_id = d.id
          WHERE d.domain = t.domain AND dc.category_id = $1 AND dc.feed_source_id IS NOT DISTINCT FROM $2
        );`,
-      [categoryId, data.feedSourceId || null]
+      [categoryId, data.feedSourceId || null],
     );
     const existingCount = Number(existingResult.rows[0].count);
     const newCount = cleanDomains.length - existingCount;
@@ -1206,7 +1272,7 @@ export async function bulkCreateDomains(data: {
            AND NOT (dc.category_id = $1 AND dc.feed_source_id IS NOT DISTINCT FROM $2)
            AND (dc.feed_source_id IS NULL OR fs2.is_paused = false)
        );`,
-      [categoryId, data.feedSourceId || null]
+      [categoryId, data.feedSourceId || null],
     );
     const stillBackedElsewhereCount = Number(stillBackedElsewhereResult.rows[0].count);
 
@@ -1391,7 +1457,11 @@ export async function bulkUpdateDomains(params: {
         // is now genuinely "thêm vào nhóm", not a move.
         await addDomainCategoryMemberships(
           tx,
-          domainIds.map((domainId) => ({ domainId, categoryId: category, sourceLabel: reason || 'Bulk action' }))
+          domainIds.map((domainId) => ({
+            domainId,
+            categoryId: category,
+            sourceLabel: reason || 'Bulk action',
+          })),
         );
       }
 
@@ -1464,13 +1534,22 @@ export async function getCategories() {
 // several categories at once, so this must check the whole array.
 export async function getBlocklistTextForCategory(categoryId: string): Promise<string | null> {
   try {
-    const cat = await db.select({ id: categories.id }).from(categories).where(eq(categories.id, categoryId)).limit(1);
+    const cat = await db
+      .select({ id: categories.id })
+      .from(categories)
+      .where(eq(categories.id, categoryId))
+      .limit(1);
     if (!cat[0]) return null;
 
     const rows = await db
       .select({ domain: domains.domain })
       .from(domains)
-      .where(and(eq(domains.status, 'active'), sql`${domains.categories} @> ${JSON.stringify([categoryId])}::jsonb`))
+      .where(
+        and(
+          eq(domains.status, 'active'),
+          sql`${domains.categories} @> ${JSON.stringify([categoryId])}::jsonb`,
+        ),
+      )
       .orderBy(domains.domain);
 
     return rows.map((r) => r.domain).join('\n') + (rows.length > 0 ? '\n' : '');
@@ -1538,7 +1617,7 @@ export async function createCategory(data: {
 
 export async function updateCategory(
   id: string,
-  patch: { name?: string; description?: string; color?: string; deltaThreshold?: number }
+  patch: { name?: string; description?: string; color?: string; deltaThreshold?: number },
 ) {
   try {
     const setValues: Record<string, any> = { updatedAt: new Date() };
@@ -1575,7 +1654,7 @@ export async function deleteCategory(id: string) {
         .where(eq(domainCategories.categoryId, id));
       const count = Number(countRes[0]?.count || 0);
       throw new Error(
-        `Không thể xoá nhóm "${id}" vì vẫn còn ${count} tên miền thuộc nhóm này. Vui lòng chuyển các tên miền sang nhóm khác trước.`
+        `Không thể xoá nhóm "${id}" vì vẫn còn ${count} tên miền thuộc nhóm này. Vui lòng chuyển các tên miền sang nhóm khác trước.`,
       );
     }
     console.error('deleteCategory failed:', error);
@@ -1615,7 +1694,11 @@ export async function createFeedSource(data: {
     // instead, same pattern already used for bulkCreateDomains/
     // addDomainCategoryMemberships (see the DB audit's own finding on this
     // inconsistency).
-    const cat = await db.select({ id: categories.id }).from(categories).where(eq(categories.id, data.category)).limit(1);
+    const cat = await db
+      .select({ id: categories.id })
+      .from(categories)
+      .where(eq(categories.id, data.category))
+      .limit(1);
     if (!cat[0]) {
       throw new Error(`Nhóm danh mục không tồn tại: ${data.category}. Vui lòng chọn lại nhóm hợp lệ.`);
     }
@@ -1698,7 +1781,9 @@ export async function recoverInterruptedSyncs() {
       .where(eq(feedSources.status, 'syncing'))
       .returning({ id: feedSources.id, name: feedSources.name });
     if (recovered.length > 0) {
-      console.log(`Đã khôi phục ${recovered.length} nguồn feed bị kẹt ở trạng thái "syncing" từ phiên chạy trước: ${recovered.map((r) => r.name).join(', ')}`);
+      console.log(
+        `Đã khôi phục ${recovered.length} nguồn feed bị kẹt ở trạng thái "syncing" từ phiên chạy trước: ${recovered.map((r) => r.name).join(', ')}`,
+      );
     }
   } catch (error) {
     console.error('recoverInterruptedSyncs failed:', error);
@@ -1724,7 +1809,9 @@ export async function migrateAwayFromGracePeriod() {
       .where(eq(domains.status, 'grace_period'))
       .returning({ id: domains.id });
     if (migrated.length > 0) {
-      console.log(`Đã chuyển ${migrated.length} tên miền từ trạng thái "grace_period" (đã loại bỏ) sang "active".`);
+      console.log(
+        `Đã chuyển ${migrated.length} tên miền từ trạng thái "grace_period" (đã loại bỏ) sang "active".`,
+      );
     }
   } catch (error) {
     console.error('migrateAwayFromGracePeriod failed:', error);
@@ -1799,7 +1886,13 @@ export async function startFeedSourceSync(id: string, actingUser?: { email?: str
   activeSyncs.add(id);
   const started = await db
     .update(feedSources)
-    .set({ status: 'syncing', syncProgress: 0, syncPhase: 'Đang kết nối...', errorMessage: null, updatedAt: new Date() })
+    .set({
+      status: 'syncing',
+      syncProgress: 0,
+      syncPhase: 'Đang kết nối...',
+      errorMessage: null,
+      updatedAt: new Date(),
+    })
     .where(eq(feedSources.id, id))
     .returning();
 
@@ -1817,7 +1910,11 @@ async function setSyncProgress(id: string, progress: number, phase: string) {
   try {
     await db
       .update(feedSources)
-      .set({ syncProgress: Math.max(0, Math.min(100, Math.round(progress))), syncPhase: phase, updatedAt: new Date() })
+      .set({
+        syncProgress: Math.max(0, Math.min(100, Math.round(progress))),
+        syncPhase: phase,
+        updatedAt: new Date(),
+      })
       .where(eq(feedSources.id, id));
   } catch (error) {
     // Progress updates are best-effort — never let a progress-write failure
@@ -1842,7 +1939,13 @@ async function runFeedSourceSyncJob(id: string, actingUser?: { email?: string; r
   const fail = async (message: string) => {
     await db
       .update(feedSources)
-      .set({ status: 'error', errorMessage: message, syncProgress: 0, syncPhase: null, updatedAt: new Date() })
+      .set({
+        status: 'error',
+        errorMessage: message,
+        syncProgress: 0,
+        syncPhase: null,
+        updatedAt: new Date(),
+      })
       .where(eq(feedSources.id, id));
   };
 
@@ -1889,7 +1992,9 @@ async function runFeedSourceSyncJob(id: string, actingUser?: { email?: string; r
 
       const contentLength = Number(response.headers.get('content-length') || 0);
       if (contentLength > MAX_FEED_BYTES) {
-        throw new Error(`Feed quá lớn (${(contentLength / 1024 / 1024).toFixed(0)} MB > giới hạn ${MAX_FEED_BYTES / 1024 / 1024} MB).`);
+        throw new Error(
+          `Feed quá lớn (${(contentLength / 1024 / 1024).toFixed(0)} MB > giới hạn ${MAX_FEED_BYTES / 1024 / 1024} MB).`,
+        );
       }
       if (response.body) {
         // Stream the body manually so real bytes-received progress is
@@ -1915,12 +2020,20 @@ async function runFeedSourceSyncJob(id: string, actingUser?: { email?: string; r
               // moves, so a fast local feed doesn't spam updates.
               if (Math.floor(percent) !== lastReportedPercent) {
                 lastReportedPercent = Math.floor(percent);
-                await setSyncProgress(id, percent, `Đang tải dữ liệu (${(received / 1024).toFixed(0)} KB / ${(contentLength / 1024).toFixed(0)} KB)...`);
+                await setSyncProgress(
+                  id,
+                  percent,
+                  `Đang tải dữ liệu (${(received / 1024).toFixed(0)} KB / ${(contentLength / 1024).toFixed(0)} KB)...`,
+                );
               }
             } else {
               // No Content-Length header — report bytes received without a
               // denominator instead of a fake percentage.
-              await setSyncProgress(id, Math.min(45, received / 20_000), `Đang tải dữ liệu (${(received / 1024).toFixed(0)} KB)...`);
+              await setSyncProgress(
+                id,
+                Math.min(45, received / 20_000),
+                `Đang tải dữ liệu (${(received / 1024).toFixed(0)} KB)...`,
+              );
             }
           }
         }
@@ -1964,7 +2077,11 @@ async function runFeedSourceSyncJob(id: string, actingUser?: { email?: string; r
       return;
     }
 
-    await setSyncProgress(id, 58, `Đã phân tích ${parsedDomains.length.toLocaleString('vi-VN')} domain — đang kiểm tra trùng lặp và ghi vào CyberDNSTIP-DB...`);
+    await setSyncProgress(
+      id,
+      58,
+      `Đã phân tích ${parsedDomains.length.toLocaleString('vi-VN')} domain — đang kiểm tra trùng lặp và ghi vào CyberDNSTIP-DB...`,
+    );
 
     // Re-check isPaused right before writing anything: phases 1-2 above
     // (download + parse) can take up to the full 120s fetch timeout, during
@@ -1974,7 +2091,11 @@ async function runFeedSourceSyncJob(id: string, actingUser?: { email?: string; r
     // paused — violating pauseFeedSource's own documented invariant (every
     // domain this source owns moves to unblocked the moment it's paused).
     // See the DB audit's own finding on this race.
-    const pauseCheck1 = await db.select({ isPaused: feedSources.isPaused }).from(feedSources).where(eq(feedSources.id, id)).limit(1);
+    const pauseCheck1 = await db
+      .select({ isPaused: feedSources.isPaused })
+      .from(feedSources)
+      .where(eq(feedSources.id, id))
+      .limit(1);
     if (pauseCheck1[0]?.isPaused) {
       await db
         .update(feedSources)
@@ -2025,7 +2146,11 @@ async function runFeedSourceSyncJob(id: string, actingUser?: { email?: string; r
     // the exact same "no other active backing" unblock logic pauseFeedSource
     // itself uses, instead of leaving this run's freshly-written domains
     // active under a paused source.
-    const pauseCheck2 = await db.select({ isPaused: feedSources.isPaused }).from(feedSources).where(eq(feedSources.id, id)).limit(1);
+    const pauseCheck2 = await db
+      .select({ isPaused: feedSources.isPaused })
+      .from(feedSources)
+      .where(eq(feedSources.id, id))
+      .limit(1);
     if (pauseCheck2[0]?.isPaused) {
       const { toUnblock: retroDomainIds } = await getDomainIdsToUnblockForFeedSource(id);
       if (retroDomainIds.length > 0) {
@@ -2071,7 +2196,8 @@ async function runFeedSourceSyncJob(id: string, actingUser?: { email?: string; r
         // this source (would unblock on a future pause) vs. still backed by
         // something else active (would stay blocked) — same predicate
         // pauseFeedSource itself uses, computed up front.
-        lastSyncMessage: `Đã nạp ${parsedDomains.length.toLocaleString('vi-VN')} domain — ` +
+        lastSyncMessage:
+          `Đã nạp ${parsedDomains.length.toLocaleString('vi-VN')} domain — ` +
           (result.stillBackedElsewhereCount > 0
             ? `${result.soleOwnerCount.toLocaleString('vi-VN')} domain CHỈ do nguồn này chặn (sẽ thôi chặn nếu tạm dừng nguồn này), ${result.stillBackedElsewhereCount.toLocaleString('vi-VN')} domain còn được nhóm/nguồn KHÁC đang hoạt động chặn (sẽ TIẾP TỤC bị chặn nếu tạm dừng nguồn này).`
             : `toàn bộ hiện chỉ do nguồn này chặn (sẽ thôi chặn hết nếu tạm dừng nguồn này).`),
@@ -2134,7 +2260,7 @@ async function getDomainIdsForFeedSource(feedSourceId: string, executor: Executo
 // than just a bare count.
 async function getDomainIdsToUnblockForFeedSource(
   feedSourceId: string,
-  executor: Executor = db
+  executor: Executor = db,
 ): Promise<{ toUnblock: number[]; totalLinked: number }> {
   const totalLinked = await getDomainIdsForFeedSource(feedSourceId, executor);
   if (totalLinked.length === 0) return { toUnblock: [], totalLinked: 0 };
@@ -2251,7 +2377,13 @@ export async function resumeFeedSource(id: string, userEmail: string) {
           const updated = await tx
             .update(domains)
             .set({ status: 'active', unblockedBySourcePause: false, updatedAt: new Date() })
-            .where(and(inArray(domains.id, chunk), eq(domains.status, 'unblocked'), eq(domains.unblockedBySourcePause, true)))
+            .where(
+              and(
+                inArray(domains.id, chunk),
+                eq(domains.status, 'unblocked'),
+                eq(domains.unblockedBySourcePause, true),
+              ),
+            )
             .returning({ id: domains.id });
           affectedCount += updated.length;
         }
@@ -2366,7 +2498,7 @@ export async function bulkCreateReviewItems(data: {
   // exact same key a feed would produce, and outright junk is dropped here
   // rather than written into review_queue as a bogus item (LOGIC-11).
   const cleanDomains = Array.from(
-    new Set(data.domains.map((d) => normalizeDomain(d)).filter((d): d is string => d !== null))
+    new Set(data.domains.map((d) => normalizeDomain(d)).filter((d): d is string => d !== null)),
   );
   if (cleanDomains.length === 0) return { insertedCount: 0, skippedCount: 0 };
 
@@ -2403,7 +2535,7 @@ export async function bulkCreateReviewItems(data: {
           threatScore: 0.5,
           queryCount24h: 0,
           evidenceNotes: '',
-        }))
+        })),
       )
       .returning({ id: reviewQueue.id });
     inserted += result.length;
@@ -2511,7 +2643,7 @@ export async function resolveReviewItem(
   decision: 'approved' | 'rejected',
   reviewerEmail: string,
   categoryOverride?: string,
-  reviewerRole?: string
+  reviewerRole?: string,
 ) {
   try {
     // Bolted together as ONE transaction: the review-queue status flip and
@@ -2532,7 +2664,9 @@ export async function resolveReviewItem(
         throw new Error(`Mục duyệt id ${id} không tồn tại.`);
       }
       if (row.status !== 'pending') {
-        throw new Error(`Mục duyệt này đã được xử lý (${row.status === 'approved' ? 'đã duyệt' : 'đã từ chối'}).`);
+        throw new Error(
+          `Mục duyệt này đã được xử lý (${row.status === 'approved' ? 'đã duyệt' : 'đã từ chối'}).`,
+        );
       }
       // `reportedBy` embeds the proposer's email (e.g. "Thủ công: a@b.com",
       // "Nhập hàng loạt: a@b.com"). A reviewer must not confirm their own
@@ -2594,7 +2728,7 @@ export async function resolveReviewItem(
             userRole: reviewerRole,
             feedSourceId: item[0].feedSourceId || undefined,
           },
-          tx
+          tx,
         );
       }
 
@@ -2650,7 +2784,9 @@ export async function rollbackAuditLog(logId: number, userEmail: string, reason?
     }
     const data = log.rollbackData as Record<string, any> | null;
     if (!data) {
-      throw new Error('Giao dịch này không có dữ liệu để hoàn tác (được ghi trước khi tính năng Hoàn tác hỗ trợ việc này).');
+      throw new Error(
+        'Giao dịch này không có dữ liệu để hoàn tác (được ghi trước khi tính năng Hoàn tác hỗ trợ việc này).',
+      );
     }
 
     // Everything below runs as ONE transaction: the forward mutations were
@@ -2673,7 +2809,11 @@ export async function rollbackAuditLog(logId: number, userEmail: string, reason?
         if (toAdd.length > 0) {
           await addDomainCategoryMemberships(
             tx,
-            toAdd.map((categoryId) => ({ domainId: data.domainId, categoryId, sourceLabel: 'Hoàn tác (Rollback)' }))
+            toAdd.map((categoryId) => ({
+              domainId: data.domainId,
+              categoryId,
+              sourceLabel: 'Hoàn tác (Rollback)',
+            })),
           );
         }
         for (const categoryId of toRemove) {
@@ -2699,7 +2839,11 @@ export async function rollbackAuditLog(logId: number, userEmail: string, reason?
 
         summary = `Hoàn tác cập nhật tên miền: ${target[0].domain}`;
       } else if (data.type === 'add') {
-        const target = await tx.select({ domain: domains.domain }).from(domains).where(eq(domains.id, data.domainId)).limit(1);
+        const target = await tx
+          .select({ domain: domains.domain })
+          .from(domains)
+          .where(eq(domains.id, data.domainId))
+          .limit(1);
         if (!target[0]) throw new Error('Tên miền không còn tồn tại — không thể hoàn tác.');
 
         // existedBefore: restore its real prior status. Otherwise this domain
@@ -2844,7 +2988,7 @@ export async function createDnsNode(
     status?: string;
     notes?: string | null;
   },
-  actingUser: { email?: string; role?: string } = {}
+  actingUser: { email?: string; role?: string } = {},
 ) {
   const ipAddress = data.ipAddress?.trim() || null;
   const ipv6Address = data.ipv6Address?.trim() || null;
@@ -2890,7 +3034,9 @@ export async function createDnsNode(
       throw new Error(`Địa chỉ IPv4 "${ipAddress}" đã được đăng ký cho một node khác.`);
     }
     console.error('createDnsNode failed:', error);
-    throw error instanceof Error && !error.cause ? error : new Error('Failed to create DNS node', { cause: error });
+    throw error instanceof Error && !error.cause
+      ? error
+      : new Error('Failed to create DNS node', { cause: error });
   }
 }
 
@@ -2909,7 +3055,7 @@ export async function updateDnsNode(
     status?: string;
     notes?: string | null;
   },
-  actingUser: { email?: string; role?: string } = {}
+  actingUser: { email?: string; role?: string } = {},
 ) {
   try {
     return await db.transaction(async (tx) => {
@@ -2965,7 +3111,9 @@ export async function updateDnsNode(
       throw new Error(`Địa chỉ IPv4 "${patch.ipAddress}" đã được đăng ký cho một node khác.`);
     }
     console.error('updateDnsNode failed:', error);
-    throw error instanceof Error && !error.cause ? error : new Error('Failed to update DNS node', { cause: error });
+    throw error instanceof Error && !error.cause
+      ? error
+      : new Error('Failed to update DNS node', { cause: error });
   }
 }
 
@@ -2991,7 +3139,9 @@ export async function deleteDnsNode(id: number, actingUser: { email?: string; ro
     });
   } catch (error) {
     console.error('deleteDnsNode failed:', error);
-    throw error instanceof Error && !error.cause ? error : new Error('Failed to delete DNS node', { cause: error });
+    throw error instanceof Error && !error.cause
+      ? error
+      : new Error('Failed to delete DNS node', { cause: error });
   }
 }
 
@@ -3000,14 +3150,21 @@ export async function deleteDnsNode(id: number, actingUser: { email?: string; ro
 // step beyond `db:push` creating the table itself.
 export async function getAclSettings() {
   try {
-    const existing = await db.select().from(blocklistAclSettings).where(eq(blocklistAclSettings.id, 1)).limit(1);
+    const existing = await db
+      .select()
+      .from(blocklistAclSettings)
+      .where(eq(blocklistAclSettings.id, 1))
+      .limit(1);
     if (existing[0]) return existing[0];
     const created = await db
       .insert(blocklistAclSettings)
       .values({ id: 1, enforceEnabled: false })
       .onConflictDoNothing()
       .returning();
-    return created[0] || (await db.select().from(blocklistAclSettings).where(eq(blocklistAclSettings.id, 1)).limit(1))[0];
+    return (
+      created[0] ||
+      (await db.select().from(blocklistAclSettings).where(eq(blocklistAclSettings.id, 1)).limit(1))[0]
+    );
   } catch (error) {
     console.error('getAclSettings failed:', error);
     throw new Error('Failed to read ACL settings', { cause: error });
@@ -3074,7 +3231,7 @@ export async function getUnknownRequesters(limit: number = 100) {
 //   the switch's position), and allowed only when enforcement is off.
 export async function evaluateBlocklistAccess(
   ipAddress: string,
-  category: string
+  category: string,
 ): Promise<{ allowed: boolean; isKnownNode: boolean }> {
   try {
     // Matches against EITHER address column — a node registered with only
@@ -3087,8 +3244,8 @@ export async function evaluateBlocklistAccess(
       .where(
         and(
           or(eq(dnsNodes.ipAddress, ipAddress), eq(dnsNodes.ipv6Address, ipAddress)),
-          eq(dnsNodes.status, 'active')
-        )
+          eq(dnsNodes.status, 'active'),
+        ),
       )
       .limit(1);
     if (match[0]) return { allowed: true, isKnownNode: true };

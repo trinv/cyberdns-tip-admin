@@ -15,11 +15,14 @@ interface ConfirmModalProps {
   onCancel: () => void;
 }
 
-const TONE_STYLES: Record<ConfirmTone, {
-  iconWrap: string;
-  icon: React.ElementType;
-  confirmBtn: string;
-}> = {
+const TONE_STYLES: Record<
+  ConfirmTone,
+  {
+    iconWrap: string;
+    icon: React.ElementType;
+    confirmBtn: string;
+  }
+> = {
   danger: {
     iconWrap: 'bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400',
     icon: AlertTriangle,
@@ -61,7 +64,9 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden text-xs text-slate-700 dark:text-slate-300 animate-in fade-in zoom-in-95 duration-150">
         <div className="p-6 space-y-4">
           <div className="flex items-start justify-between">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${iconWrap}`}>
+            <div
+              className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${iconWrap}`}
+            >
               <ToneIcon className="w-5 h-5" />
             </div>
             <button

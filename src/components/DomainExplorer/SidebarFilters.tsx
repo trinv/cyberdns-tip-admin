@@ -124,11 +124,13 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
               <span className="w-2.5 h-2.5 rounded-full bg-slate-400 dark:bg-slate-500"></span>
               <span className="truncate">Tất cả nhóm</span>
             </div>
-            <span className={`font-mono text-xs px-1.5 py-0.5 rounded ${
-              selectedCategory === 'all' 
-                ? 'bg-emerald-100/80 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 font-bold' 
-                : 'text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800'
-            }`}>
+            <span
+              className={`font-mono text-xs px-1.5 py-0.5 rounded ${
+                selectedCategory === 'all'
+                  ? 'bg-emerald-100/80 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 font-bold'
+                  : 'text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800'
+              }`}
+            >
               {formatNumber(allCategoriesCount)}
             </span>
           </button>
@@ -162,11 +164,13 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
                   ></span>
                   <span className="truncate">{cat.name}</span>
                 </div>
-                <span className={`font-mono text-xs px-1.5 py-0.5 rounded ${
-                  isSelected 
-                    ? 'bg-emerald-100/80 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 font-bold' 
-                    : 'text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800'
-                }`}>
+                <span
+                  className={`font-mono text-xs px-1.5 py-0.5 rounded ${
+                    isSelected
+                      ? 'bg-emerald-100/80 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 font-bold'
+                      : 'text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800'
+                  }`}
+                >
                   {formatNumber(cat.count)}
                 </span>
               </button>
@@ -216,7 +220,9 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
                 }`}
               >
                 <span className="flex flex-col min-w-0 truncate">
-                  <span className={`truncate ${isOn ? 'text-emerald-700 dark:text-emerald-300 font-bold' : 'text-slate-700 dark:text-slate-300 font-semibold'}`}>
+                  <span
+                    className={`truncate ${isOn ? 'text-emerald-700 dark:text-emerald-300 font-bold' : 'text-slate-700 dark:text-slate-300 font-semibold'}`}
+                  >
                     {opt.label}
                   </span>
                   <span className="font-mono text-xs text-slate-400 dark:text-slate-500">
@@ -275,9 +281,7 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
                 }`}
               >
                 <span className="truncate">{sf.name}</span>
-                <span className="font-mono text-xs text-slate-400 dark:text-slate-500 ml-1">
-                  {sf.count}
-                </span>
+                <span className="font-mono text-xs text-slate-400 dark:text-slate-500 ml-1">{sf.count}</span>
               </button>
             );
           })}
@@ -299,7 +303,7 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
       {/* Mobile Drawer */}
       {isOpenMobile && (
         <>
-          <div 
+          <div
             onClick={onCloseMobile}
             className="lg:hidden fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 animate-in fade-in duration-200"
           />

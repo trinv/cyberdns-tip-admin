@@ -31,7 +31,7 @@ export const LoginHistoryView: React.FC = () => {
   const filteredLogs = logs.filter(
     (l) =>
       l.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      l.ipAddress.toLowerCase().includes(searchTerm.toLowerCase())
+      l.ipAddress.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   const newIpCount = logs.filter((l) => l.success && l.isNewIp).length;
@@ -96,17 +96,25 @@ export const LoginHistoryView: React.FC = () => {
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono text-slate-700 dark:text-slate-300">
               {filteredLogs.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-5 py-8 text-center text-slate-400 dark:text-slate-500 font-sans">
+                  <td
+                    colSpan={5}
+                    className="px-5 py-8 text-center text-slate-400 dark:text-slate-500 font-sans"
+                  >
                     {isLoading ? 'Đang tải...' : 'Chưa có lượt đăng nhập nào được ghi nhận.'}
                   </td>
                 </tr>
               )}
               {filteredLogs.map((log) => (
-                <tr key={log.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
+                <tr
+                  key={log.id}
+                  className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
+                >
                   <td className="px-5 py-3.5 text-slate-400 dark:text-slate-500 whitespace-nowrap">
                     {new Date(log.createdAt).toLocaleString('vi-VN')}
                   </td>
-                  <td className="px-5 py-3.5 font-sans font-semibold text-slate-800 dark:text-slate-200">{log.email}</td>
+                  <td className="px-5 py-3.5 font-sans font-semibold text-slate-800 dark:text-slate-200">
+                    {log.email}
+                  </td>
                   <td className="px-5 py-3.5">
                     <div className="flex items-center space-x-1.5">
                       <MapPin className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 flex-shrink-0" />
@@ -118,7 +126,10 @@ export const LoginHistoryView: React.FC = () => {
                       )}
                     </div>
                   </td>
-                  <td className="px-5 py-3.5 text-slate-500 dark:text-slate-400 max-w-xs truncate font-sans" title={log.userAgent || ''}>
+                  <td
+                    className="px-5 py-3.5 text-slate-500 dark:text-slate-400 max-w-xs truncate font-sans"
+                    title={log.userAgent || ''}
+                  >
                     {log.userAgent || '—'}
                   </td>
                   <td className="px-5 py-3.5">

@@ -5,10 +5,15 @@ import { UserPlus, ShieldCheck, ShieldOff, KeyRound, X } from 'lucide-react';
 interface UserManagementViewProps {
   users: AppUser[];
   currentUserId: number | null;
-  onCreateUser: (data: { email: string; password: string; displayName?: string; role?: string }) => Promise<void>;
+  onCreateUser: (data: {
+    email: string;
+    password: string;
+    displayName?: string;
+    role?: string;
+  }) => Promise<void>;
   onUpdateUser: (
     id: number,
-    patch: { role?: string; isActive?: boolean; displayName?: string; password?: string }
+    patch: { role?: string; isActive?: boolean; displayName?: string; password?: string },
   ) => Promise<void>;
 }
 
@@ -55,7 +60,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({
             <span>Quản lý người dùng & phân quyền</span>
           </h1>
           <p className="text-slate-500 dark:text-slate-400 text-xs mt-1">
-            Tạo tài khoản mới, đổi vai trò, hoặc thu hồi quyền truy cập. 
+            Tạo tài khoản mới, đổi vai trò, hoặc thu hồi quyền truy cập.
           </p>
         </div>
         <button
@@ -94,7 +99,10 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({
                     <td className="px-4 py-3">
                       <div className="font-bold text-slate-800 dark:text-slate-200 font-mono">{u.email}</div>
                       <div className="text-slate-400 dark:text-slate-500">
-                        {u.displayName || '—'} {isSelf && <span className="text-emerald-600 dark:text-emerald-400 font-semibold">(bạn)</span>}
+                        {u.displayName || '—'}{' '}
+                        {isSelf && (
+                          <span className="text-emerald-600 dark:text-emerald-400 font-semibold">(bạn)</span>
+                        )}
                       </div>
                     </td>
                     <td className="px-4 py-3">
@@ -190,7 +198,9 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/40">
-              <h2 className="text-base font-bold text-slate-900 dark:text-white font-sans">Tạo tài khoản mới</h2>
+              <h2 className="text-base font-bold text-slate-900 dark:text-white font-sans">
+                Tạo tài khoản mới
+              </h2>
               <button
                 onClick={() => setIsCreateOpen(false)}
                 className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
@@ -210,7 +220,9 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({
                 />
               </div>
               <div className="space-y-1">
-                <label className="block text-slate-800 dark:text-slate-200 font-bold text-xs">Mật khẩu tạm thời</label>
+                <label className="block text-slate-800 dark:text-slate-200 font-bold text-xs">
+                  Mật khẩu tạm thời
+                </label>
                 <input
                   type="text"
                   required
@@ -221,7 +233,9 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({
                 />
               </div>
               <div className="space-y-1">
-                <label className="block text-slate-800 dark:text-slate-200 font-bold text-xs">Tên hiển thị</label>
+                <label className="block text-slate-800 dark:text-slate-200 font-bold text-xs">
+                  Tên hiển thị
+                </label>
                 <input
                   type="text"
                   value={displayName}

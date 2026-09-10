@@ -74,7 +74,8 @@ function embeddedV4(addr: string): string | null {
 function isBlockedV6(ip: string): boolean {
   const addr = ip.toLowerCase().split('%')[0]; // drop any zone id
   if (addr === '::1' || addr === '::') return true;
-  if (addr.startsWith('fe80:') || addr.startsWith('fe9') || addr.startsWith('fea') || addr.startsWith('feb')) return true; // link-local fe80::/10
+  if (addr.startsWith('fe80:') || addr.startsWith('fe9') || addr.startsWith('fea') || addr.startsWith('feb'))
+    return true; // link-local fe80::/10
   if (addr.startsWith('fc') || addr.startsWith('fd')) return true; // ULA fc00::/7
   if (addr.startsWith('ff')) return true; // multicast
   if (addr.startsWith('2001:db8:')) return true; // documentation
@@ -90,10 +91,14 @@ function isBlockedV6(ip: string): boolean {
 function assertIpAllowed(ip: string, host: string) {
   const kind = isIP(ip);
   if (kind === 4 && isBlockedV4(ip)) {
-    throw new SsrfBlockedError(`Địa chỉ đích không hợp lệ cho feed URL: ${host} → ${ip} (dải nội bộ/dành riêng).`);
+    throw new SsrfBlockedError(
+      `Địa chỉ đích không hợp lệ cho feed URL: ${host} → ${ip} (dải nội bộ/dành riêng).`,
+    );
   }
   if (kind === 6 && isBlockedV6(ip)) {
-    throw new SsrfBlockedError(`Địa chỉ đích không hợp lệ cho feed URL: ${host} → ${ip} (dải nội bộ/dành riêng).`);
+    throw new SsrfBlockedError(
+      `Địa chỉ đích không hợp lệ cho feed URL: ${host} → ${ip} (dải nội bộ/dành riêng).`,
+    );
   }
   if (kind === 0) {
     throw new SsrfBlockedError(`Không phân giải được địa chỉ hợp lệ cho ${host}.`);
@@ -157,7 +162,10 @@ export async function assertResolvesToPublic(url: URL): Promise<void> {
  * redirect hop) resolves to a public address before connecting. Redirects
  * are followed manually so each new Location can be re-checked.
  */
-export async function safeFeedFetch(rawUrl: string, init: RequestInit & { signal?: AbortSignal }): Promise<Response> {
+export async function safeFeedFetch(
+  rawUrl: string,
+  init: RequestInit & { signal?: AbortSignal },
+): Promise<Response> {
   let current = assertPublicFeedUrl(rawUrl);
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     await assertResolvesToPublic(current);

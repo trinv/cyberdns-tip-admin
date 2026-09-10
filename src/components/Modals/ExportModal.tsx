@@ -1,5 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { X, Download, Copy, Check, FileText, Code2, Database, Shield, FileSpreadsheet, Loader2, AlertTriangle } from 'lucide-react';
+import {
+  X,
+  Download,
+  Copy,
+  Check,
+  FileText,
+  Code2,
+  Database,
+  Shield,
+  FileSpreadsheet,
+  Loader2,
+  AlertTriangle,
+} from 'lucide-react';
 import { DomainItem } from '../../types';
 import { copyToClipboard } from '../../lib/clipboard';
 
@@ -59,15 +71,24 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     setIsLoadingAll(true);
     setLoadError(null);
     fetchAllFilteredDomains()
-      .then((list) => { if (!cancelled) setAllFilteredDomains(list); })
-      .catch((err) => { if (!cancelled) setLoadError(err?.message || 'Không thể tải toàn bộ danh sách — vui lòng thử lại.'); })
-      .finally(() => { if (!cancelled) setIsLoadingAll(false); });
-    return () => { cancelled = true; };
+      .then((list) => {
+        if (!cancelled) setAllFilteredDomains(list);
+      })
+      .catch((err) => {
+        if (!cancelled) setLoadError(err?.message || 'Không thể tải toàn bộ danh sách — vui lòng thử lại.');
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingAll(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [isOpen, scope, allFilteredDomains, isLoadingAll, fetchAllFilteredDomains]);
 
   if (!isOpen) return null;
 
-  const targetList = scope === 'selected' && selectedDomains.length > 0 ? selectedDomains : (allFilteredDomains || []);
+  const targetList =
+    scope === 'selected' && selectedDomains.length > 0 ? selectedDomains : allFilteredDomains || [];
   const isReady = scope === 'selected' ? true : allFilteredDomains !== null;
 
   // Generate file content based on selected format
@@ -85,9 +106,12 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
       case 'csv': {
         const header = 'domain,etld1,tld,primary_category,categories,status,first_seen,last_seen\n';
-        const rows = targetList.map((d) =>
-          `"${d.domain}","${d.etld1}","${d.tld}","${d.primaryCategory}","${d.categories.join(';')}","${d.status}","${d.firstSeen}","${d.lastSeen}"`
-        ).join('\n');
+        const rows = targetList
+          .map(
+            (d) =>
+              `"${d.domain}","${d.etld1}","${d.tld}","${d.primaryCategory}","${d.categories.join(';')}","${d.status}","${d.firstSeen}","${d.lastSeen}"`,
+          )
+          .join('\n');
         return header + rows;
       }
 
@@ -295,7 +319,9 @@ export const ExportModal: React.FC<ExportModalProps> = ({
           {/* Scope selection */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50/80 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 rounded-xl p-3">
             <div className="space-y-1">
-              <label className="block font-bold text-slate-800 dark:text-slate-200 text-xs">PHẠM VI DỮ LIỆU</label>
+              <label className="block font-bold text-slate-800 dark:text-slate-200 text-xs">
+                PHẠM VI DỮ LIỆU
+              </label>
               <div className="flex flex-wrap items-center gap-3">
                 <label className="flex items-center space-x-1.5 cursor-pointer font-medium">
                   <input
@@ -305,7 +331,9 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                     onChange={() => setScope('filtered')}
                     className="accent-emerald-600"
                   />
-                  <span>Toàn bộ danh mục đang chọn ({totalFilteredCount.toLocaleString('vi-VN')} domain)</span>
+                  <span>
+                    Toàn bộ danh mục đang chọn ({totalFilteredCount.toLocaleString('vi-VN')} domain)
+                  </span>
                 </label>
                 {selectedCount > 0 && (
                   <label className="flex items-center space-x-1.5 cursor-pointer font-medium text-emerald-600 dark:text-emerald-400">
@@ -344,14 +372,20 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                 disabled={!isReady}
                 className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 font-semibold flex items-center space-x-1 cursor-pointer text-xs disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                {copied ? (
+                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                ) : (
+                  <Copy className="w-3.5 h-3.5" />
+                )}
                 <span>{copied ? 'Đã sao chép!' : 'Sao chép nhanh'}</span>
               </button>
             </div>
             {isLoadingAll ? (
               <div className="bg-slate-950 text-slate-400 font-mono text-xs p-3.5 rounded-xl h-24 flex items-center justify-center space-x-2 border border-slate-800">
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Đang tải toàn bộ {totalFilteredCount.toLocaleString('vi-VN')} domain của danh mục...</span>
+                <span>
+                  Đang tải toàn bộ {totalFilteredCount.toLocaleString('vi-VN')} domain của danh mục...
+                </span>
               </div>
             ) : loadError ? (
               <div className="bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 font-mono text-xs p-3.5 rounded-xl border border-rose-200 dark:border-rose-800 flex items-center justify-between gap-3">

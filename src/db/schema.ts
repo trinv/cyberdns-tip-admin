@@ -17,22 +17,19 @@ import {
 // src/lib/password.ts). isActive is the revoke switch: a deactivated
 // account's existing sessions are rejected on their very next request (see
 // getSessionUser in queries.ts) without needing to hunt down every token.
-export const users = pgTable(
-  'users',
-  {
-    id: serial('id').primaryKey(),
-    email: text('email').notNull().unique(),
-    passwordHash: text('password_hash').notNull(),
-    displayName: text('display_name'),
-    avatarUrl: text('avatar_url'),
-    // Least-privilege default: a brand-new account must be promoted to Admin
-    // explicitly by an existing Admin — it must never be granted implicitly.
-    role: varchar('role', { length: 50 }).default('Analyst').notNull(),
-    isActive: boolean('is_active').default(true).notNull(),
-    createdAt: timestamp('created_at').defaultNow().notNull(),
-    updatedAt: timestamp('updated_at').defaultNow().notNull(),
-  }
-);
+export const users = pgTable('users', {
+  id: serial('id').primaryKey(),
+  email: text('email').notNull().unique(),
+  passwordHash: text('password_hash').notNull(),
+  displayName: text('display_name'),
+  avatarUrl: text('avatar_url'),
+  // Least-privilege default: a brand-new account must be promoted to Admin
+  // explicitly by an existing Admin — it must never be granted implicitly.
+  role: varchar('role', { length: 50 }).default('Analyst').notNull(),
+  isActive: boolean('is_active').default(true).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
 
 // 1b. Sessions — opaque bearer tokens issued on login. Deleting a row (logout)
 // or flipping users.isActive to false (revoke) invalidates access immediately;
@@ -47,7 +44,7 @@ export const sessions = pgTable(
     createdAt: timestamp('created_at').defaultNow().notNull(),
     expiresAt: timestamp('expires_at').notNull(),
   },
-  (table) => [index('sessions_user_id_idx').on(table.userId)]
+  (table) => [index('sessions_user_id_idx').on(table.userId)],
 );
 
 // 1c. Login Logs — one row per real login attempt (success AND failure),
@@ -82,26 +79,23 @@ export const loginLogs = pgTable(
   (table) => [
     index('login_logs_user_idx').on(table.userId),
     index('login_logs_created_at_idx').on(table.createdAt),
-  ]
+  ],
 );
 
 // 2. Categories Table
-export const categories = pgTable(
-  'categories',
-  {
-    id: varchar('id', { length: 100 }).primaryKey(),
-    name: text('name').notNull(),
-    description: text('description'),
-    count: integer('count').default(0).notNull(),
-    color: varchar('color', { length: 20 }).default('#10B981').notNull(),
-    borderColor: varchar('border_color', { length: 50 }).default('border-emerald-500/30').notNull(),
-    badgeBg: varchar('badge_bg', { length: 50 }).default('bg-emerald-500/10').notNull(),
-    badgeText: varchar('badge_text', { length: 50 }).default('text-emerald-500').notNull(),
-    deltaThreshold: integer('delta_threshold').default(3).notNull(), // Max allowed deletion delta %
-    createdAt: timestamp('created_at').defaultNow().notNull(),
-    updatedAt: timestamp('updated_at').defaultNow().notNull(),
-  }
-);
+export const categories = pgTable('categories', {
+  id: varchar('id', { length: 100 }).primaryKey(),
+  name: text('name').notNull(),
+  description: text('description'),
+  count: integer('count').default(0).notNull(),
+  color: varchar('color', { length: 20 }).default('#10B981').notNull(),
+  borderColor: varchar('border_color', { length: 50 }).default('border-emerald-500/30').notNull(),
+  badgeBg: varchar('badge_bg', { length: 50 }).default('bg-emerald-500/10').notNull(),
+  badgeText: varchar('badge_text', { length: 50 }).default('text-emerald-500').notNull(),
+  deltaThreshold: integer('delta_threshold').default(3).notNull(), // Max allowed deletion delta %
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
 
 // 3. Domains Table (Core Threat Intel Inventory)
 export const domains = pgTable(
@@ -145,12 +139,17 @@ export const domains = pgTable(
     // around also cost real write throughput: every domain row is smaller
     // and cheaper to insert/update without them.
     isProtected: boolean('is_protected').default(false).notNull(),
-    timeline: jsonb('timeline').$type<Array<{
-      time: string;
-      description: string;
-      source: string;
-      type: 'crawler' | 'feed' | 'manual' | 'system';
-    }>>().default([]).notNull(),
+    timeline: jsonb('timeline')
+      .$type<
+        Array<{
+          time: string;
+          description: string;
+          source: string;
+          type: 'crawler' | 'feed' | 'manual' | 'system';
+        }>
+      >()
+      .default([])
+      .notNull(),
     tags: jsonb('tags').$type<string[]>().default([]).notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -180,50 +179,47 @@ export const domains = pgTable(
     // unsorted-by-choice page load had to fully sort the entire filtered
     // result set before applying LIMIT.
     index('domains_last_seen_idx').on(table.lastSeen),
-  ]
+  ],
 );
 
 // 4. Feed Sources Table
-export const feedSources = pgTable(
-  'feed_sources',
-  {
-    id: varchar('id', { length: 100 }).primaryKey(),
-    name: text('name').notNull(),
-    url: text('url').notNull(),
-    category: varchar('category', { length: 100 }).notNull(),
-    domainCount: integer('domain_count').default(0).notNull(),
-    // Null until the source has actually been synced once — defaulting this
-    // to "now" at creation time (the old behavior) falsely implied a source
-    // had already fetched data the moment it was added.
-    lastSync: timestamp('last_sync'),
-    syncInterval: varchar('sync_interval', { length: 50 }).default('1 giờ').notNull(),
-    // 'idle' (never synced) | 'syncing' | 'healthy' | 'warning' | 'error'
-    status: varchar('status', { length: 50 }).default('idle').notNull(),
-    // Real progress while status = 'syncing', updated incrementally by the
-    // background sync job (see runFeedSourceSyncJob in queries.ts) — 0-100.
-    syncProgress: integer('sync_progress').default(0).notNull(),
-    // Human-readable current step, e.g. "Đang tải dữ liệu (42%)...",
-    // "Đang phân tích...", "Đang ghi vào CyberDNSTIP-DB (3/12)..." — null
-    // when not currently syncing.
-    syncPhase: text('sync_phase'),
-    // When true: excluded from "Đồng bộ tất cả" / the sync button is
-    // disabled, and every domain this source is currently linked to (via
-    // domain_categories.feedSourceId) has been moved to 'unblocked' — see
-    // pauseFeedSource/resumeFeedSource in queries.ts.
-    isPaused: boolean('is_paused').default(false).notNull(),
-    color: varchar('color', { length: 20 }).default('#10B981').notNull(),
-    removedToday: integer('removed_today').default(0).notNull(),
-    errorMessage: text('error_message'),
-    // Neutral (non-error) human-readable outcome of the most recent
-    // successful sync, e.g. "Đã nạp 41.485 domain — 12.300 mới, 29.185 đã
-    // tồn tại" — kept separate from errorMessage so the UI doesn't render a
-    // successful sync's summary inside a red error box.
-    lastSyncMessage: text('last_sync_message'),
-    isCustom: boolean('is_custom').default(false).notNull(),
-    createdAt: timestamp('created_at').defaultNow().notNull(),
-    updatedAt: timestamp('updated_at').defaultNow().notNull(),
-  }
-);
+export const feedSources = pgTable('feed_sources', {
+  id: varchar('id', { length: 100 }).primaryKey(),
+  name: text('name').notNull(),
+  url: text('url').notNull(),
+  category: varchar('category', { length: 100 }).notNull(),
+  domainCount: integer('domain_count').default(0).notNull(),
+  // Null until the source has actually been synced once — defaulting this
+  // to "now" at creation time (the old behavior) falsely implied a source
+  // had already fetched data the moment it was added.
+  lastSync: timestamp('last_sync'),
+  syncInterval: varchar('sync_interval', { length: 50 }).default('1 giờ').notNull(),
+  // 'idle' (never synced) | 'syncing' | 'healthy' | 'warning' | 'error'
+  status: varchar('status', { length: 50 }).default('idle').notNull(),
+  // Real progress while status = 'syncing', updated incrementally by the
+  // background sync job (see runFeedSourceSyncJob in queries.ts) — 0-100.
+  syncProgress: integer('sync_progress').default(0).notNull(),
+  // Human-readable current step, e.g. "Đang tải dữ liệu (42%)...",
+  // "Đang phân tích...", "Đang ghi vào CyberDNSTIP-DB (3/12)..." — null
+  // when not currently syncing.
+  syncPhase: text('sync_phase'),
+  // When true: excluded from "Đồng bộ tất cả" / the sync button is
+  // disabled, and every domain this source is currently linked to (via
+  // domain_categories.feedSourceId) has been moved to 'unblocked' — see
+  // pauseFeedSource/resumeFeedSource in queries.ts.
+  isPaused: boolean('is_paused').default(false).notNull(),
+  color: varchar('color', { length: 20 }).default('#10B981').notNull(),
+  removedToday: integer('removed_today').default(0).notNull(),
+  errorMessage: text('error_message'),
+  // Neutral (non-error) human-readable outcome of the most recent
+  // successful sync, e.g. "Đã nạp 41.485 domain — 12.300 mới, 29.185 đã
+  // tồn tại" — kept separate from errorMessage so the UI doesn't render a
+  // successful sync's summary inside a red error box.
+  lastSyncMessage: text('last_sync_message'),
+  isCustom: boolean('is_custom').default(false).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
 
 // 4b. Domain ↔ Category Membership (the authoritative relation)
 //
@@ -301,7 +297,7 @@ export const domainCategories = pgTable(
     // `domain_categories_domain_idx` until this fix.)
     index('domain_categories_category_idx').on(table.categoryId),
     index('domain_categories_feed_source_idx').on(table.feedSourceId),
-  ]
+  ],
 );
 
 // 5. (Release Pipeline Table removed — the whole canary/diff/safety-gate
@@ -330,7 +326,9 @@ export const reviewQueue = pgTable(
     // that path remain traceable via domain_categories.feedSourceId (see
     // resolveReviewItem), and so old pending rows from before this change
     // still carry their real provenance.
-    feedSourceId: varchar('feed_source_id', { length: 100 }).references(() => feedSources.id, { onDelete: 'set null' }),
+    feedSourceId: varchar('feed_source_id', { length: 100 }).references(() => feedSources.id, {
+      onDelete: 'set null',
+    }),
     status: varchar('status', { length: 50 }).default('pending').notNull(), // 'pending' | 'approved' | 'rejected'
     reason: text('reason').notNull(),
     screenshotUrl: text('screenshot_url'),
@@ -339,9 +337,7 @@ export const reviewQueue = pgTable(
     reviewedAt: timestamp('reviewed_at'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
-  (table) => [
-    index('review_status_idx').on(table.status),
-  ]
+  (table) => [index('review_status_idx').on(table.status)],
 );
 
 // 7. Audit Logs Table (Full SOC Governance & Rollback capability)
@@ -371,22 +367,19 @@ export const auditLogs = pgTable(
   (table) => [
     index('audit_logs_created_at_idx').on(table.createdAt),
     index('audit_logs_action_idx').on(table.action),
-  ]
+  ],
 );
 
 // 8. Saved Filters Table
-export const savedFilters = pgTable(
-  'saved_filters',
-  {
-    id: varchar('id', { length: 100 }).primaryKey(),
-    name: text('name').notNull(),
-    query: text('query').default('').notNull(),
-    category: varchar('category', { length: 100 }),
-    status: varchar('status', { length: 50 }),
-    count: integer('count').default(0).notNull(),
-    createdAt: timestamp('created_at').defaultNow().notNull(),
-  }
-);
+export const savedFilters = pgTable('saved_filters', {
+  id: varchar('id', { length: 100 }).primaryKey(),
+  name: text('name').notNull(),
+  query: text('query').default('').notNull(),
+  category: varchar('category', { length: 100 }),
+  status: varchar('status', { length: 50 }),
+  count: integer('count').default(0).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
 
 // 9. DNS Nodes Table — CyberDNS's own real DNS resolver fleet (NOT a threat
 // feed source). Purpose: (a) an operational inventory of the physical/
@@ -395,50 +388,47 @@ export const savedFilters = pgTable(
 // only an ipAddress/ipv6Address of a `status = 'active'` row here is ever
 // allowed to bypass that ACL. See getBlocklistTextForCategory's call site
 // in server.ts, and evaluateBlocklistAccess in this file for the match.
-export const dnsNodes = pgTable(
-  'dns_nodes',
-  {
-    id: serial('id').primaryKey(),
-    name: text('name').notNull(),
-    // Display-only — NEVER used to decide ACL access. Matching by hostname
-    // would mean trusting reverse/forward DNS, which is trivially spoofable
-    // by anyone who controls the requesting host's own resolver; the real
-    // ACL key is always ipAddress/ipv6Address below.
-    hostname: text('hostname'),
-    // A node's IPv4 address — nullable (a node may be IPv6-only), but the
-    // application layer (see createDnsNode/updateDnsNode) requires at
-    // least one of ipAddress/ipv6Address to be set; not enforced as a DB
-    // CHECK constraint, matching this schema's existing convention of
-    // validating business rules in code rather than at the DB level.
-    // Column name kept as `ip_address` (not renamed to `ipv4_address`) to
-    // avoid an unnecessary rename touching evaluateBlocklistAccess, audit
-    // logs, and the push-based migration.
-    ipAddress: varchar('ip_address', { length: 64 }).unique(),
-    // A node's IPv6 address — same nullable/unique/"at least one of the
-    // two" reasoning as ipAddress above. Postgres allows multiple NULLs in
-    // a UNIQUE column, so IPv4-only nodes never collide with each other
-    // here.
-    ipv6Address: varchar('ipv6_address', { length: 64 }).unique(),
-    // 'LITE' | 'PRO' | 'FAMILY' — which CyberDNS product tier this resolver
-    // serves; free-form varchar (not a DB enum) so a new tier never needs a
-    // migration, same reasoning as domains.status/feedSources.status above.
-    tier: varchar('tier', { length: 20 }).default('LITE').notNull(),
-    location: text('location'),
-    // Optional map pin coordinates — admin-entered by hand, no geocoding
-    // pipeline. A node with either left null simply has no pin (still shows
-    // in the table) rather than defaulting to (0,0) or another fake value.
-    latitude: doublePrecision('latitude'),
-    longitude: doublePrecision('longitude'),
-    provider: text('provider'),
-    // 'active' | 'inactive' — only 'active' nodes ever pass the Blocklist
-    // ACL check; toggling this off is the fast way to revoke one node's
-    // access without deleting its record.
-    status: varchar('status', { length: 20 }).default('active').notNull(),
-    notes: text('notes'),
-    createdAt: timestamp('created_at').defaultNow().notNull(),
-    updatedAt: timestamp('updated_at').defaultNow().notNull(),
-  }
-);
+export const dnsNodes = pgTable('dns_nodes', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  // Display-only — NEVER used to decide ACL access. Matching by hostname
+  // would mean trusting reverse/forward DNS, which is trivially spoofable
+  // by anyone who controls the requesting host's own resolver; the real
+  // ACL key is always ipAddress/ipv6Address below.
+  hostname: text('hostname'),
+  // A node's IPv4 address — nullable (a node may be IPv6-only), but the
+  // application layer (see createDnsNode/updateDnsNode) requires at
+  // least one of ipAddress/ipv6Address to be set; not enforced as a DB
+  // CHECK constraint, matching this schema's existing convention of
+  // validating business rules in code rather than at the DB level.
+  // Column name kept as `ip_address` (not renamed to `ipv4_address`) to
+  // avoid an unnecessary rename touching evaluateBlocklistAccess, audit
+  // logs, and the push-based migration.
+  ipAddress: varchar('ip_address', { length: 64 }).unique(),
+  // A node's IPv6 address — same nullable/unique/"at least one of the
+  // two" reasoning as ipAddress above. Postgres allows multiple NULLs in
+  // a UNIQUE column, so IPv4-only nodes never collide with each other
+  // here.
+  ipv6Address: varchar('ipv6_address', { length: 64 }).unique(),
+  // 'LITE' | 'PRO' | 'FAMILY' — which CyberDNS product tier this resolver
+  // serves; free-form varchar (not a DB enum) so a new tier never needs a
+  // migration, same reasoning as domains.status/feedSources.status above.
+  tier: varchar('tier', { length: 20 }).default('LITE').notNull(),
+  location: text('location'),
+  // Optional map pin coordinates — admin-entered by hand, no geocoding
+  // pipeline. A node with either left null simply has no pin (still shows
+  // in the table) rather than defaulting to (0,0) or another fake value.
+  latitude: doublePrecision('latitude'),
+  longitude: doublePrecision('longitude'),
+  provider: text('provider'),
+  // 'active' | 'inactive' — only 'active' nodes ever pass the Blocklist
+  // ACL check; toggling this off is the fast way to revoke one node's
+  // access without deleting its record.
+  status: varchar('status', { length: 20 }).default('active').notNull(),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
 
 // 10. Blocklist ACL Settings — a single-row (id fixed at 1) switch, not a
 // per-deployment env var, specifically so an Admin can flip it live from
@@ -447,15 +437,12 @@ export const dnsNodes = pgTable(
 // can never itself cut off a Blocky instance that hasn't been registered as
 // a node yet; an Admin opts into real enforcement only once they've
 // confirmed the recent-unknown-IP panel is clean.
-export const blocklistAclSettings = pgTable(
-  'blocklist_acl_settings',
-  {
-    id: integer('id').primaryKey(),
-    enforceEnabled: boolean('enforce_enabled').default(false).notNull(),
-    updatedBy: text('updated_by'),
-    updatedAt: timestamp('updated_at').defaultNow().notNull(),
-  }
-);
+export const blocklistAclSettings = pgTable('blocklist_acl_settings', {
+  id: integer('id').primaryKey(),
+  enforceEnabled: boolean('enforce_enabled').default(false).notNull(),
+  updatedBy: text('updated_by'),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
 
 // 11. Blocklist Unknown Requesters — upserted once per distinct IP that
 // calls GET /v1/blocklist/:category.txt WITHOUT matching an active DNS node
@@ -475,7 +462,5 @@ export const blocklistUnknownRequesters = pgTable(
     requestCount: integer('request_count').default(1).notNull(),
     lastCategory: varchar('last_category', { length: 100 }),
   },
-  (table) => [
-    index('blocklist_unknown_requesters_last_seen_idx').on(table.lastSeenAt),
-  ]
+  (table) => [index('blocklist_unknown_requesters_last_seen_idx').on(table.lastSeenAt)],
 );

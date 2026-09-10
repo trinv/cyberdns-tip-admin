@@ -103,7 +103,8 @@ export const ReleasesView: React.FC<ReleasesViewProps> = ({ categories, stats, o
               Blocklist URL Đã Phát Hành
             </h1>
             <p className="text-slate-500 dark:text-slate-400 text-xs mt-1">
-              Mỗi Category có 1 URL text thuần, luôn phản ánh dữ liệu mới nhất trong CSDL — Blocky (hoặc bộ chặn DNS khác) tải định kỳ.
+              Mỗi Category có 1 URL text thuần, luôn phản ánh dữ liệu mới nhất trong CSDL — Blocky (hoặc bộ
+              chặn DNS khác) tải định kỳ.
             </p>
           </div>
         </div>
@@ -136,7 +137,10 @@ export const ReleasesView: React.FC<ReleasesViewProps> = ({ categories, stats, o
                 const check = checks[cat.id] || { kind: 'idle' as const };
                 const isCopied = copiedId === cat.id;
                 return (
-                  <tr key={cat.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
+                  <tr
+                    key={cat.id}
+                    className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
+                  >
                     <td className="px-5 py-3">
                       <div className="flex items-center space-x-2">
                         <span
@@ -147,7 +151,10 @@ export const ReleasesView: React.FC<ReleasesViewProps> = ({ categories, stats, o
                       </div>
                     </td>
                     <td className="px-5 py-3 max-w-[260px]">
-                      <code className="block truncate text-slate-500 dark:text-slate-400 font-mono text-xs" title={url}>
+                      <code
+                        className="block truncate text-slate-500 dark:text-slate-400 font-mono text-xs"
+                        title={url}
+                      >
                         {url}
                       </code>
                     </td>
@@ -156,7 +163,10 @@ export const ReleasesView: React.FC<ReleasesViewProps> = ({ categories, stats, o
                     </td>
                     <td className="px-5 py-3">
                       {check.kind === 'idle' && (
-                        <span className="tag" style={{ background: 'var(--bg-subtle)', color: 'var(--text-muted)' }}>
+                        <span
+                          className="tag"
+                          style={{ background: 'var(--bg-subtle)', color: 'var(--text-muted)' }}
+                        >
                           Chưa kiểm tra
                         </span>
                       )}
@@ -165,8 +175,8 @@ export const ReleasesView: React.FC<ReleasesViewProps> = ({ categories, stats, o
                         <div className="space-y-0.5">
                           <span className="tag t-active">OK · {check.status}</span>
                           <div className="text-[11px] font-mono text-slate-400 dark:text-slate-500">
-                            {formatBytes(check.bytes)} · {check.lines.toLocaleString('vi-VN')} dòng · {check.ms} ms ·{' '}
-                            {check.checkedAt.toLocaleTimeString('vi-VN')}
+                            {formatBytes(check.bytes)} · {check.lines.toLocaleString('vi-VN')} dòng ·{' '}
+                            {check.ms} ms · {check.checkedAt.toLocaleTimeString('vi-VN')}
                           </div>
                         </div>
                       )}
@@ -186,14 +196,20 @@ export const ReleasesView: React.FC<ReleasesViewProps> = ({ categories, stats, o
                           title="Kiểm tra lại"
                           className="w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                         >
-                          <RefreshCw className={`w-3.5 h-3.5 ${check.kind === 'checking' ? 'animate-spin' : ''}`} />
+                          <RefreshCw
+                            className={`w-3.5 h-3.5 ${check.kind === 'checking' ? 'animate-spin' : ''}`}
+                          />
                         </button>
                         <button
                           onClick={() => handleCopy(cat.id)}
                           title="Sao chép URL"
                           className="w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                         >
-                          {isCopied ? <Check className="w-3.5 h-3.5 text-green-600 dark:text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                          {isCopied ? (
+                            <Check className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
+                          ) : (
+                            <Copy className="w-3.5 h-3.5" />
+                          )}
                         </button>
                         <a
                           href={url}
@@ -231,8 +247,9 @@ export const ReleasesView: React.FC<ReleasesViewProps> = ({ categories, stats, o
       {/* Honest caveat: this check runs from the admin's own browser, not
           from wherever Blocky actually runs — see the plan's rationale. */}
       <p className="text-[11px] text-slate-400 dark:text-slate-600 leading-relaxed px-1">
-        Kiểm tra chạy trực tiếp từ trình duyệt của bạn tới URL công khai ở trên — phản ánh đúng nội dung server đang phục vụ
-        tại thời điểm kiểm tra, nhưng không đại diện cho độ trễ mạng thực tế mà Blocky (chạy ở nơi khác) sẽ thấy.
+        Kiểm tra chạy trực tiếp từ trình duyệt của bạn tới URL công khai ở trên — phản ánh đúng nội dung
+        server đang phục vụ tại thời điểm kiểm tra, nhưng không đại diện cho độ trễ mạng thực tế mà Blocky
+        (chạy ở nơi khác) sẽ thấy.
       </p>
     </div>
   );

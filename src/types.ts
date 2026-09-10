@@ -1,12 +1,5 @@
 export type DomainCategory =
-  | 'all'
-  | 'malware-phishing'
-  | 'tracking-adware'
-  | 'nsfw'
-  | 'gambling'
-  | 'social'
-  | 'crypto-scam'
-  | string;
+  'all' | 'malware-phishing' | 'tracking-adware' | 'nsfw' | 'gambling' | 'social' | 'crypto-scam' | string;
 
 // 'grace_period' removed per explicit request — only 3 user-facing statuses
 // now. 'protected' (a system-managed status literal never actually written

@@ -4,17 +4,25 @@ import { createLoginRateLimiter } from './rateLimit.ts';
 
 // Minimal stand-ins — the limiter only ever touches req.ip / req.body.email
 // and res.set / res.status / res.json.
-const req = (ip: string, email?: string) =>
-  ({ ip, body: email ? { email } : {} }) as unknown as Request;
+const req = (ip: string, email?: string) => ({ ip, body: email ? { email } : {} }) as unknown as Request;
 
 function fakeRes() {
   const res = {
     statusCode: 0,
     headers: {} as Record<string, string>,
     body: undefined as unknown,
-    set(k: string, v: string) { this.headers[k] = v; return this; },
-    status(c: number) { this.statusCode = c; return this; },
-    json(b: unknown) { this.body = b; return this; },
+    set(k: string, v: string) {
+      this.headers[k] = v;
+      return this;
+    },
+    status(c: number) {
+      this.statusCode = c;
+      return this;
+    },
+    json(b: unknown) {
+      this.body = b;
+      return this;
+    },
   };
   return res;
 }
@@ -22,7 +30,9 @@ function fakeRes() {
 const run = (limiter: ReturnType<typeof createLoginRateLimiter>, r: Request) => {
   const res = fakeRes();
   let nexted = false;
-  limiter.middleware(r, res as unknown as Response, () => { nexted = true; });
+  limiter.middleware(r, res as unknown as Response, () => {
+    nexted = true;
+  });
   return { res, nexted };
 };
 

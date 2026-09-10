@@ -39,10 +39,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, isDarkMode, toggl
     <div className="h-screen w-screen overflow-y-auto bg-background flex flex-col lg:flex-row transition-colors">
       {/* Left: brand panel */}
       <div className="relative lg:w-1/2 xl:w-[55%] flex-shrink-0 bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950 dark:from-[#060a14] dark:via-[#060a14] dark:to-emerald-950 text-white flex flex-col justify-between p-8 sm:p-12 lg:p-16 min-h-[280px] lg:min-h-0">
-        <div className="absolute inset-0 opacity-[0.07] pointer-events-none" style={{
-          backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)',
-          backgroundSize: '28px 28px',
-        }} />
+        <div
+          className="absolute inset-0 opacity-[0.07] pointer-events-none"
+          style={{
+            backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)',
+            backgroundSize: '28px 28px',
+          }}
+        />
 
         <div className="relative">
           {/* variant="dark": this panel's background is ALWAYS the dark
@@ -56,10 +59,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, isDarkMode, toggl
 
         <div className="relative space-y-5 py-10 lg:py-0">
           <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight leading-tight">
-            Lá chắn an toàn<br />trên không gian mạng
+            Lá chắn an toàn
+            <br />
+            trên không gian mạng
           </h1>
           <p className="text-slate-300 text-sm max-w-md leading-relaxed">
-            An toàn hơn trên Internet, bắt đầu từ DNS. Cổng quản trị Threat Intelligence Platform — đồng bộ nguồn feed, phân loại danh mục, kiểm duyệt và phát hành danh sách chặn có kiểm soát.
+            An toàn hơn trên Internet, bắt đầu từ DNS. Cổng quản trị Threat Intelligence Platform — đồng bộ
+            nguồn feed, phân loại danh mục, kiểm duyệt và phát hành danh sách chặn có kiểm soát.
           </p>
 
           <div className="grid grid-cols-3 gap-4 pt-4 max-w-md">
@@ -86,7 +92,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, isDarkMode, toggl
 
         <div className="relative text-xs text-slate-400">
           © CyberDNS. All rights reserved. ·{' '}
-          <a href="https://cyberdns.vn" target="_blank" rel="noreferrer" className="hover:text-emerald-400 transition-colors underline decoration-slate-600">
+          <a
+            href="https://cyberdns.vn"
+            target="_blank"
+            rel="noreferrer"
+            className="hover:text-emerald-400 transition-colors underline decoration-slate-600"
+          >
             cyberdns.vn
           </a>
         </div>
@@ -109,7 +120,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, isDarkMode, toggl
               app uses for a page title + subtitle. */}
           <div className="space-y-1">
             <h2 className="text-lg font-bold font-sans text-slate-900 dark:text-white">Đăng nhập</h2>
-            <p className="text-slate-500 dark:text-slate-400 text-xs">Truy cập CyberDNS Threat Intelligence Platform</p>
+            <p className="text-slate-500 dark:text-slate-400 text-xs">
+              Truy cập CyberDNS Threat Intelligence Platform
+            </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">

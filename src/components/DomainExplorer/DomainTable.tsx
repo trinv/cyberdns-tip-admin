@@ -3,11 +3,22 @@ import { DomainItem, CategoryInfo, DomainStatus, FeedSource, MANUAL_SOURCE_FILTE
 import { useClickOutside } from '../../hooks/useClickOutside';
 import { copyToClipboard } from '../../lib/clipboard';
 import {
-  Search, X, Plus, Download, ShieldAlert,
+  Search,
+  X,
+  Plus,
+  Download,
+  ShieldAlert,
   ArrowUpDown,
-  Copy, Check, Filter,
-  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
-  FileText, FileSpreadsheet, Database
+  Copy,
+  Check,
+  Filter,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  FileText,
+  FileSpreadsheet,
+  Database,
 } from 'lucide-react';
 
 interface DomainTableProps {
@@ -399,7 +410,9 @@ export const DomainTable: React.FC<DomainTableProps> = ({
                 <FileText className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 <div>
                   <div className="font-bold">Xuất file .TXT (Danh sách Domain)</div>
-                  <div className="text-xs text-slate-400 dark:text-slate-500">Một tên miền mỗi dòng (Feed/Script)</div>
+                  <div className="text-xs text-slate-400 dark:text-slate-500">
+                    Một tên miền mỗi dòng (Feed/Script)
+                  </div>
                 </div>
               </button>
 
@@ -413,7 +426,9 @@ export const DomainTable: React.FC<DomainTableProps> = ({
                 <FileSpreadsheet className="w-4 h-4 text-teal-600 dark:text-teal-400" />
                 <div>
                   <div className="font-bold">Xuất file .CSV (Đầy đủ thuộc tính)</div>
-                  <div className="text-xs text-slate-400 dark:text-slate-500">Bao gồm nhóm, trạng thái, nguồn và mốc thời gian</div>
+                  <div className="text-xs text-slate-400 dark:text-slate-500">
+                    Bao gồm nhóm, trạng thái, nguồn và mốc thời gian
+                  </div>
                 </div>
               </button>
 
@@ -429,7 +444,9 @@ export const DomainTable: React.FC<DomainTableProps> = ({
                 <Database className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                 <div>
                   <div>Hộp thoại đa định dạng nâng cao...</div>
-                  <div className="text-xs text-slate-400 dark:text-slate-500 font-normal">Hỗ trợ .HOSTS, RPZ Zone, AdBlock, Dnsmasq</div>
+                  <div className="text-xs text-slate-400 dark:text-slate-500 font-normal">
+                    Hỗ trợ .HOSTS, RPZ Zone, AdBlock, Dnsmasq
+                  </div>
                 </div>
               </button>
             </div>
@@ -511,7 +528,9 @@ export const DomainTable: React.FC<DomainTableProps> = ({
                   <div className="flex items-center space-x-1">
                     <span>TÊN MIỀN (DOMAIN)</span>
                     {sortField === 'domain' ? (
-                      <span className="text-emerald-600 dark:text-emerald-400 font-mono">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                      <span className="text-emerald-600 dark:text-emerald-400 font-mono">
+                        {sortDirection === 'asc' ? '↑' : '↓'}
+                      </span>
                     ) : (
                       <ArrowUpDown className="w-3 h-3 text-slate-400" />
                     )}
@@ -527,7 +546,9 @@ export const DomainTable: React.FC<DomainTableProps> = ({
                   <div className="flex items-center space-x-1">
                     <span>THẤY LẦN ĐẦU</span>
                     {sortField === 'firstSeen' && (
-                      <span className="text-emerald-600 dark:text-emerald-400 font-mono">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                      <span className="text-emerald-600 dark:text-emerald-400 font-mono">
+                        {sortDirection === 'asc' ? '↑' : '↓'}
+                      </span>
                     )}
                   </div>
                 </th>
@@ -546,10 +567,7 @@ export const DomainTable: React.FC<DomainTableProps> = ({
                         : 'hover:bg-slate-50/80 dark:hover:bg-slate-800/40'
                     }`}
                   >
-                    <td
-                      className="px-4 py-3 text-center"
-                      onClick={() => onToggleSelectDomain(item.id)}
-                    >
+                    <td className="px-4 py-3 text-center" onClick={() => onToggleSelectDomain(item.id)}>
                       <input
                         type="checkbox"
                         checked={isSelected}
@@ -585,7 +603,7 @@ export const DomainTable: React.FC<DomainTableProps> = ({
                           <span
                             key={cat}
                             className={`px-2 py-0.5 rounded-md text-xs font-semibold border ${getCategoryBadgeClass(
-                              cat
+                              cat,
                             )}`}
                           >
                             {cat}
@@ -600,9 +618,7 @@ export const DomainTable: React.FC<DomainTableProps> = ({
                     </td>
 
                     {/* Status */}
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      {renderStatus(item.status)}
-                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">{renderStatus(item.status)}</td>
 
                     {/* First Seen */}
                     <td className="px-4 py-3 font-mono text-slate-400 dark:text-slate-500 whitespace-nowrap">
@@ -622,7 +638,9 @@ export const DomainTable: React.FC<DomainTableProps> = ({
                 {isLoading ? 'Đang tải...' : 'Không tìm thấy tên miền nào khớp bộ lọc'}
               </p>
               {!isLoading && (
-                <p className="text-xs text-slate-400 dark:text-slate-500">Hãy thử đổi từ khóa tìm kiếm hoặc bỏ chọn các điều kiện lọc</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500">
+                  Hãy thử đổi từ khóa tìm kiếm hoặc bỏ chọn các điều kiện lọc
+                </p>
               )}
             </div>
           )}
@@ -633,7 +651,15 @@ export const DomainTable: React.FC<DomainTableProps> = ({
             <div className="px-5 py-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600 dark:text-slate-400">
               <div className="flex items-center space-x-3">
                 <span>
-                  Hiển thị <span className="font-bold text-slate-800 dark:text-slate-200">{(page - 1) * pageSize + 1} - {Math.min(page * pageSize, totalCount)}</span> trên <span className="font-bold text-slate-800 dark:text-slate-200">{totalCount.toLocaleString('vi-VN')}</span> kết quả
+                  Hiển thị{' '}
+                  <span className="font-bold text-slate-800 dark:text-slate-200">
+                    {(page - 1) * pageSize + 1} - {Math.min(page * pageSize, totalCount)}
+                  </span>{' '}
+                  trên{' '}
+                  <span className="font-bold text-slate-800 dark:text-slate-200">
+                    {totalCount.toLocaleString('vi-VN')}
+                  </span>{' '}
+                  kết quả
                 </span>
                 <span className="text-slate-300 dark:text-slate-700">|</span>
                 <div className="flex items-center space-x-1.5">
@@ -699,7 +725,12 @@ export const DomainTable: React.FC<DomainTableProps> = ({
       {/* Bottom Status Bar & Shortcuts */}
       <div className="px-5 py-2 bg-white dark:bg-slate-900 border-t border-slate-200/80 dark:border-slate-800 flex flex-wrap items-center justify-between text-xs text-slate-500 dark:text-slate-400 select-none shadow-xs transition-colors">
         <div className="flex items-center space-x-2">
-          <span>Tổng số khớp bộ lọc: <strong className="text-slate-800 dark:text-slate-200 font-mono">{totalCount.toLocaleString('vi-VN')}</strong></span>
+          <span>
+            Tổng số khớp bộ lọc:{' '}
+            <strong className="text-slate-800 dark:text-slate-200 font-mono">
+              {totalCount.toLocaleString('vi-VN')}
+            </strong>
+          </span>
         </div>
 
         <div className="hidden md:flex items-center space-x-3 text-slate-500 dark:text-slate-400 font-mono text-xs">

@@ -26,8 +26,7 @@ function resolvePool() {
   if (!connectionString && !discrete) {
     throw new Error('Set DATABASE_URL, or all of SQL_HOST / SQL_DB_NAME / SQL_USER / SQL_PASSWORD.');
   }
-  const ssl =
-    process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false;
+  const ssl = process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false;
   return new Pool(
     connectionString
       ? { connectionString, ssl }
@@ -38,7 +37,7 @@ function resolvePool() {
           user: process.env.SQL_USER,
           password: process.env.SQL_PASSWORD,
           ssl,
-        }
+        },
   );
 }
 
@@ -55,24 +54,26 @@ async function main() {
     await client.query('BEGIN');
     await client.query('CREATE SCHEMA IF NOT EXISTS drizzle');
     await client.query(
-      'CREATE TABLE IF NOT EXISTS drizzle."__drizzle_migrations" (id SERIAL PRIMARY KEY, hash text NOT NULL, created_at bigint)'
+      'CREATE TABLE IF NOT EXISTS drizzle."__drizzle_migrations" (id SERIAL PRIMARY KEY, hash text NOT NULL, created_at bigint)',
     );
 
     const { rows } = await client.query('SELECT count(*)::int AS n FROM drizzle."__drizzle_migrations"');
     if (rows[0].n > 0) {
-      console.log(`drizzle.__drizzle_migrations already has ${rows[0].n} row(s) — nothing to baseline. Aborting.`);
+      console.log(
+        `drizzle.__drizzle_migrations already has ${rows[0].n} row(s) — nothing to baseline. Aborting.`,
+      );
       await client.query('ROLLBACK');
       return;
     }
 
     // Sanity check: this really is the expected pre-migration schema.
     const { rows: tbl } = await client.query(
-      "SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'domains'"
+      "SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'domains'",
     );
     if (tbl[0].n === 0) {
       await client.query('ROLLBACK');
       throw new Error(
-        'No `public.domains` table found — this looks like a FRESH database. Do NOT baseline it; run `npm run db:migrate` instead.'
+        'No `public.domains` table found — this looks like a FRESH database. Do NOT baseline it; run `npm run db:migrate` instead.',
       );
     }
 

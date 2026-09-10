@@ -6,7 +6,9 @@ function fakeRes() {
   const headers: Record<string, string> = {};
   const res = {
     headers,
-    setHeader(k: string, v: string) { headers[k.toLowerCase()] = v; },
+    setHeader(k: string, v: string) {
+      headers[k.toLowerCase()] = v;
+    },
   };
   return res as unknown as Response & { headers: Record<string, string> };
 }
@@ -14,7 +16,9 @@ function fakeRes() {
 const call = (reqPartial: Partial<Request>) => {
   const res = fakeRes();
   let nexted = false;
-  securityHeaders()(reqPartial as Request, res, () => { nexted = true; });
+  securityHeaders()(reqPartial as Request, res, () => {
+    nexted = true;
+  });
   return { headers: res.headers, nexted };
 };
 
@@ -33,8 +37,12 @@ describe('securityHeaders', () => {
 
   it('sends HSTS only when the request is HTTPS (directly or via the proxy header)', () => {
     expect(call({ headers: {} }).headers['strict-transport-security']).toBeUndefined();
-    expect(call({ headers: { 'x-forwarded-proto': 'https' } }).headers['strict-transport-security']).toContain('max-age=31536000');
-    expect(call({ secure: true, headers: {} }).headers['strict-transport-security']).toContain('includeSubDomains');
+    expect(
+      call({ headers: { 'x-forwarded-proto': 'https' } }).headers['strict-transport-security'],
+    ).toContain('max-age=31536000');
+    expect(call({ secure: true, headers: {} }).headers['strict-transport-security']).toContain(
+      'includeSubDomains',
+    );
   });
 
   it('sends CSP only in production', () => {

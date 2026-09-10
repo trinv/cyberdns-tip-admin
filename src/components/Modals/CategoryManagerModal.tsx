@@ -10,7 +10,12 @@ interface CategoryManagerModalProps {
   // No `id` here — the server generates and owns it (see createCategory in
   // queries.ts) so it's guaranteed unique and stays stable even if the name
   // is renamed later. This form only ever supplies the human-facing fields.
-  onAddCategory: (cat: { name: string; description?: string; color?: string; deltaThreshold?: number }) => void;
+  onAddCategory: (cat: {
+    name: string;
+    description?: string;
+    color?: string;
+    deltaThreshold?: number;
+  }) => void;
   onUpdateCategory?: (id: string, patch: Partial<CategoryInfo>) => void;
   onDeleteCategory?: (id: string) => void;
 }
@@ -161,7 +166,9 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                         className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-xs"
                         style={{ backgroundColor: c.color }}
                       ></span>
-                      <span className="truncate text-slate-800 dark:text-slate-200 font-medium text-xs font-sans">{c.name}</span>
+                      <span className="truncate text-slate-800 dark:text-slate-200 font-medium text-xs font-sans">
+                        {c.name}
+                      </span>
                     </div>
                     <div className="flex items-center space-x-1.5 flex-shrink-0">
                       <span className="text-xs text-slate-400 dark:text-slate-500 font-bold">
@@ -185,13 +192,16 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                       </button>
                     </div>
                   </div>
-                )
+                ),
               )}
             </div>
           </div>
 
           {/* Form to add a new category */}
-          <form onSubmit={handleSubmit} className="space-y-3.5 pt-4 border-t border-slate-100 dark:border-slate-800">
+          <form
+            onSubmit={handleSubmit}
+            className="space-y-3.5 pt-4 border-t border-slate-100 dark:border-slate-800"
+          >
             <div className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
               + TẠO NHÓM DANH MỤC MỚI
             </div>
@@ -207,7 +217,8 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-800 rounded-xl px-3.5 py-2 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 text-xs focus:outline-none"
               />
               <p className="text-xs text-slate-400 dark:text-slate-500">
-                Mã định danh (id) sẽ được hệ thống tự sinh và giữ nguyên vĩnh viễn — đổi tên ở đây sau này sẽ không làm thay đổi mã đó.
+                Mã định danh (id) sẽ được hệ thống tự sinh và giữ nguyên vĩnh viễn — đổi tên ở đây sau này sẽ
+                không làm thay đổi mã đó.
               </p>
             </div>
 
@@ -232,12 +243,16 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                     onChange={(e) => setColor(e.target.value)}
                     className="w-8 h-8 rounded-lg bg-transparent border border-slate-300 dark:border-slate-600 cursor-pointer"
                   />
-                  <span className="font-mono text-xs text-slate-700 dark:text-slate-300 font-bold">{color}</span>
+                  <span className="font-mono text-xs text-slate-700 dark:text-slate-300 font-bold">
+                    {color}
+                  </span>
                 </div>
               </div>
 
               <div className="space-y-1">
-                <label className="block text-slate-800 dark:text-slate-200 font-bold">Ngưỡng cảnh báo delta (±%)</label>
+                <label className="block text-slate-800 dark:text-slate-200 font-bold">
+                  Ngưỡng cảnh báo delta (±%)
+                </label>
                 <input
                   type="number"
                   step="0.5"

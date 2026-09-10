@@ -9,7 +9,11 @@ interface DomainBulkModalProps {
   targetCategory?: string;
   selectedDomains: DomainItem[];
   categories: CategoryInfo[];
-  onConfirm: (action: 'add_group' | 'allowlist' | 'unblock' | 'block', targetCategories: string[], reason: string) => Promise<void> | void;
+  onConfirm: (
+    action: 'add_group' | 'allowlist' | 'unblock' | 'block',
+    targetCategories: string[],
+    reason: string,
+  ) => Promise<void> | void;
 }
 
 export const DomainBulkModal: React.FC<DomainBulkModalProps> = ({
@@ -105,7 +109,8 @@ export const DomainBulkModal: React.FC<DomainBulkModalProps> = ({
                 ))}
               </select>
               <p className="text-xs text-slate-400 dark:text-slate-500">
-                Một tên miền có thể thuộc nhiều nhóm cùng lúc — thao tác này CHỈ THÊM nhóm này, không gỡ bỏ nhóm hiện có của domain.
+                Một tên miền có thể thuộc nhiều nhóm cùng lúc — thao tác này CHỈ THÊM nhóm này, không gỡ bỏ
+                nhóm hiện có của domain.
               </p>
             </div>
           )}
@@ -117,7 +122,9 @@ export const DomainBulkModal: React.FC<DomainBulkModalProps> = ({
             </div>
             <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 rounded-2xl p-3 font-mono text-xs text-slate-700 dark:text-slate-300 max-h-32 overflow-y-auto space-y-0.5">
               {actionableDomains.length === 0 ? (
-                <div className="text-slate-400 dark:text-slate-500 italic">Không có domain nào (tất cả đã bị loại vì protected).</div>
+                <div className="text-slate-400 dark:text-slate-500 italic">
+                  Không có domain nào (tất cả đã bị loại vì protected).
+                </div>
               ) : (
                 <>
                   {actionableDomains.slice(0, 20).map((d) => (
@@ -159,7 +166,9 @@ export const DomainBulkModal: React.FC<DomainBulkModalProps> = ({
           <div className="bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-100 dark:border-emerald-900 rounded-2xl p-3.5 flex items-start space-x-2.5 text-emerald-900 dark:text-emerald-200">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5" />
             <div>
-              <span className="font-bold text-emerald-800 dark:text-emerald-300">✓ Được ghi vào nhật ký kiểm toán: </span>
+              <span className="font-bold text-emerald-800 dark:text-emerald-300">
+                ✓ Được ghi vào nhật ký kiểm toán:{' '}
+              </span>
               <span className="text-slate-700 dark:text-slate-300 text-xs">
                 Thao tác này sẽ xuất hiện trong Audit Logs với đầy đủ lý do và người thực hiện.
               </span>
@@ -169,7 +178,8 @@ export const DomainBulkModal: React.FC<DomainBulkModalProps> = ({
           {/* Reason field */}
           <div className="space-y-1.5">
             <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
-              LÝ DO <span className="text-rose-500">*</span> <span className="text-slate-400 dark:text-slate-500 font-normal">(Bắt buộc)</span>
+              LÝ DO <span className="text-rose-500">*</span>{' '}
+              <span className="text-slate-400 dark:text-slate-500 font-normal">(Bắt buộc)</span>
             </label>
             <input
               type="text"

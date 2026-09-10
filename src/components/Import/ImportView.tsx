@@ -1,8 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { CategoryInfo } from '../../types';
 import {
-  Upload, FileText, Globe, CheckCircle2, AlertTriangle, ShieldCheck,
-  ArrowRight, Sparkles, Filter, Database, RefreshCw, Layers
+  Upload,
+  FileText,
+  Globe,
+  CheckCircle2,
+  AlertTriangle,
+  ShieldCheck,
+  ArrowRight,
+  Sparkles,
+  Filter,
+  Database,
+  RefreshCw,
+  Layers,
 } from 'lucide-react';
 
 interface ImportViewProps {
@@ -86,7 +96,9 @@ export const ImportView: React.FC<ImportViewProps> = ({ categories, onImportDoma
     setTimeout(() => {
       onImportDomains(parsed.uniqueValid, selectedCategory, reason);
       setIsParsing(false);
-      setSuccessMessage(`Đã gửi ${parsed.uniqueValid.length} domain vào Hàng đợi duyệt (nhóm ${selectedCategory}) — chờ xác nhận trước khi chặn.`);
+      setSuccessMessage(
+        `Đã gửi ${parsed.uniqueValid.length} domain vào Hàng đợi duyệt (nhóm ${selectedCategory}) — chờ xác nhận trước khi chặn.`,
+      );
       setTimeout(() => setSuccessMessage(null), 4000);
     }, 500);
   };
@@ -98,7 +110,8 @@ export const ImportView: React.FC<ImportViewProps> = ({ categories, onImportDoma
           <span>Nhập danh sách tên miền (Batch Import & Smart Parser)</span>
         </h1>
         <p className="text-slate-500 dark:text-slate-400 text-xs mt-1">
-          Hỗ trợ phân tích cú pháp hosts, URL feeds, wildcard regex và tự động bảo vệ các tên miền chính thống (Protected Domains).
+          Hỗ trợ phân tích cú pháp hosts, URL feeds, wildcard regex và tự động bảo vệ các tên miền chính thống
+          (Protected Domains).
         </p>
       </div>
 
@@ -171,8 +184,12 @@ export const ImportView: React.FC<ImportViewProps> = ({ categories, onImportDoma
             {importTab === 'file' && (
               <div className="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl p-8 text-center space-y-2 hover:border-emerald-400 hover:bg-emerald-50/20 dark:hover:bg-emerald-950/20 transition-all cursor-pointer bg-slate-50/50 dark:bg-slate-800/40">
                 <Upload className="w-10 h-10 text-emerald-600 dark:text-emerald-400 mx-auto" />
-                <p className="font-bold text-slate-800 dark:text-slate-200 text-sm">Kéo thả file vào đây hoặc bấm để chọn file</p>
-                <p className="text-xs text-slate-400 dark:text-slate-500">Hỗ trợ định dạng .txt, .csv, AdGuard, Pi-hole blocklist</p>
+                <p className="font-bold text-slate-800 dark:text-slate-200 text-sm">
+                  Kéo thả file vào đây hoặc bấm để chọn file
+                </p>
+                <p className="text-xs text-slate-400 dark:text-slate-500">
+                  Hỗ trợ định dạng .txt, .csv, AdGuard, Pi-hole blocklist
+                </p>
               </div>
             )}
 
@@ -275,14 +292,18 @@ export const ImportView: React.FC<ImportViewProps> = ({ categories, onImportDoma
                 <div className="text-xl font-bold text-emerald-700 dark:text-emerald-300">
                   {parsed.uniqueValid.length}
                 </div>
-                <div className="text-xs text-emerald-800 dark:text-emerald-400 font-bold uppercase mt-0.5">Hợp lệ</div>
+                <div className="text-xs text-emerald-800 dark:text-emerald-400 font-bold uppercase mt-0.5">
+                  Hợp lệ
+                </div>
               </div>
 
               <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 rounded-xl p-3">
                 <div className="text-xl font-bold text-slate-500 dark:text-slate-400">
                   {parsed.invalidLines.length}
                 </div>
-                <div className="text-xs text-slate-400 dark:text-slate-500 font-bold uppercase mt-0.5">Bỏ qua / Lỗi</div>
+                <div className="text-xs text-slate-400 dark:text-slate-500 font-bold uppercase mt-0.5">
+                  Bỏ qua / Lỗi
+                </div>
               </div>
             </div>
 
@@ -297,7 +318,8 @@ export const ImportView: React.FC<ImportViewProps> = ({ categories, onImportDoma
                   {parsed.protectedDomains.join(', ')}
                 </div>
                 <p className="text-xs text-amber-800 dark:text-amber-300 pl-5 pt-0.5">
-                  Các domain này tự động bị loại khỏi danh sách chặn để tránh gián đoạn dịch vụ thiết yếu quốc gia.
+                  Các domain này tự động bị loại khỏi danh sách chặn để tránh gián đoạn dịch vụ thiết yếu quốc
+                  gia.
                 </p>
               </div>
             )}
@@ -311,7 +333,9 @@ export const ImportView: React.FC<ImportViewProps> = ({ categories, onImportDoma
                 {parsed.uniqueValid.length > 0 ? (
                   parsed.uniqueValid.map((d, i) => (
                     <div key={i} className="flex items-center space-x-2">
-                      <span className="text-slate-400 dark:text-slate-500 w-5 font-sans font-medium">{i + 1}.</span>
+                      <span className="text-slate-400 dark:text-slate-500 w-5 font-sans font-medium">
+                        {i + 1}.
+                      </span>
                       <span className="font-semibold">{d}</span>
                     </div>
                   ))

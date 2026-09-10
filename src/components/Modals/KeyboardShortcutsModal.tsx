@@ -6,10 +6,7 @@ interface KeyboardShortcutsModalProps {
   onClose: () => void;
 }
 
-export const KeyboardShortcutsModal: React.FC<KeyboardShortcutsModalProps> = ({
-  isOpen,
-  onClose,
-}) => {
+export const KeyboardShortcutsModal: React.FC<KeyboardShortcutsModalProps> = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   const shortcuts = [
@@ -30,7 +27,9 @@ export const KeyboardShortcutsModal: React.FC<KeyboardShortcutsModalProps> = ({
         <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/40">
           <div className="flex items-center space-x-2">
             <Keyboard className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-            <h2 className="text-sm font-bold text-slate-900 dark:text-white font-sans">Phím tắt thao tác nhanh</h2>
+            <h2 className="text-sm font-bold text-slate-900 dark:text-white font-sans">
+              Phím tắt thao tác nhanh
+            </h2>
           </div>
           <button
             onClick={onClose}

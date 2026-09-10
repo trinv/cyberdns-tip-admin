@@ -4,24 +4,72 @@ import React, { useState, useMemo, useRef, useEffect, lazy, Suspense } from 'rea
 // etc.), which would bloat the bundle for chart types this Dashboard never
 // uses.
 import {
-  Chart, DoughnutController, ArcElement, BarController, BarElement,
-  LineController, LineElement, PointElement, Filler,
-  LinearScale, CategoryScale, Tooltip, type ChartConfiguration,
+  Chart,
+  DoughnutController,
+  ArcElement,
+  BarController,
+  BarElement,
+  LineController,
+  LineElement,
+  PointElement,
+  Filler,
+  LinearScale,
+  CategoryScale,
+  Tooltip,
+  type ChartConfiguration,
 } from 'chart.js';
 Chart.register(
-  DoughnutController, ArcElement, BarController, BarElement,
-  LineController, LineElement, PointElement, Filler,
-  LinearScale, CategoryScale, Tooltip
+  DoughnutController,
+  ArcElement,
+  BarController,
+  BarElement,
+  LineController,
+  LineElement,
+  PointElement,
+  Filler,
+  LinearScale,
+  CategoryScale,
+  Tooltip,
 );
 import {
-  ShieldAlert, ShieldCheck, Activity, Globe, Database,
-  ArrowUpRight, ArrowDownRight, AlertTriangle, CheckCircle2,
-  TrendingUp, Layers, RefreshCw, BarChart3, Download,
-  Radio, PieChart as PieIcon, ChevronRight, ExternalLink,
-  Shield, Server, Eye, FileText, Check, MoreVertical,
-  Zap, Lock, AlertOctagon, Terminal, Filter,
-  Crosshair, Flame, Share2, Search, ArrowRight, PlayCircle,
-  Link2, Copy, Files
+  ShieldAlert,
+  ShieldCheck,
+  Activity,
+  Globe,
+  Database,
+  ArrowUpRight,
+  ArrowDownRight,
+  AlertTriangle,
+  CheckCircle2,
+  TrendingUp,
+  Layers,
+  RefreshCw,
+  BarChart3,
+  Download,
+  Radio,
+  PieChart as PieIcon,
+  ChevronRight,
+  ExternalLink,
+  Shield,
+  Server,
+  Eye,
+  FileText,
+  Check,
+  MoreVertical,
+  Zap,
+  Lock,
+  AlertOctagon,
+  Terminal,
+  Filter,
+  Crosshair,
+  Flame,
+  Share2,
+  Search,
+  ArrowRight,
+  PlayCircle,
+  Link2,
+  Copy,
+  Files,
 } from 'lucide-react';
 import { FeedSource, CategoryInfo, DashboardStats, ReviewDomainItem } from '../../types';
 import { MetricDetailModal, MetricType } from './MetricDetailModal';
@@ -38,7 +86,7 @@ import { buildBlocklistUrl } from '../../lib/blocklistUrl';
 // `isAdmin` is true below — a non-Admin viewing their Dashboard never
 // triggers this import at all, not even to find out the card would 401/403.
 const DnsNodeStatusCard = lazy(() =>
-  import('./DnsNodeStatusCard').then((m) => ({ default: m.DnsNodeStatusCard }))
+  import('./DnsNodeStatusCard').then((m) => ({ default: m.DnsNodeStatusCard })),
 );
 
 // Chart.js draws onto a <canvas> once, at creation time — unlike CSS, it
@@ -144,7 +192,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   // you hover always matches what you see.
   const statusBreakdownSorted = useMemo(
     () => statusBreakdown.slice().sort((a, b) => b.count - a.count),
-    [statusBreakdown]
+    [statusBreakdown],
   );
 
   // Status breakdown — horizontal bar chart, single blue family shading
@@ -206,7 +254,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         datasets: [
           {
             data: statusBreakdownSorted.map((s) => s.count),
-            backgroundColor: statusBreakdownSorted.map((_, i) => STATUS_BAR_SHADES[i % STATUS_BAR_SHADES.length]),
+            backgroundColor: statusBreakdownSorted.map(
+              (_, i) => STATUS_BAR_SHADES[i % STATUS_BAR_SHADES.length],
+            ),
             borderRadius: 4,
             maxBarThickness: 32,
           },
@@ -329,7 +379,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       type: 'line',
       data: {
         labels: domainGrowth.map((g) =>
-          new Date(g.date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
+          new Date(g.date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }),
         ),
         datasets: [
           {
@@ -376,7 +426,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             callbacks: {
               title: (items) => {
                 const g = domainGrowth[items[0].dataIndex];
-                return new Date(g.date).toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
+                return new Date(g.date).toLocaleDateString('vi-VN', {
+                  weekday: 'long',
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric',
+                });
               },
               label: (ctx) => `${(ctx.parsed.y ?? 0).toLocaleString('vi-VN')} domain mới`,
             },
@@ -385,11 +440,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         scales: {
           x: {
             grid: { display: false },
-            ticks: { color: textMuted, font: { size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 10 },
+            ticks: {
+              color: textMuted,
+              font: { size: 10 },
+              maxRotation: 0,
+              autoSkip: true,
+              maxTicksLimit: 10,
+            },
           },
           y: {
             beginAtZero: true,
-            grid: { color: gridColor, },
+            grid: { color: gridColor },
             ticks: { color: textMuted, font: { size: 10 }, precision: 0 },
           },
         },
@@ -586,196 +647,211 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   return (
     <div className="flex-1 bg-[#f8fafc] dark:bg-[#0B1120] overflow-y-auto h-full p-4 sm:p-6 transition-colors">
       <div className="space-y-6 max-w-7xl mx-auto w-full">
-      {/* Row 1: 3 Key SOC Operational Metric Cards - Simplified General Numbers */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-        {/* Card 1: Tổng IOC Tên miền Đang chặn — gradient-tinted "hero
+        {/* Row 1: 3 Key SOC Operational Metric Cards - Simplified General Numbers */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+          {/* Card 1: Tổng IOC Tên miền Đang chặn — gradient-tinted "hero
             metric" card style (per reference), each card's own semantic
             accent color used for the tint/icon/badge/footer instead of a
             flat white background. No week-over-week % anywhere here — see
             the growth-trend card just below for why (no reliable historical
             snapshot to compute a real delta against). */}
-        <div
-          onClick={() => setSelectedMetricModal('total_blocked')}
-          className="relative overflow-hidden bg-gradient-to-br from-emerald-50 via-white to-white dark:from-emerald-950/30 dark:via-slate-900 dark:to-slate-900 border border-emerald-100 dark:border-emerald-900/40 rounded-2xl p-5 shadow-xs hover:shadow-md transition-all cursor-pointer group active-press"
-          title="Nhấp để xem đồ thị và phân tích chi tiết"
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-100/80 dark:bg-emerald-900/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:scale-105 transition-transform">
-                <Shield className="w-5 h-5" />
+          <div
+            onClick={() => setSelectedMetricModal('total_blocked')}
+            className="relative overflow-hidden bg-gradient-to-br from-emerald-50 via-white to-white dark:from-emerald-950/30 dark:via-slate-900 dark:to-slate-900 border border-emerald-100 dark:border-emerald-900/40 rounded-2xl p-5 shadow-xs hover:shadow-md transition-all cursor-pointer group active-press"
+            title="Nhấp để xem đồ thị và phân tích chi tiết"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-100/80 dark:bg-emerald-900/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:scale-105 transition-transform">
+                  <Shield className="w-5 h-5" />
+                </div>
+                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  IOCs / Tổng domain chặn
+                </span>
               </div>
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                IOCs / Tổng domain chặn
+              <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100/70 dark:bg-emerald-900/50 px-2.5 py-1 rounded-full flex items-center space-x-1 flex-shrink-0">
+                <span>Chi tiết</span>
+                <ChevronRight className="w-3.5 h-3.5" />
               </span>
             </div>
-            <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100/70 dark:bg-emerald-900/50 px-2.5 py-1 rounded-full flex items-center space-x-1 flex-shrink-0">
-              <span>Chi tiết</span>
-              <ChevronRight className="w-3.5 h-3.5" />
-            </span>
+
+            <div className="mt-5">
+              <div className="text-[32px] leading-none font-extrabold font-mono text-slate-900 dark:text-white tracking-tight">
+                {stats ? totalActiveDisplay : '—'}
+              </div>
+              <div className="flex items-center space-x-1.5 mt-3 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+                <span>{stats ? 'Cập nhật trực tiếp từ CyberDNSTIP-DB' : 'Đang tải...'}</span>
+              </div>
+            </div>
           </div>
 
-          <div className="mt-5">
-            <div className="text-[32px] leading-none font-extrabold font-mono text-slate-900 dark:text-white tracking-tight">
-              {stats ? totalActiveDisplay : '—'}
+          {/* Card 2: SOC Triage Queue */}
+          <div
+            onClick={() => setSelectedMetricModal('soc_queue')}
+            className="relative overflow-hidden bg-gradient-to-br from-rose-50 via-white to-white dark:from-rose-950/30 dark:via-slate-900 dark:to-slate-900 border border-rose-100 dark:border-rose-900/40 rounded-2xl p-5 shadow-xs hover:shadow-md transition-all cursor-pointer group active-press"
+            title="Nhấp để xem đồ thị và phân tích chi tiết"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-rose-100/80 dark:bg-rose-900/50 flex items-center justify-center text-rose-600 dark:text-rose-400 group-hover:scale-105 transition-transform">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  Hàng đợi duyệt SOC
+                </span>
+              </div>
+              <span className="text-xs font-bold text-rose-700 dark:text-rose-300 bg-rose-100/70 dark:bg-rose-900/50 px-2.5 py-1 rounded-full flex items-center space-x-1 flex-shrink-0">
+                <span>Chi tiết</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </span>
             </div>
-            <div className="flex items-center space-x-1.5 mt-3 text-xs font-medium text-emerald-700 dark:text-emerald-400">
-              <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
-              <span>{stats ? 'Cập nhật trực tiếp từ CyberDNSTIP-DB' : 'Đang tải...'}</span>
+
+            <div className="mt-5">
+              <div className="text-[32px] leading-none font-extrabold font-mono text-rose-600 dark:text-rose-400 tracking-tight">
+                {reviewCount} Tên miền
+              </div>
+              <div className="flex items-center space-x-1.5 mt-3 text-xs font-medium text-rose-700 dark:text-rose-400">
+                <AlertOctagon className="w-3.5 h-3.5 flex-shrink-0" />
+                <span>Chờ phê duyệt thủ công</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 3: Nguồn cấp IOC & Phân loại Danh mục */}
+          <div
+            onClick={() => setSelectedMetricModal('sources_coverage')}
+            className="relative overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-white dark:from-indigo-950/30 dark:via-slate-900 dark:to-slate-900 border border-indigo-100 dark:border-indigo-900/40 rounded-2xl p-5 shadow-xs hover:shadow-md transition-all cursor-pointer group active-press"
+            title="Nhấp để xem nguồn cấp và phân loại chi tiết"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-100/80 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400 group-hover:scale-105 transition-transform">
+                  <Layers className="w-5 h-5" />
+                </div>
+                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  Nguồn cấp & danh mục
+                </span>
+              </div>
+              <span className="text-xs font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-100/70 dark:bg-indigo-900/50 px-2.5 py-1 rounded-full flex items-center space-x-1 flex-shrink-0">
+                <span>Chi tiết</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </span>
+            </div>
+
+            <div className="mt-5">
+              <div className="text-[32px] leading-none font-extrabold font-mono text-slate-900 dark:text-white tracking-tight">
+                {sources.length} Feeds / {categories.length} Nhóm
+              </div>
+              <div className="flex items-center space-x-1.5 mt-3 text-xs font-medium text-indigo-700 dark:text-indigo-400">
+                <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+                <span>
+                  {sources.filter((s) => s.status === 'healthy').length}/{sources.length || 0} nguồn hoạt động
+                  tốt
+                </span>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Card 2: SOC Triage Queue */}
-        <div
-          onClick={() => setSelectedMetricModal('soc_queue')}
-          className="relative overflow-hidden bg-gradient-to-br from-rose-50 via-white to-white dark:from-rose-950/30 dark:via-slate-900 dark:to-slate-900 border border-rose-100 dark:border-rose-900/40 rounded-2xl p-5 shadow-xs hover:shadow-md transition-all cursor-pointer group active-press"
-          title="Nhấp để xem đồ thị và phân tích chi tiết"
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-xl bg-rose-100/80 dark:bg-rose-900/50 flex items-center justify-center text-rose-600 dark:text-rose-400 group-hover:scale-105 transition-transform">
-                <AlertTriangle className="w-5 h-5" />
-              </div>
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                Hàng đợi duyệt SOC
-              </span>
-            </div>
-            <span className="text-xs font-bold text-rose-700 dark:text-rose-300 bg-rose-100/70 dark:bg-rose-900/50 px-2.5 py-1 rounded-full flex items-center space-x-1 flex-shrink-0">
-              <span>Chi tiết</span>
-              <ChevronRight className="w-3.5 h-3.5" />
-            </span>
-          </div>
-
-          <div className="mt-5">
-            <div className="text-[32px] leading-none font-extrabold font-mono text-rose-600 dark:text-rose-400 tracking-tight">
-              {reviewCount} Tên miền
-            </div>
-            <div className="flex items-center space-x-1.5 mt-3 text-xs font-medium text-rose-700 dark:text-rose-400">
-              <AlertOctagon className="w-3.5 h-3.5 flex-shrink-0" />
-              <span>Chờ phê duyệt thủ công</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Card 3: Nguồn cấp IOC & Phân loại Danh mục */}
-        <div
-          onClick={() => setSelectedMetricModal('sources_coverage')}
-          className="relative overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-white dark:from-indigo-950/30 dark:via-slate-900 dark:to-slate-900 border border-indigo-100 dark:border-indigo-900/40 rounded-2xl p-5 shadow-xs hover:shadow-md transition-all cursor-pointer group active-press"
-          title="Nhấp để xem nguồn cấp và phân loại chi tiết"
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-xl bg-indigo-100/80 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400 group-hover:scale-105 transition-transform">
-                <Layers className="w-5 h-5" />
-              </div>
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                Nguồn cấp & danh mục
-              </span>
-            </div>
-            <span className="text-xs font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-100/70 dark:bg-indigo-900/50 px-2.5 py-1 rounded-full flex items-center space-x-1 flex-shrink-0">
-              <span>Chi tiết</span>
-              <ChevronRight className="w-3.5 h-3.5" />
-            </span>
-          </div>
-
-          <div className="mt-5">
-            <div className="text-[32px] leading-none font-extrabold font-mono text-slate-900 dark:text-white tracking-tight">
-              {sources.length} Feeds / {categories.length} Nhóm
-            </div>
-            <div className="flex items-center space-x-1.5 mt-3 text-xs font-medium text-indigo-700 dark:text-indigo-400">
-              <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
-              <span>
-                {sources.filter((s) => s.status === 'healthy').length}/{sources.length || 0} nguồn hoạt động tốt
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Row 1b: Domain growth trend — real daily counts from firstSeen,
+        {/* Row 1b: Domain growth trend — real daily counts from firstSeen,
           last 30 days, every day present (even 0) so the bars never have a
           gap. No fabricated week-over-week % anywhere here. */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xs transition-colors">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-          <div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-white font-sans">
-              Tên miền độc hại mới phát hiện
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Theo dõi số lượng tên miền mới được phát hiện trong 30 ngày gần nhất.
-            </p>
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xs transition-colors">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white font-sans">
+                Tên miền độc hại mới phát hiện
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Theo dõi số lượng tên miền mới được phát hiện trong 30 ngày gần nhất.
+              </p>
+            </div>
           </div>
+
+          {!stats ? (
+            <div className="py-10 text-center text-slate-400 dark:text-slate-500 text-xs">
+              Đang tải dữ liệu từ CyberDNSTIP-DB...
+            </div>
+          ) : domainGrowth.every((g) => g.count === 0) ? (
+            <div className="py-10 text-center text-slate-400 dark:text-slate-500 text-xs">
+              Chưa có domain nào được phát hiện trong 30 ngày qua.
+            </div>
+          ) : (
+            <div className="h-56">
+              <canvas ref={growthCanvasRef} role="img" aria-label="Xu hướng domain mới bị chặn theo ngày" />
+            </div>
+          )}
         </div>
 
-        {!stats ? (
-          <div className="py-10 text-center text-slate-400 dark:text-slate-500 text-xs">Đang tải dữ liệu từ CyberDNSTIP-DB...</div>
-        ) : domainGrowth.every((g) => g.count === 0) ? (
-          <div className="py-10 text-center text-slate-400 dark:text-slate-500 text-xs">Chưa có domain nào được phát hiện trong 30 ngày qua.</div>
-        ) : (
-          <div className="h-56">
-            <canvas ref={growthCanvasRef} role="img" aria-label="Xu hướng domain mới bị chặn theo ngày" />
-          </div>
-        )}
-      </div>
-
-      {/* Row 2: Main Telemetry Spline Chart + Category Donut Breakdown */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left 2 Cols: Real status breakdown across every domain in the DB */}
-        <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xs flex flex-col justify-between transition-colors">
-          <div>
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-              <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white font-sans">
-                  Phân bố tên miền theo trạng thái xử lý
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Thống kê số lượng tên miền theo từng trạng thái xử lý trên nền tảng CyberDNS TI
-                </p>
+        {/* Row 2: Main Telemetry Spline Chart + Category Donut Breakdown */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left 2 Cols: Real status breakdown across every domain in the DB */}
+          <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xs flex flex-col justify-between transition-colors">
+            <div>
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white font-sans">
+                    Phân bố tên miền theo trạng thái xử lý
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Thống kê số lượng tên miền theo từng trạng thái xử lý trên nền tảng CyberDNS TI
+                  </p>
+                </div>
               </div>
+
+              {!stats ? (
+                <div className="py-10 text-center text-slate-400 dark:text-slate-500 text-xs">
+                  Đang tải dữ liệu từ CyberDNSTIP-DB...
+                </div>
+              ) : statusBreakdown.length === 0 || statusBreakdown.every((s) => s.count === 0) ? (
+                <div className="py-10 text-center text-slate-400 dark:text-slate-500 text-xs">
+                  Chưa có tên miền nào trong hệ thống.
+                </div>
+              ) : (
+                <div className="h-56">
+                  <canvas ref={statusCanvasRef} role="img" aria-label="Phân bổ theo trạng thái xử lý" />
+                </div>
+              )}
             </div>
 
-            {!stats ? (
-              <div className="py-10 text-center text-slate-400 dark:text-slate-500 text-xs">Đang tải dữ liệu từ CyberDNSTIP-DB...</div>
-            ) : statusBreakdown.length === 0 || statusBreakdown.every((s) => s.count === 0) ? (
-              <div className="py-10 text-center text-slate-400 dark:text-slate-500 text-xs">Chưa có tên miền nào trong hệ thống.</div>
-            ) : (
-              <div className="h-56">
-                <canvas ref={statusCanvasRef} role="img" aria-label="Phân bổ theo trạng thái xử lý" />
-              </div>
-            )}
-          </div>
-
-          <div className="pt-4 mt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
-            <span className="text-slate-400 dark:text-slate-500 uppercase font-bold tracking-wider">Tổng số tên miền trong DB</span>
-            <span className="font-extrabold font-mono text-slate-900 dark:text-white">{(stats?.totalAll ?? 0).toLocaleString('vi-VN')}</span>
-          </div>
-        </div>
-
-        {/* Right 1 Col: Donut Chart - Threat Category Distribution */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xs flex flex-col justify-between transition-colors">
-          <div>
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white font-sans tracking-tight">
-                  Phân bố tên miền theo danh mục (Category) bị chặn
-                </h3>
-              </div>
-              <button 
-                onClick={() => setSelectedMetricModal('sources_coverage')}
-                className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                title="Tùy chọn hiển thị & phân tích"
-              >
-                <MoreVertical className="w-4 h-4" />
-              </button>
+            <div className="pt-4 mt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+              <span className="text-slate-400 dark:text-slate-500 uppercase font-bold tracking-wider">
+                Tổng số tên miền trong DB
+              </span>
+              <span className="font-extrabold font-mono text-slate-900 dark:text-white">
+                {(stats?.totalAll ?? 0).toLocaleString('vi-VN')}
+              </span>
             </div>
+          </div>
 
-            {donutSlices.length === 0 ? (
-              <div className="py-16 text-center text-slate-400 dark:text-slate-500 text-xs">
-                {stats ? 'Chưa có domain đang chặn nào để phân bổ.' : 'Đang tải dữ liệu từ CyberDNSTIP-DB...'}
+          {/* Right 1 Col: Donut Chart - Threat Category Distribution */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xs flex flex-col justify-between transition-colors">
+            <div>
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white font-sans tracking-tight">
+                    Phân bố tên miền theo danh mục (Category) bị chặn
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setSelectedMetricModal('sources_coverage')}
+                  className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  title="Tùy chọn hiển thị & phân tích"
+                >
+                  <MoreVertical className="w-4 h-4" />
+                </button>
               </div>
-            ) : (
-            <>
-            {/* Real Chart.js doughnut (was a hand-drawn SVG arc-math donut).
+
+              {donutSlices.length === 0 ? (
+                <div className="py-16 text-center text-slate-400 dark:text-slate-500 text-xs">
+                  {stats
+                    ? 'Chưa có domain đang chặn nào để phân bổ.'
+                    : 'Đang tải dữ liệu từ CyberDNSTIP-DB...'}
+                </div>
+              ) : (
+                <>
+                  {/* Real Chart.js doughnut (was a hand-drawn SVG arc-math donut).
                 Hover is driven by Chart.js's own onHover callback into the
                 SAME activeDonutIndex state the center readout and the 2x2
                 cards below already used — their JSX is unchanged. Chart.js
@@ -783,216 +859,232 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 hand-positioned "floating pill" (computed from the SVG's own
                 angle math, which no longer exists) was removed rather than
                 reimplemented against canvas coordinates. */}
-            <div className="relative w-full h-64 flex items-center justify-center my-3">
-              <div className="w-56 h-56">
-                <canvas ref={donutCanvasRef} role="img" aria-label="Phân bổ danh mục nguy cơ" />
-              </div>
+                  <div className="relative w-full h-64 flex items-center justify-center my-3">
+                    <div className="w-56 h-56">
+                      <canvas ref={donutCanvasRef} role="img" aria-label="Phân bổ danh mục nguy cơ" />
+                    </div>
 
-              {/* Center Donut Readout */}
-              {(() => {
-                const activeItem = donutSlices[activeDonutIndex !== null && activeDonutIndex < donutSlices.length ? activeDonutIndex : 0];
-                return (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center px-4">
-                    <span
-                      className="text-xs font-bold font-sans transition-colors duration-200"
-                      style={{ color: activeItem.color }}
-                    >
-                      {activeItem.shortName}
-                    </span>
-                    <span className="text-2xl font-extrabold font-mono text-slate-900 dark:text-white tracking-tight mt-0.5">
-                      {activeItem.count}
-                    </span>
-                    <span className="text-xs font-mono text-slate-400 dark:text-slate-500 font-medium">
-                      {activeItem.percent} tỷ trọng
-                    </span>
+                    {/* Center Donut Readout */}
+                    {(() => {
+                      const activeItem =
+                        donutSlices[
+                          activeDonutIndex !== null && activeDonutIndex < donutSlices.length
+                            ? activeDonutIndex
+                            : 0
+                        ];
+                      return (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center px-4">
+                          <span
+                            className="text-xs font-bold font-sans transition-colors duration-200"
+                            style={{ color: activeItem.color }}
+                          >
+                            {activeItem.shortName}
+                          </span>
+                          <span className="text-2xl font-extrabold font-mono text-slate-900 dark:text-white tracking-tight mt-0.5">
+                            {activeItem.count}
+                          </span>
+                          <span className="text-xs font-mono text-slate-400 dark:text-slate-500 font-medium">
+                            {activeItem.percent} tỷ trọng
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </div>
-                );
-              })()}
+
+                  {/* 2x2 Category Metrics Cards below Donut */}
+                  <div className="grid grid-cols-2 gap-3 mt-2">
+                    {donutSlices.map((cat, i) => {
+                      const isSelected =
+                        (activeDonutIndex !== null && activeDonutIndex < donutSlices.length
+                          ? activeDonutIndex
+                          : 0) === i;
+                      return (
+                        <div
+                          key={cat.id}
+                          onMouseEnter={() => setActiveDonutIndex(i)}
+                          onClick={() => onNavigateToTab('domain')}
+                          className={`p-3.5 rounded-xl border transition-all cursor-pointer group ${
+                            isSelected
+                              ? 'bg-slate-50/90 dark:bg-slate-800/90 border-slate-300 dark:border-slate-600 shadow-xs ring-1 ring-slate-200/80 dark:ring-slate-700'
+                              : 'bg-slate-50/50 dark:bg-slate-800/30 border-slate-100 dark:border-slate-800/80 hover:bg-slate-100/70 dark:hover:bg-slate-800/60'
+                          }`}
+                        >
+                          <div className="flex items-center space-x-2">
+                            <span
+                              className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                              style={{ backgroundColor: cat.color }}
+                            ></span>
+                            <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 truncate font-sans">
+                              {cat.shortName.split('/')[0].trim()}
+                            </span>
+                          </div>
+                          <div className="mt-2 flex items-baseline justify-between">
+                            <span className="text-sm font-extrabold font-mono text-slate-900 dark:text-white tracking-tight">
+                              {cat.count}
+                            </span>
+                            {cat.delta ? (
+                              <span className="text-xs font-mono text-emerald-600 dark:text-emerald-400 font-semibold flex items-center">
+                                <ArrowUpRight className="w-3.5 h-3.5 inline mr-0.5" />
+                                {cat.delta}
+                              </span>
+                            ) : (
+                              <span className="text-xs font-mono text-slate-300 dark:text-slate-600">
+                                {cat.percent}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </div>
 
-            {/* 2x2 Category Metrics Cards below Donut */}
-            <div className="grid grid-cols-2 gap-3 mt-2">
-              {donutSlices.map((cat, i) => {
-                const isSelected = (activeDonutIndex !== null && activeDonutIndex < donutSlices.length ? activeDonutIndex : 0) === i;
-                return (
-                  <div
-                    key={cat.id}
-                    onMouseEnter={() => setActiveDonutIndex(i)}
-                    onClick={() => onNavigateToTab('domain')}
-                    className={`p-3.5 rounded-xl border transition-all cursor-pointer group ${
-                      isSelected 
-                        ? 'bg-slate-50/90 dark:bg-slate-800/90 border-slate-300 dark:border-slate-600 shadow-xs ring-1 ring-slate-200/80 dark:ring-slate-700' 
-                        : 'bg-slate-50/50 dark:bg-slate-800/30 border-slate-100 dark:border-slate-800/80 hover:bg-slate-100/70 dark:hover:bg-slate-800/60'
-                    }`}
-                  >
-                    <div className="flex items-center space-x-2">
-                      <span 
-                        className="w-2.5 h-2.5 rounded-full flex-shrink-0" 
-                        style={{ backgroundColor: cat.color }}
-                      ></span>
-                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 truncate font-sans">
-                        {cat.shortName.split('/')[0].trim()}
-                      </span>
-                    </div>
-                    <div className="mt-2 flex items-baseline justify-between">
-                      <span className="text-sm font-extrabold font-mono text-slate-900 dark:text-white tracking-tight">
-                        {cat.count}
-                      </span>
-                      {cat.delta ? (
-                        <span className="text-xs font-mono text-emerald-600 dark:text-emerald-400 font-semibold flex items-center">
-                          <ArrowUpRight className="w-3.5 h-3.5 inline mr-0.5" />
-                          {cat.delta}
-                        </span>
-                      ) : (
-                        <span className="text-xs font-mono text-slate-300 dark:text-slate-600">{cat.percent}</span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            </>
-            )}
+            <button
+              onClick={() => onNavigateToTab('domain')}
+              className="w-full mt-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs rounded-xl transition-colors cursor-pointer active-press font-sans flex items-center justify-center space-x-1.5"
+            >
+              <span>Mở Bộ Lọc Domain Explorer Theo Nhóm</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
           </div>
-
-          <button
-            onClick={() => onNavigateToTab('domain')}
-            className="w-full mt-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs rounded-xl transition-colors cursor-pointer active-press font-sans flex items-center justify-center space-x-1.5"
-          >
-            <span>Mở Bộ Lọc Domain Explorer Theo Nhóm</span>
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
         </div>
-      </div>
 
-      {/* Row 3: High-Risk TLD & ASNs (real data only — the brand-impersonation
+        {/* Row 3: High-Risk TLD & ASNs (real data only — the brand-impersonation
           panel that used to sit alongside this was 100% fabricated with no
           backing data source, so it was removed rather than left showing
           fake numbers). */}
-      <div className="grid grid-cols-1 gap-6">
-        {/* High Risk TLDs and ASNs */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xs flex flex-col justify-between transition-colors">
-          <div>
-            <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100 dark:border-slate-800">
-              <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white font-sans">
-                  Phân bố theo đuôi tên miền (TLD)
-                </h3>
+        <div className="grid grid-cols-1 gap-6">
+          {/* High Risk TLDs and ASNs */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xs flex flex-col justify-between transition-colors">
+            <div>
+              <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100 dark:border-slate-800">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white font-sans">
+                    Phân bố theo đuôi tên miền (TLD)
+                  </h3>
+                </div>
               </div>
-            </div>
 
-            {/* TLD Bar Chart — real counts per TLD (top 20 by blocked-domain
+              {/* TLD Bar Chart — real counts per TLD (top 20 by blocked-domain
                 count), one bar each, hover for exact count + share (was a
                 stacked list of horizontal percentage bars). */}
-            {tldBreakdownSource.length === 0 ? (
-              <div className="py-6 text-center text-slate-400 dark:text-slate-500 text-xs">
-                {stats ? 'Chưa có dữ liệu TLD.' : 'Đang tải...'}
-              </div>
-            ) : (
-              <div className="h-72">
-                <canvas ref={tldCanvasRef} role="img" aria-label="Phân bố theo đuôi tên miền (TLD)" />
-              </div>
-            )}
-
+              {tldBreakdownSource.length === 0 ? (
+                <div className="py-6 text-center text-slate-400 dark:text-slate-500 text-xs">
+                  {stats ? 'Chưa có dữ liệu TLD.' : 'Đang tải...'}
+                </div>
+              ) : (
+                <div className="h-72">
+                  <canvas ref={tldCanvasRef} role="img" aria-label="Phân bố theo đuôi tên miền (TLD)" />
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* DNS Blocklist URL — mỗi Category có 1 URL text thuần, công khai
+        {/* DNS Blocklist URL — mỗi Category có 1 URL text thuần, công khai
           không cần xác thực (Blocky tự động tải lại định kỳ, không có cách
           nào truyền credential), dạng {origin}/v1/blocklist/{category}.txt,
           khớp cách các nhà cung cấp blocklist thật (OISD, Hagezi...) công
           bố danh sách của họ. Đặt ở cuối trang theo yêu cầu — đây là thông
           tin tra cứu/tích hợp, không phải chỉ số vận hành cần xem đầu tiên. */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xs transition-all">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-3.5">
-          <div className="flex items-center space-x-3.5 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-primary-soft border border-primary/20 flex items-center justify-center text-primary flex-shrink-0">
-              <Link2 className="w-5 h-5" />
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xs transition-all">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3.5">
+            <div className="flex items-center space-x-3.5 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-primary-soft border border-primary/20 flex items-center justify-center text-primary flex-shrink-0">
+                <Link2 className="w-5 h-5" />
+              </div>
+              <div className="space-y-0.5 min-w-0">
+                <span className="block text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                  DNS Blocklist URL
+                </span>
+                <span className="block text-xs text-slate-500 dark:text-slate-400">
+                  Mỗi Category có một URL riêng và được cập nhật định kỳ
+                </span>
+              </div>
             </div>
-            <div className="space-y-0.5 min-w-0">
-              <span className="block text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-                DNS Blocklist URL
-              </span>
-              <span className="block text-xs text-slate-500 dark:text-slate-400">
-                Mỗi Category có một URL riêng và được cập nhật định kỳ
-              </span>
-            </div>
+
+            <button
+              onClick={handleCopyAllBlocklistUrls}
+              title="Sao chép toàn bộ URL của mọi Category, mỗi dòng một URL"
+              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-200/90 dark:border-slate-700 text-xs font-bold rounded-xl transition-all shadow-xs flex items-center space-x-2 cursor-pointer active-press flex-shrink-0"
+            >
+              {copiedBlocklistId === 'all' ? (
+                <Check className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
+              ) : (
+                <Files className="w-3.5 h-3.5" />
+              )}
+              <span>{copiedBlocklistId === 'all' ? 'Đã sao chép' : 'Sao chép tất cả'}</span>
+            </button>
           </div>
 
-          <button
-            onClick={handleCopyAllBlocklistUrls}
-            title="Sao chép toàn bộ URL của mọi Category, mỗi dòng một URL"
-            className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-200/90 dark:border-slate-700 text-xs font-bold rounded-xl transition-all shadow-xs flex items-center space-x-2 cursor-pointer active-press flex-shrink-0"
-          >
-            {copiedBlocklistId === 'all' ? (
-              <Check className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
-            ) : (
-              <Files className="w-3.5 h-3.5" />
-            )}
-            <span>{copiedBlocklistId === 'all' ? 'Đã sao chép' : 'Sao chép tất cả'}</span>
-          </button>
-        </div>
-
-        <div className="divide-y divide-slate-100 dark:divide-slate-800 border-t border-slate-100 dark:border-slate-800">
-          {categories.map((cat) => {
-            const url = buildBlocklistUrl(cat.id);
-            const isCopied = copiedBlocklistId === cat.id;
-            return (
-              <div key={cat.id} className="flex items-center gap-3 py-2.5">
-                <span
-                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: cat.color || '#64748b' }}
-                />
-                <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 w-32 sm:w-40 flex-shrink-0 truncate">
-                  {cat.name}
-                </span>
-                <code className="flex-1 min-w-0 truncate text-xs font-mono text-slate-500 dark:text-slate-400" title={url}>
-                  {url}
-                </code>
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  <button
-                    onClick={() => handleCopyBlocklistUrl(cat.id)}
-                    title="Sao chép URL"
-                    className="w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+          <div className="divide-y divide-slate-100 dark:divide-slate-800 border-t border-slate-100 dark:border-slate-800">
+            {categories.map((cat) => {
+              const url = buildBlocklistUrl(cat.id);
+              const isCopied = copiedBlocklistId === cat.id;
+              return (
+                <div key={cat.id} className="flex items-center gap-3 py-2.5">
+                  <span
+                    className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: cat.color || '#64748b' }}
+                  />
+                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 w-32 sm:w-40 flex-shrink-0 truncate">
+                    {cat.name}
+                  </span>
+                  <code
+                    className="flex-1 min-w-0 truncate text-xs font-mono text-slate-500 dark:text-slate-400"
+                    title={url}
                   >
-                    {isCopied ? <Check className="w-3.5 h-3.5 text-green-600 dark:text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  </button>
-                  <a
-                    href={url}
-                    target="_blank"
-                    rel="noreferrer"
-                    title="Mở URL trong tab mới"
-                    className="w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
+                    {url}
+                  </code>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <button
+                      onClick={() => handleCopyBlocklistUrl(cat.id)}
+                      title="Sao chép URL"
+                      className="w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                    >
+                      {isCopied ? (
+                        <Check className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noreferrer"
+                      title="Mở URL trong tab mới"
+                      className="w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-          {categories.length === 0 && (
-            <p className="py-3 text-xs text-slate-400 dark:text-slate-600">Chưa có Category nào.</p>
-          )}
+              );
+            })}
+            {categories.length === 0 && (
+              <p className="py-3 text-xs text-slate-400 dark:text-slate-600">Chưa có Category nào.</p>
+            )}
+          </div>
         </div>
-      </div>
 
-      {/* DNS Node status map — read-only copy of DnsNodesView.tsx's own
+        {/* DNS Node status map — read-only copy of DnsNodesView.tsx's own
           card, Admin-only (see isAdmin prop's own note above). Placed last
           on the page per explicit request — infrastructure/reference info,
           not an operational metric that needs to be seen first, same
           reasoning as the DNS Blocklist URL card just above it. */}
-      {isAdmin && (
-        <Suspense
-          fallback={
-            <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xs text-xs text-slate-400 dark:text-slate-500">
-              Đang tải...
-            </div>
-          }
-        >
-          <DnsNodeStatusCard />
-        </Suspense>
-      )}
+        {isAdmin && (
+          <Suspense
+            fallback={
+              <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xs text-xs text-slate-400 dark:text-slate-500">
+                Đang tải...
+              </div>
+            }
+          >
+            <DnsNodeStatusCard />
+          </Suspense>
+        )}
       </div>
 
       {/* Metric Detail Modal when clicking on any of the 3 Top KPI Blocks */}
