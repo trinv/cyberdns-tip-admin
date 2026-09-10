@@ -145,6 +145,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const categoryBreakdownSource = liveCategoryBreakdown || [];
   const totalActiveDisplay = stats ? stats.totalActive.toLocaleString('vi-VN') : '—';
 
+  // Already fetched (via stats/sources props), never previously rendered on
+  // this page — backs the new "hoạt động gần đây" + "tình trạng nguồn cấp"
+  // rail cards and the feed-error banner below. No new API calls.
+  const recentActivity = stats?.recentActive || [];
+  const erroredSources = sources.filter((s) => s.status === 'error');
+  const SOURCE_STATUS_DOT: Record<string, string> = {
+    healthy: 'bg-emerald-500',
+    warning: 'bg-amber-500',
+    error: 'bg-rose-500',
+    syncing: 'bg-blue-500',
+    idle: 'bg-slate-400',
+  };
+
   // Processing-status breakdown (active / allowlist / unblocked —
   // 'grace_period' and 'protected' both removed per explicit request) —
   // real counts across ALL domains, not just active ones, replacing what
@@ -618,6 +631,27 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   return (
     <div className="flex-1 bg-[#f8fafc] dark:bg-[#0B1120] overflow-y-auto h-full p-4 sm:p-6 transition-colors">
       <div className="space-y-6 max-w-7xl mx-auto w-full">
+        {/* Cảnh báo vận hành — chỉ hiện khi có nguồn feed đang lỗi đồng bộ.
+          Tín hiệu này trước đây chỉ xem được sau khi bấm mở Card 3's modal
+          (sources_coverage); một dashboard SOC cần thấy ngay không cần
+          click. Đặt trước cả KPI vì đây là cảnh báo cần hành động, không
+          phải số liệu thường quy. */}
+        {erroredSources.length > 0 && (
+          <div className="flex items-start space-x-2 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 rounded-2xl px-4 py-3 font-medium">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <span className="flex-1">
+              {erroredSources.length} nguồn feed đang gặp lỗi đồng bộ — có thể ảnh hưởng tới độ mới của
+              blocklist.
+            </span>
+            <button
+              onClick={() => setSelectedMetricModal('sources_coverage')}
+              className="font-bold underline decoration-rose-400 hover:decoration-rose-600 flex-shrink-0 cursor-pointer"
+            >
+              Xem chi tiết →
+            </button>
+          </div>
+        )}
+
         {/* Row 1: 3 Key SOC Operational Metric Cards - Simplified General Numbers */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
           {/* Card 1: Tổng IOC Tên miền Đang chặn — gradient-tinted "hero
@@ -725,34 +759,81 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Row 1b: Domain growth trend — real daily counts from firstSeen,
-          last 30 days, every day present (even 0) so the bars never have a
-          gap. No fabricated week-over-week % anywhere here. */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xs transition-colors">
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-            <div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-white font-sans">
-                Tên miền độc hại mới phát hiện
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Theo dõi số lượng tên miền mới được phát hiện trong 30 ngày gần nhất.
-              </p>
+        {/* Row 1b: Domain growth trend (2/3) + "Hoạt động gần đây" rail
+          (1/3) — cùng pattern grid lg:grid-cols-3 như Row 2 ngay bên dưới,
+          thay vì để biểu đồ đơn độc full-width. Rail dùng stats.recentActive
+          (6 domain active mới nhất, server đã ORDER BY lastSeen DESC), dữ
+          liệu đã fetch sẵn nhưng trước đây không có chỗ nào hiển thị. */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xs transition-colors">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white font-sans">
+                  Tên miền độc hại mới phát hiện
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Theo dõi số lượng tên miền mới được phát hiện trong 30 ngày gần nhất.
+                </p>
+              </div>
             </div>
+
+            {!stats ? (
+              <div className="py-10 text-center text-slate-400 dark:text-slate-500 text-xs">
+                Đang tải dữ liệu từ CyberDNSTIP-DB...
+              </div>
+            ) : domainGrowth.every((g) => g.count === 0) ? (
+              <div className="py-10 text-center text-slate-400 dark:text-slate-500 text-xs">
+                Chưa có domain nào được phát hiện trong 30 ngày qua.
+              </div>
+            ) : (
+              <div className="h-56">
+                <canvas ref={growthCanvasRef} role="img" aria-label="Xu hướng domain mới bị chặn theo ngày" />
+              </div>
+            )}
           </div>
 
-          {!stats ? (
-            <div className="py-10 text-center text-slate-400 dark:text-slate-500 text-xs">
-              Đang tải dữ liệu từ CyberDNSTIP-DB...
+          <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xs flex flex-col justify-between transition-colors">
+            <div>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white font-sans mb-3">
+                Hoạt động gần đây
+              </h3>
+              {!stats ? (
+                <div className="py-6 text-center text-slate-400 dark:text-slate-500 text-xs">Đang tải...</div>
+              ) : recentActivity.length === 0 ? (
+                <div className="py-6 text-center text-slate-400 dark:text-slate-500 text-xs">
+                  Chưa có domain nào được phát hiện gần đây.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {recentActivity.map((item) => {
+                    const cat = categories.find((c) => c.id === item.primaryCategory);
+                    return (
+                      <div key={item.id} className="flex items-center space-x-2.5">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: cat?.color || '#64748b' }}
+                        ></span>
+                        <span className="flex-1 truncate text-xs font-semibold text-slate-700 dark:text-slate-200 font-mono">
+                          {item.domain}
+                        </span>
+                        <span className="text-xs text-slate-400 dark:text-slate-500 flex-shrink-0">
+                          {new Date(item.lastSeen).toLocaleDateString('vi-VN')}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          ) : domainGrowth.every((g) => g.count === 0) ? (
-            <div className="py-10 text-center text-slate-400 dark:text-slate-500 text-xs">
-              Chưa có domain nào được phát hiện trong 30 ngày qua.
-            </div>
-          ) : (
-            <div className="h-56">
-              <canvas ref={growthCanvasRef} role="img" aria-label="Xu hướng domain mới bị chặn theo ngày" />
-            </div>
-          )}
+
+            <button
+              onClick={() => onNavigateToTab('domain')}
+              className="w-full mt-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs rounded-xl transition-colors cursor-pointer active-press font-sans flex items-center justify-center space-x-1.5"
+            >
+              <span>Xem tất cả trong Domain Explorer</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
         {/* Row 2: Main Telemetry Spline Chart + Category Donut Breakdown */}
@@ -922,13 +1003,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Row 3: High-Risk TLD & ASNs (real data only — the brand-impersonation
-          panel that used to sit alongside this was 100% fabricated with no
-          backing data source, so it was removed rather than left showing
-          fake numbers). */}
-        <div className="grid grid-cols-1 gap-6">
-          {/* High Risk TLDs and ASNs */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xs flex flex-col justify-between transition-colors">
+        {/* Row 3: High-Risk TLD (2/3) + "Tình trạng nguồn cấp" rail (1/3) —
+          real data only (the brand-impersonation panel that used to sit
+          alongside this was 100% fabricated with no backing data source, so
+          it was removed rather than left showing fake numbers; the rail
+          here replaces it with real, already-fetched feed-source status).
+          Cùng pattern grid lg:grid-cols-3 như Row 1b/Row 2. */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* High Risk TLDs */}
+          <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xs flex flex-col justify-between transition-colors">
             <div>
               <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100 dark:border-slate-800">
                 <div>
@@ -951,6 +1034,48 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </div>
               )}
             </div>
+          </div>
+
+          <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xs flex flex-col justify-between transition-colors">
+            <div>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white font-sans mb-3">
+                Tình trạng nguồn cấp
+              </h3>
+              {sources.length === 0 ? (
+                <div className="py-6 text-center text-slate-400 dark:text-slate-500 text-xs">
+                  Chưa có nguồn feed nào.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {sources.slice(0, 5).map((s) => (
+                    <div key={s.id} className="flex items-center space-x-2.5">
+                      <span
+                        className={`w-2 h-2 rounded-full flex-shrink-0 ${SOURCE_STATUS_DOT[s.status] || 'bg-slate-400'}`}
+                      ></span>
+                      <span className="flex-1 truncate text-xs font-semibold text-slate-700 dark:text-slate-200">
+                        {s.name}
+                      </span>
+                      <span className="text-xs font-mono text-slate-400 dark:text-slate-500 flex-shrink-0">
+                        {s.domainCount.toLocaleString('vi-VN')}
+                      </span>
+                    </div>
+                  ))}
+                  {sources.length > 5 && (
+                    <p className="text-xs text-slate-400 dark:text-slate-500">
+                      +{sources.length - 5} nguồn khác
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => setSelectedMetricModal('sources_coverage')}
+              className="w-full mt-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs rounded-xl transition-colors cursor-pointer active-press font-sans flex items-center justify-center space-x-1.5"
+            >
+              <span>Xem tất cả nguồn cấp</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
 
