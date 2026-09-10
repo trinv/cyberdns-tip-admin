@@ -13,15 +13,30 @@
 import 'dotenv/config';
 import path from 'node:path';
 import process from 'node:process';
+import { sql } from 'drizzle-orm';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { db, pool } from '../src/db/index.ts';
 
 const migrationsFolder = path.resolve(process.cwd(), 'drizzle');
 
+async function appliedCount(): Promise<number> {
+  try {
+    const r = await db.execute<{ n: number }>(
+      sql`SELECT count(*)::int AS n FROM drizzle."__drizzle_migrations"`,
+    );
+    return Number(r.rows[0]?.n ?? 0);
+  } catch {
+    return 0; // table doesn't exist yet on a truly fresh DB
+  }
+}
+
 async function main() {
+  const before = await appliedCount();
   console.log(`[migrate] applying migrations from ${migrationsFolder} ...`);
   await migrate(db, { migrationsFolder });
-  console.log('[migrate] database is up to date.');
+  const after = await appliedCount();
+  const ran = after - before;
+  console.log(ran > 0 ? `[migrate] applied ${ran} new migration(s).` : '[migrate] already up to date.');
 }
 
 main()

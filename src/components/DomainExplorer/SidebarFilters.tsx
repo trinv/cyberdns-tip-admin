@@ -1,6 +1,6 @@
 import React from 'react';
-import { CategoryInfo, SavedFilter, DomainStatus } from '../../types';
-import { Plus, Bookmark, Filter, X } from 'lucide-react';
+import { CategoryInfo, DomainStatus } from '../../types';
+import { Plus, Filter, X } from 'lucide-react';
 
 const STATUS_OPTIONS: { value: DomainStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'Tất cả' },
@@ -15,11 +15,7 @@ interface SidebarFiltersProps {
   onSelectCategory: (categoryId: string) => void;
   selectedStatus: DomainStatus | 'all';
   onSelectStatus: (status: DomainStatus | 'all') => void;
-  savedFilters: SavedFilter[];
-  activeSavedFilter: string | null;
-  onSelectSavedFilter: (filter: SavedFilter) => void;
   onOpenAddCategory: () => void;
-  onSaveCurrentFilter: () => void;
   // Creating/renaming/deleting a category is Admin-only server-side (see
   // server.ts) — hide the "add category" affordances for everyone else.
   canManageCategories?: boolean;
@@ -56,12 +52,8 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
   onSelectCategory,
   selectedStatus,
   onSelectStatus,
-  savedFilters,
-  activeSavedFilter,
-  onSelectSavedFilter,
   onOpenAddCategory,
   canManageCategories = true,
-  onSaveCurrentFilter,
   allCategoriesCount,
   allStatusCount,
   statusCounts,
@@ -249,51 +241,6 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
             );
           })}
         </div>
-      </div>
-
-      {/* BỘ LỌC ĐÃ LƯU SECTION */}
-      <div>
-        <div className="flex items-center justify-between px-2 mb-2.5 text-slate-400 dark:text-slate-500 font-bold tracking-wider text-xs uppercase">
-          <span>BỘ LỌC ĐÃ LƯU</span>
-          <button
-            onClick={onSaveCurrentFilter}
-            title="Lưu bộ lọc"
-            className="text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors p-0.5 rounded cursor-pointer"
-          >
-            <Bookmark className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
-        <div className="space-y-1">
-          {savedFilters.map((sf) => {
-            const isFilterActive = activeSavedFilter === sf.id;
-            return (
-              <button
-                key={sf.id}
-                onClick={() => {
-                  onSelectSavedFilter(sf);
-                  if (onCloseMobile) onCloseMobile();
-                }}
-                className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-left transition-colors cursor-pointer ${
-                  isFilterActive
-                    ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold'
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                <span className="truncate">{sf.name}</span>
-                <span className="font-mono text-xs text-slate-400 dark:text-slate-500 ml-1">{sf.count}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        <button
-          onClick={onSaveCurrentFilter}
-          className="w-full mt-2 text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 text-xs py-1.5 text-left px-2 flex items-center space-x-1.5 transition-colors cursor-pointer font-medium"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          <span>Lưu bộ lọc hiện tại</span>
-        </button>
       </div>
     </div>
   );

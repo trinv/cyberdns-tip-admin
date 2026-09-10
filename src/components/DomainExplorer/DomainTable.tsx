@@ -64,7 +64,6 @@ interface DomainTableProps {
   onOpenExportModal: () => void;
   onQuickExportTxt: () => void;
   onQuickExportCsv: () => void;
-  onSaveFilter: () => void;
   onOpenMobileFilters?: () => void;
   // Bulk domain mutations (allowlist / unblock / block / add-to-group) are
   // Reviewer/Admin only server-side (POST /api/domains/bulk-action). An
@@ -101,7 +100,6 @@ export const DomainTable: React.FC<DomainTableProps> = ({
   onOpenExportModal,
   onQuickExportTxt,
   onQuickExportCsv,
-  onSaveFilter,
   onOpenMobileFilters,
   canBulkAction = true,
 }) => {
@@ -355,14 +353,6 @@ export const DomainTable: React.FC<DomainTableProps> = ({
               )}
             </div>
           )}
-
-          {/* Save Filter Button */}
-          <button
-            onClick={onSaveFilter}
-            className="text-xs text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 font-semibold px-2.5 py-1.5 rounded-xl hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors cursor-pointer"
-          >
-            Lưu bộ lọc
-          </button>
         </div>
 
         {/* Export Dropdown Menu */}

@@ -217,12 +217,3 @@ export interface GeoProvince {
   latitude: number;
   longitude: number;
 }
-
-export interface SavedFilter {
-  id: string;
-  name: string;
-  query: string;
-  category?: string;
-  status?: string;
-  count: number;
-}

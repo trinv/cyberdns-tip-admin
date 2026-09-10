@@ -5,7 +5,6 @@ import {
   FeedSource,
   AuditLog,
   ReviewDomainItem,
-  SavedFilter,
   DomainStatus,
   DashboardStats,
   CategoryStatusBreakdown,
@@ -257,7 +256,6 @@ export default function App() {
   const [sources, setSources] = useState<FeedSource[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [reviewItems, setReviewItems] = useState<ReviewDomainItem[]>([]);
-  const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
   const [managedUsers, setManagedUsers] = useState<AppUser[]>([]);
   // Backs the sidebar's "TRẠNG THÁI BLOCKLIST" section specifically — SCOPED
@@ -333,11 +331,9 @@ export default function App() {
   const [selectedSource, setSelectedSource] = useState<string>('');
   // Single-select (was a multi-checkbox Record<DomainStatus, boolean>) — a
   // dropdown of "Tất cả" + the 4 real statuses matches how this was already
-  // effectively used (handleSelectSavedFilter below only ever restored ONE
-  // status at a time; nothing in the UI let a user meaningfully pick more
-  // than one at once either).
+  // effectively used; nothing in the UI let a user meaningfully pick more
+  // than one status at once either.
   const [selectedStatus, setSelectedStatus] = useState<DomainStatus | 'all'>('active');
-  const [activeSavedFilter, setActiveSavedFilter] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
   // Debounced so typing a search term doesn't fire a request per keystroke.
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>('');
@@ -698,17 +694,6 @@ export default function App() {
   // Status filter dropdown selection
   const handleSelectStatus = (status: DomainStatus | 'all') => {
     setSelectedStatus(status);
-  };
-
-  // Saved Filter select
-  const handleSelectSavedFilter = (sf: SavedFilter) => {
-    setActiveSavedFilter(sf.id);
-    if (sf.category) setSelectedCategory(sf.category);
-    if (sf.query) setSearchQuery(sf.query);
-    if (sf.status) {
-      setSelectedStatus(sf.status as DomainStatus);
-    }
-    showToast(`Đã áp dụng bộ lọc: ${sf.name}`, 'info');
   };
 
   // Bulk Actions
@@ -1108,14 +1093,8 @@ export default function App() {
                 onSelectCategory={setSelectedCategory}
                 selectedStatus={selectedStatus}
                 onSelectStatus={handleSelectStatus}
-                savedFilters={savedFilters}
-                activeSavedFilter={activeSavedFilter}
-                onSelectSavedFilter={handleSelectSavedFilter}
                 onOpenAddCategory={() => setIsCategoryModalOpen(true)}
                 canManageCategories={isAdmin}
-                onSaveCurrentFilter={() =>
-                  showToast('Đã lưu bộ lọc tìm kiếm hiện tại vào danh sách!', 'info')
-                }
                 allCategoriesCount={dashboardStats?.totalAll ?? 0}
                 allStatusCount={categoryStatusBreakdown?.totalAll ?? 0}
                 statusCounts={statusCountsMap}
@@ -1162,7 +1141,6 @@ export default function App() {
                 onOpenExportModal={() => setIsExportModalOpen(true)}
                 onQuickExportTxt={handleQuickExportTxt}
                 onQuickExportCsv={handleQuickExportCsv}
-                onSaveFilter={() => showToast('Đã lưu bộ lọc tìm kiếm hiện tại vào danh sách!', 'info')}
                 onOpenMobileFilters={() => setIsMobileFiltersOpen(true)}
                 canBulkAction={canReview}
               />

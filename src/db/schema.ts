@@ -369,18 +369,7 @@ export const auditLogs = pgTable(
   ],
 );
 
-// 8. Saved Filters Table
-export const savedFilters = pgTable('saved_filters', {
-  id: varchar('id', { length: 100 }).primaryKey(),
-  name: text('name').notNull(),
-  query: text('query').default('').notNull(),
-  category: varchar('category', { length: 100 }),
-  status: varchar('status', { length: 50 }),
-  count: integer('count').default(0).notNull(),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-});
-
-// 9. DNS Nodes Table — CyberDNS's own real DNS resolver fleet (NOT a threat
+// 8. DNS Nodes Table — CyberDNS's own real DNS resolver fleet (NOT a threat
 // feed source). Purpose: (a) an operational inventory of the physical/
 // virtual servers running Blocky, with location/provider/tier for map +
 // reporting, and (b) the allowlist backing the Blocklist-URL ACL below —

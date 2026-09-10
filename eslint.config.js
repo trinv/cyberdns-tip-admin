@@ -50,11 +50,8 @@ export default tseslint.config(
       // genuinely dead locals.
       '@typescript-eslint/no-unused-vars': 'off',
       'unused-imports/no-unused-imports': 'error',
-      // Dead locals / props: `warn` for now — a dedicated dead-code pass
-      // (DEBT-04: savedFilters scaffolding, release-alert props, MobileBottomNav)
-      // removes them, then this flips to `error`.
       'unused-imports/no-unused-vars': [
-        'warn',
+        'error',
         {
           vars: 'all',
           varsIgnorePattern: '^_',
