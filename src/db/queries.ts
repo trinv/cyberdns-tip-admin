@@ -2589,115 +2589,133 @@ export async function rollbackAuditLog(logId: number, userEmail: string, reason?
       throw new Error('Giao dịch này không có dữ liệu để hoàn tác (được ghi trước khi tính năng Hoàn tác hỗ trợ việc này).');
     }
 
-    let summary: string;
+    // Everything below runs as ONE transaction: the forward mutations were
+    // deliberately transactional (see updateDomain / bulkUpdateDomains /
+    // pauseFeedSource), so their undo must be too — a failure partway
+    // through used to leave a half-reverted domain plus `canRollback`
+    // in an inconsistent state. The `add_group` undo also no longer
+    // swallows its own error with `.catch(() => {})`.
+    return await db.transaction(async (tx) => {
+      let summary: string;
 
-    if (data.type === 'edit_group') {
-      const target = await db.select().from(domains).where(eq(domains.id, data.domainId)).limit(1);
-      if (!target[0]) throw new Error('Tên miền không còn tồn tại — không thể hoàn tác.');
+      if (data.type === 'edit_group') {
+        const target = await tx.select().from(domains).where(eq(domains.id, data.domainId)).limit(1);
+        if (!target[0]) throw new Error('Tên miền không còn tồn tại — không thể hoàn tác.');
 
-      const desired = new Set<string>(data.before.categories || []);
-      const current = new Set<string>(target[0].categories || []);
-      const toAdd = [...desired].filter((c) => !current.has(c));
-      const toRemove = [...current].filter((c) => !desired.has(c));
-      if (toAdd.length > 0) {
-        await addDomainCategoryMemberships(
-          db,
-          toAdd.map((categoryId) => ({ domainId: data.domainId, categoryId, sourceLabel: 'Hoàn tác (Rollback)' }))
-        );
-      }
-      for (const categoryId of toRemove) {
-        await removeDomainCategoryMemberships(db, [data.domainId], categoryId);
-      }
+        const desired = new Set<string>(data.before.categories || []);
+        const current = new Set<string>(target[0].categories || []);
+        const toAdd = [...desired].filter((c) => !current.has(c));
+        const toRemove = [...current].filter((c) => !desired.has(c));
+        if (toAdd.length > 0) {
+          await addDomainCategoryMemberships(
+            tx,
+            toAdd.map((categoryId) => ({ domainId: data.domainId, categoryId, sourceLabel: 'Hoàn tác (Rollback)' }))
+          );
+        }
+        for (const categoryId of toRemove) {
+          await removeDomainCategoryMemberships(tx, [data.domainId], categoryId);
+        }
 
-      await db
-        .update(domains)
-        .set({
-          status: data.before.status,
-          sourceDetail: data.before.sourceDetail,
-          tags: data.before.tags,
-          isProtected: data.before.isProtected,
-          // Only present on entries written after this field started being
-          // snapshotted (see updateDomain) — undefined on older ones leaves
-          // the column untouched rather than overwriting it with `undefined`.
-          ...(data.before.unblockedBySourcePause !== undefined
-            ? { unblockedBySourcePause: data.before.unblockedBySourcePause }
-            : {}),
-          updatedAt: new Date(),
-        })
-        .where(eq(domains.id, data.domainId));
-
-      summary = `Hoàn tác cập nhật tên miền: ${target[0].domain}`;
-    } else if (data.type === 'add') {
-      const target = await db.select({ domain: domains.domain }).from(domains).where(eq(domains.id, data.domainId)).limit(1);
-      if (!target[0]) throw new Error('Tên miền không còn tồn tại — không thể hoàn tác.');
-
-      // existedBefore: restore its real prior status. Otherwise this domain
-      // row didn't exist until this "add" created it — soft-revert to
-      // "unblocked" (never a hard delete, consistent with how pausing/
-      // deleting a feed source already un-does its effect elsewhere).
-      await db
-        .update(domains)
-        .set({ status: data.existedBefore ? data.previousStatus : 'unblocked', updatedAt: new Date() })
-        .where(eq(domains.id, data.domainId));
-
-      summary = `Hoàn tác thêm tên miền: ${target[0].domain}`;
-    } else if (data.type === 'bulk_action') {
-      const items = (data.items || []) as {
-        domainId: number;
-        status: string;
-        hadCategoryBefore?: boolean;
-        unblockedBySourcePause?: boolean;
-      }[];
-      for (const item of items) {
-        await db
+        await tx
           .update(domains)
           .set({
-            status: item.status,
+            status: data.before.status,
+            sourceDetail: data.before.sourceDetail,
+            tags: data.before.tags,
+            isProtected: data.before.isProtected,
             // Only present on entries written after this field started being
-            // snapshotted (see bulkUpdateDomains) — undefined on older ones
-            // leaves the column untouched rather than overwriting it.
-            ...(item.unblockedBySourcePause !== undefined
-              ? { unblockedBySourcePause: item.unblockedBySourcePause }
+            // snapshotted (see updateDomain) — undefined on older ones leaves
+            // the column untouched rather than overwriting it with `undefined`.
+            ...(data.before.unblockedBySourcePause !== undefined
+              ? { unblockedBySourcePause: data.before.unblockedBySourcePause }
               : {}),
             updatedAt: new Date(),
           })
-          .where(eq(domains.id, item.domainId));
-      }
-      // add_group is additive now (a domain can be in several categories —
-      // see schema.ts's note on domain_categories' composite unique
-      // constraint), so undoing it means removing exactly the category THIS
-      // action added — never touching a domain that already had it before
-      // (hadCategoryBefore), and never touching any other category the
-      // domain has, since add_group never removed anything to begin with.
-      if (data.action === 'add_group' && data.category) {
-        const newlyAddedIds = items.filter((i) => !i.hadCategoryBefore).map((i) => i.domainId);
-        if (newlyAddedIds.length > 0) {
-          // Scoped to feedSourceId=null — the bulk toolbar's own
-          // attribution (see bulkUpdateDomains) — never touches a real feed
-          // source's own, independent row for the same category.
-          await removeDomainCategoryMemberships(db, newlyAddedIds, data.category, null).catch(() => {});
+          .where(eq(domains.id, data.domainId));
+
+        summary = `Hoàn tác cập nhật tên miền: ${target[0].domain}`;
+      } else if (data.type === 'add') {
+        const target = await tx.select({ domain: domains.domain }).from(domains).where(eq(domains.id, data.domainId)).limit(1);
+        if (!target[0]) throw new Error('Tên miền không còn tồn tại — không thể hoàn tác.');
+
+        // existedBefore: restore its real prior status. Otherwise this domain
+        // row didn't exist until this "add" created it — soft-revert to
+        // "unblocked" (never a hard delete, consistent with how pausing/
+        // deleting a feed source already un-does its effect elsewhere).
+        await tx
+          .update(domains)
+          .set({ status: data.existedBefore ? data.previousStatus : 'unblocked', updatedAt: new Date() })
+          .where(eq(domains.id, data.domainId));
+
+        summary = `Hoàn tác thêm tên miền: ${target[0].domain}`;
+      } else if (data.type === 'bulk_action') {
+        const items = (data.items || []) as {
+          domainId: number;
+          status: string;
+          hadCategoryBefore?: boolean;
+          unblockedBySourcePause?: boolean;
+        }[];
+        for (const item of items) {
+          await tx
+            .update(domains)
+            .set({
+              status: item.status,
+              // Only present on entries written after this field started being
+              // snapshotted (see bulkUpdateDomains) — undefined on older ones
+              // leaves the column untouched rather than overwriting it.
+              ...(item.unblockedBySourcePause !== undefined
+                ? { unblockedBySourcePause: item.unblockedBySourcePause }
+                : {}),
+              updatedAt: new Date(),
+            })
+            .where(eq(domains.id, item.domainId));
         }
+        // add_group is additive now (a domain can be in several categories —
+        // see schema.ts's note on domain_categories' composite unique
+        // constraint), so undoing it means removing exactly the category THIS
+        // action added — never touching a domain that already had it before
+        // (hadCategoryBefore), and never touching any other category the
+        // domain has, since add_group never removed anything to begin with.
+        if (data.action === 'add_group' && data.category) {
+          const newlyAddedIds = items.filter((i) => !i.hadCategoryBefore).map((i) => i.domainId);
+          if (newlyAddedIds.length > 0) {
+            // Scoped to feedSourceId=null — the bulk toolbar's own
+            // attribution (see bulkUpdateDomains) — never touches a real feed
+            // source's own, independent row for the same category. NOT
+            // swallowed: if this fails the whole rollback rolls back.
+            await removeDomainCategoryMemberships(tx, newlyAddedIds, data.category, null);
+          }
+        }
+        summary = `Hoàn tác thao tác hàng loạt trên ${items.length} tên miền`;
+      } else {
+        throw new Error('Loại giao dịch này chưa hỗ trợ hoàn tác tự động.');
       }
-      summary = `Hoàn tác thao tác hàng loạt trên ${items.length} tên miền`;
-    } else {
-      throw new Error('Loại giao dịch này chưa hỗ trợ hoàn tác tự động.');
-    }
 
-    // Once rolled back, the original entry can't be rolled back again.
-    await db.update(auditLogs).set({ canRollback: false }).where(eq(auditLogs.id, logId));
+      // Once rolled back, the original entry can't be rolled back again —
+      // re-check canRollback in the WHERE so two concurrent rollbacks of the
+      // same entry can't both proceed.
+      const flipped = await tx
+        .update(auditLogs)
+        .set({ canRollback: false })
+        .where(and(eq(auditLogs.id, logId), eq(auditLogs.canRollback, true)))
+        .returning({ id: auditLogs.id });
+      if (!flipped[0]) {
+        throw new Error('Giao dịch này vừa được hoàn tác bởi một thao tác khác.');
+      }
 
-    await db.insert(auditLogs).values({
-      user: userEmail || 'Admin',
-      role: 'Admin',
-      action: 'rollback',
-      targetCount: log.targetCount,
-      summary,
-      reason: reason || `Hoàn tác giao dịch #${logId}: ${log.summary}`,
-      canRollback: false,
-      details: [`Hoàn tác giao dịch gốc #${logId}`, log.summary],
+      await tx.insert(auditLogs).values({
+        user: userEmail || 'Admin',
+        role: 'Admin',
+        action: 'rollback',
+        targetCount: log.targetCount,
+        summary,
+        reason: reason || `Hoàn tác giao dịch #${logId}: ${log.summary}`,
+        canRollback: false,
+        details: [`Hoàn tác giao dịch gốc #${logId}`, log.summary],
+      });
+
+      return { success: true, summary };
     });
-
-    return { success: true, summary };
   } catch (error: any) {
     console.error('rollbackAuditLog failed:', error);
     // A deliberately-thrown, already-clear message above (e.g. "expired",
