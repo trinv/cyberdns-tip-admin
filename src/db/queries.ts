@@ -23,6 +23,7 @@ import { isIPv4, isIPv6 } from 'node:net';
 import { parseFeedText } from './feedParser.ts';
 import { hashPassword, verifyPassword, burnPasswordCompare, generateSessionToken, generateTempPassword } from '../lib/password.ts';
 import { sendNewIpLoginAlert } from '../lib/mailer.ts';
+import { assertPublicFeedUrl, safeFeedFetch } from '../lib/ssrfGuard.ts';
 // bulkCreateDomains' bulk load uses the real COPY wire protocol — the one
 // thing Drizzle's query builder has no equivalent for — so it needs a raw
 // pg client (see `pool` above) rather than going through `db`.
@@ -1561,6 +1562,13 @@ export async function createFeedSource(data: {
       throw new Error(`Nhóm danh mục không tồn tại: ${data.category}. Vui lòng chọn lại nhóm hợp lệ.`);
     }
 
+    // Early, friendly rejection of an obviously-bad feed URL (wrong scheme,
+    // an internal IP literal). The full DNS-resolution + redirect check
+    // happens at sync time in runFeedSourceSyncJob (safeFeedFetch) — that's
+    // the real SSRF boundary; this just spares the admin a confusing
+    // failure on the first sync instead.
+    assertPublicFeedUrl(data.url);
+
     const slug = data.name
       .toLowerCase()
       .trim()
@@ -1798,25 +1806,33 @@ async function runFeedSourceSyncJob(id: string, actingUser?: { email?: string; r
     slotAcquired = true;
 
     // --- Phase 1: download the full feed to local memory (0-50%) ---
+    // Hard caps so a hostile/broken feed host can't hold the single sync
+    // slot forever or OOM the process: the AbortController deadline covers
+    // the WHOLE download (not just time-to-first-byte — the previous code
+    // cleared the timer as soon as headers arrived), and MAX_FEED_BYTES
+    // bounds total size regardless of (or the absence of) Content-Length.
+    // The largest real lists (Hagezi pro, oisd big) are well under this.
+    const OVERALL_TIMEOUT_MS = 180_000;
+    const MAX_FEED_BYTES = 256 * 1024 * 1024;
     let feedText: string;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), OVERALL_TIMEOUT_MS);
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 120_000);
-      let response: Response;
-      try {
-        // Some CDNs/feed hosts (e.g. jsdelivr) reject requests with no/an
-        // empty User-Agent as a basic bot-blocking heuristic — a plain
-        // Node fetch trips this and gets a 403, so identify honestly instead.
-        response = await fetch(source.url, {
-          signal: controller.signal,
-          headers: { 'User-Agent': 'CyberDNS-TIP-FeedSync/1.0 (+https://cyberdns.vn)' },
-        });
-      } finally {
-        clearTimeout(timeoutId);
-      }
+      // safeFeedFetch validates the target (and every redirect hop)
+      // resolves to a public address before connecting — see
+      // src/lib/ssrfGuard.ts. Some CDNs/feed hosts (e.g. jsdelivr) reject
+      // requests with no/an empty User-Agent as a basic bot-blocking
+      // heuristic, so identify honestly.
+      const response = await safeFeedFetch(source.url, {
+        signal: controller.signal,
+        headers: { 'User-Agent': 'CyberDNS-TIP-FeedSync/1.0 (+https://cyberdns.vn)' },
+      });
       if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
 
       const contentLength = Number(response.headers.get('content-length') || 0);
+      if (contentLength > MAX_FEED_BYTES) {
+        throw new Error(`Feed quá lớn (${(contentLength / 1024 / 1024).toFixed(0)} MB > giới hạn ${MAX_FEED_BYTES / 1024 / 1024} MB).`);
+      }
       if (response.body) {
         // Stream the body manually so real bytes-received progress is
         // available instead of blocking opaquely on response.text().
@@ -1830,6 +1846,10 @@ async function runFeedSourceSyncJob(id: string, actingUser?: { email?: string; r
           if (done) break;
           if (value) {
             received += value.byteLength;
+            if (received > MAX_FEED_BYTES) {
+              controller.abort();
+              throw new Error(`Feed vượt quá giới hạn ${MAX_FEED_BYTES / 1024 / 1024} MB khi đang tải.`);
+            }
             chunks.push(decoder.decode(value, { stream: true }));
             if (contentLength > 0) {
               const percent = Math.min(50, (received / contentLength) * 50);
@@ -1852,8 +1872,13 @@ async function runFeedSourceSyncJob(id: string, actingUser?: { email?: string; r
         feedText = await response.text();
       }
     } catch (fetchError: any) {
-      await fail(`Không tải được feed: ${fetchError?.message || String(fetchError)}`);
+      const msg = controller.signal.aborted
+        ? `Không tải được feed: quá thời gian hoặc vượt giới hạn dung lượng.`
+        : `Không tải được feed: ${fetchError?.message || String(fetchError)}`;
+      await fail(msg);
       return;
+    } finally {
+      clearTimeout(timeoutId);
     }
 
     await setSyncProgress(id, 52, 'Đang phân tích dữ liệu...');
