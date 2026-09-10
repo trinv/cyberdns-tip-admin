@@ -55,6 +55,22 @@ function isBlockedV4(ip: string): boolean {
   return BLOCKED_V4.some(([base, bits]) => inCidr(ip, base, bits));
 }
 
+// Pull an embedded IPv4 out of the trailing 32 bits of a v4-mapped / -embedded
+// IPv6 address, in either textual form:
+//   "::ffff:127.0.0.1"   (dotted)   or
+//   "::ffff:7f00:1"      (hex — what WHATWG URL / dns.lookup actually emit)
+function embeddedV4(addr: string): string | null {
+  const dotted = addr.match(/:((?:\d{1,3}\.){3}\d{1,3})$/);
+  if (dotted) return dotted[1];
+  const hex = addr.match(/:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i);
+  if (hex) {
+    const hi = parseInt(hex[1], 16);
+    const lo = parseInt(hex[2], 16);
+    return `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
+  }
+  return null;
+}
+
 function isBlockedV6(ip: string): boolean {
   const addr = ip.toLowerCase().split('%')[0]; // drop any zone id
   if (addr === '::1' || addr === '::') return true;
@@ -62,11 +78,11 @@ function isBlockedV6(ip: string): boolean {
   if (addr.startsWith('fc') || addr.startsWith('fd')) return true; // ULA fc00::/7
   if (addr.startsWith('ff')) return true; // multicast
   if (addr.startsWith('2001:db8:')) return true; // documentation
-  // IPv4-mapped / -embedded — pull the trailing dotted quad and re-check as v4
-  const v4Embedded = addr.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
+  // IPv4-mapped ("::ffff:x"), -compatible ("::x", deprecated) and NAT64
+  // ("64:ff9b::x") — resolve the embedded v4 (dotted OR hex) and re-check it.
   if (addr.startsWith('::ffff:') || addr.startsWith('64:ff9b:') || addr.startsWith('::')) {
-    if (v4Embedded && isBlockedV4(v4Embedded[1])) return true;
-    if (addr === '::ffff:0:0' || v4Embedded?.[1] === '0.0.0.0') return true;
+    const v4 = embeddedV4(addr);
+    if (v4 && (isBlockedV4(v4) || v4 === '0.0.0.0')) return true;
   }
   return false;
 }
@@ -82,6 +98,15 @@ function assertIpAllowed(ip: string, host: string) {
   if (kind === 0) {
     throw new SsrfBlockedError(`Không phân giải được địa chỉ hợp lệ cho ${host}.`);
   }
+}
+
+// WHATWG URL keeps an IPv6 literal bracketed in `.hostname` ("[::1]"), which
+// neither node:net's isIP nor dns.lookup accept — strip the brackets so an
+// IPv6-literal feed URL is range-checked, not waved through / bounced as an
+// unresolvable name.
+function hostForCheck(url: URL): string {
+  const h = url.hostname;
+  return h.startsWith('[') && h.endsWith(']') ? h.slice(1, -1) : h;
 }
 
 // Sync, cheap: scheme + shape. Safe to call at feed-creation time for an
@@ -101,28 +126,30 @@ export function assertPublicFeedUrl(rawUrl: string): URL {
   }
   // A bare IP literal that's already in a blocked range → reject without
   // even a DNS lookup.
-  const literalKind = isIP(url.hostname);
-  if (literalKind !== 0) assertIpAllowed(url.hostname, url.hostname);
+  const host = hostForCheck(url);
+  const literalKind = isIP(host);
+  if (literalKind !== 0) assertIpAllowed(host, host);
   return url;
 }
 
 // Full check: resolve the hostname and verify every returned address is a
 // public, routable one. Call this right before fetching.
 export async function assertResolvesToPublic(url: URL): Promise<void> {
-  if (isIP(url.hostname) !== 0) {
-    assertIpAllowed(url.hostname, url.hostname);
+  const host = hostForCheck(url);
+  if (isIP(host) !== 0) {
+    assertIpAllowed(host, host);
     return;
   }
   let addrs: Array<{ address: string }>;
   try {
-    addrs = await lookup(url.hostname, { all: true });
+    addrs = await lookup(host, { all: true });
   } catch {
-    throw new SsrfBlockedError(`Không phân giải được hostname của feed: ${url.hostname}.`);
+    throw new SsrfBlockedError(`Không phân giải được hostname của feed: ${host}.`);
   }
   if (addrs.length === 0) {
-    throw new SsrfBlockedError(`Không phân giải được hostname của feed: ${url.hostname}.`);
+    throw new SsrfBlockedError(`Không phân giải được hostname của feed: ${host}.`);
   }
-  for (const { address } of addrs) assertIpAllowed(address, url.hostname);
+  for (const { address } of addrs) assertIpAllowed(address, host);
 }
 
 /**
