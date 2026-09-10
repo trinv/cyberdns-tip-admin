@@ -4,18 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- Real logo artwork (see src/components/CyberDNSLogo.tsx) reused as
-         the favicon too — dark/light swap follows the OS/browser color
-         scheme via `media`, the only mechanism a static favicon has for
-         reacting to theme (it can't see this app's own in-page toggle).
-         The first, unconditional link is the fallback for browsers that
-         don't support `media` matching on favicon links at all. PNG, not
+         the favicon too — always the light-on-transparent (green) mark,
+         regardless of OS/browser color scheme: browser tab chrome is
+         effectively always a light-ish strip even in "dark" browser
+         themes, and this is what the mark was designed to sit on. PNG, not
          SVG — favicon support for SVG (let alone one using <mask>+filter)
          is inconsistent across browsers; PNG is the most broadly
          compatible favicon format and is what actually fixed the broken/
          blank icon this was showing. -->
-    <link rel="icon" type="image/png" href="/logo-light.png" />
-    <link rel="icon" type="image/png" href="/logo-light.png" media="(prefers-color-scheme: light)" />
-    <link rel="icon" type="image/png" href="/logo-dark.png" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" type="image/png" href="/logo_cyberdns_light.png" />
     <!-- "Inter" and "IBM Plex Mono" are used throughout src/index.css
          (font-sans / font-mono) but were never actually loaded as web
          fonts anywhere — every browser was silently falling back to

@@ -44,31 +44,34 @@ export const CyberDNSLogo: React.FC<LogoProps> = ({
           glow ? 'drop-shadow-[0_0_12px_rgba(16,185,129,0.35)]' : ''
         }`}
       >
-        {/* Real logo artwork (public/logo-light.png, public/logo-dark.png)
-            replaces the earlier hand-drawn shield paths — same shield
-            silhouette, now sourced from the actual brand asset instead of
-            an approximation of it. PNG, not the originally-provided SVGs
-            (which used a <mask>+feColorMatrix technique) — that combo is a
-            known cross-browser rendering gap specifically for SVGs loaded
-            via <img>/favicon ("image context", more restricted than an
-            inlined <svg>) and was in fact what broke the logo everywhere
-            it appears right after that switch; flattening to PNG removes
-            the whole risk category. 'auto' stacks both and lets the same
-            ambient `.dark` class this file already keyed off of (see
-            variant's own doc-comment) show/hide the right one via Tailwind
-            `dark:` — no JS theme detection needed. 'light'/'dark' render
-            only the single forced variant, matching how markFill/
-            cyberTextClass below already force one or the other. */}
+        {/* Real logo artwork (public/logo_cyberdns_light.png,
+            public/logo_cyberdns_dark.png — a green shield mark on
+            transparent for light surfaces, a white shield mark on
+            transparent for dark ones) replaces the earlier hand-drawn
+            shield paths. PNG, not an SVG using <mask>+feColorMatrix — that
+            combo is a known cross-browser rendering gap specifically for
+            SVGs loaded via <img>/favicon ("image context", more restricted
+            than an inlined <svg>) and was in fact what broke the logo
+            everywhere it appears the last time this used SVGs; flattening
+            to PNG removes the whole risk category. Both files are cropped
+            to their content + resized to a 512px-max master (source was a
+            5000px, 1.4–2MB export) — this only ever renders at <=40px CSS,
+            so that's still generous headroom for retina. 'auto' stacks both
+            and lets the same ambient `.dark` class this file already keyed
+            off of (see variant's own doc-comment) show/hide the right one
+            via Tailwind `dark:` — no JS theme detection needed. 'light'/
+            'dark' render only the single forced variant, matching how
+            cyberTextClass below already forces one or the other. */}
         {isAuto ? (
           <>
             <img
-              src="/logo-light.png"
+              src="/logo_cyberdns_light.png"
               alt="CyberDNS"
               draggable={false}
               className="w-full h-full object-contain transition-colors duration-200 dark:hidden"
             />
             <img
-              src="/logo-dark.png"
+              src="/logo_cyberdns_dark.png"
               alt="CyberDNS"
               draggable={false}
               className="hidden w-full h-full object-contain transition-colors duration-200 dark:block"
@@ -76,7 +79,7 @@ export const CyberDNSLogo: React.FC<LogoProps> = ({
           </>
         ) : (
           <img
-            src={isForcedDark ? '/logo-dark.png' : '/logo-light.png'}
+            src={isForcedDark ? '/logo_cyberdns_dark.png' : '/logo_cyberdns_light.png'}
             alt="CyberDNS"
             draggable={false}
             className="w-full h-full object-contain"
