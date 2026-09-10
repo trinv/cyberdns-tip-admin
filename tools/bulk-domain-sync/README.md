@@ -99,7 +99,7 @@ python -m venv .venv && source .venv/bin/activate   # optional but recommended
 pip install -r requirements.txt
 
 # Against a real CyberDNS TIP database, this is a no-op (everything
-# already exists via the app's own `npm run db:push` + trigger install).
+# already exists via the app's own migrations + trigger install).
 # Against a fresh/empty database, this provisions everything needed to
 # run this tool standalone.
 psql "$DATABASE_URL" -f schema.sql

@@ -1,20 +1,21 @@
 #!/bin/sh
-# Applies the current schema (src/db/schema.ts) to the database before the
-# server starts, every time the container starts. This is idempotent — if
-# the schema already matches, drizzle-kit reports "No changes detected" and
-# does nothing. The "Yes" answers drizzle-kit's interactive confirmation
-# prompt non-interactively (there is no TTY inside a container).
+# Applies any pending versioned database migrations (the reviewed SQL files
+# in ./drizzle, tracked in drizzle.__drizzle_migrations) before the server
+# starts, then execs the server.
 #
-# NOTE for a production/"final version" deploy: a schema change that would
-# be genuinely destructive (e.g. dropping a column with real data in it)
-# will also get auto-confirmed here. For anything beyond casual dev/test
-# iteration, review `docker compose run --rm app npm run db:push` output
-# BEFORE rolling out an image with schema changes, instead of relying on
-# this automatic apply-on-boot.
+# This replaced the old `echo "Yes" | drizzle-kit push`: push diffed
+# src/db/schema.ts against the live DB and auto-confirmed its prompt, so a
+# change it classified as destructive (a column rename reads as drop + add)
+# would silently drop real data on the next container start. Migrations only
+# ever run SQL a human wrote and committed.
+#
+# FIRST cut-over on an EXISTING database: run `npm run db:baseline` once
+# against that DB before deploying this image (see MIGRATION.md), so the
+# already-present tables are recorded as applied instead of re-created.
 set -e
 
-echo "[entrypoint] Applying database schema (drizzle-kit push)..."
-echo "Yes" | npx drizzle-kit push --config=src/db/drizzle.config.ts
+echo "[entrypoint] Applying database migrations..."
+node dist/migrate.cjs
 
 echo "[entrypoint] Starting CyberDNS TIP..."
 exec "$@"

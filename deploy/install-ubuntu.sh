@@ -89,9 +89,12 @@ echo "==> npm ci"
 npm ci
 echo "==> npm run build"
 npm run build
-echo "==> Applying database schema"
+echo "==> Applying database migrations"
 set -a; source "$REPO_DIR/.env"; set +a
-echo "Yes" | npx drizzle-kit push --config=src/db/drizzle.config.ts
+# Fresh install: builds the whole schema from drizzle/0000_baseline_schema.sql.
+# Upgrading an install that predates versioned migrations: run
+# `npm run db:baseline` ONCE first (see MIGRATION.md), then this is a no-op.
+node dist/migrate.cjs
 
 # ---- 6. systemd service ----
 SERVICE_PATH="/etc/systemd/system/cyberdns-tip.service"
@@ -106,6 +109,10 @@ Type=simple
 User=${APP_USER}
 WorkingDirectory=${REPO_DIR}
 EnvironmentFile=${REPO_DIR}/.env
+# Apply any pending DB migrations before the server starts (mirrors the
+# Docker entrypoint). A failure here (non-zero exit) blocks ExecStart, so the
+# server never boots against a half-migrated schema.
+ExecStartPre=/usr/bin/node ${REPO_DIR}/dist/migrate.cjs
 ExecStart=/usr/bin/node ${REPO_DIR}/dist/server.cjs
 Restart=on-failure
 RestartSec=3

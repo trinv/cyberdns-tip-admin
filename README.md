@@ -41,7 +41,7 @@ http://<ip-vps-cua-ban>:3000
 ```bash
 docker compose up -d --build
 ```
-Schema database được áp dụng tự động mỗi lần container khởi động (xem `docker-entrypoint.sh`) — không cần chạy migration thủ công cho việc cài đặt/cập nhật thông thường. Với thay đổi schema có khả năng phá hủy dữ liệu, hãy xem trước bằng `docker compose run --rm app npm run db:push` trước khi rollout.
+Migration database (các file SQL đã review trong `drizzle/`) được áp dụng tự động mỗi lần container khởi động (`docker-entrypoint.sh` → `dist/migrate.cjs`) — cài đặt mới không cần thao tác gì thêm. **Lần đầu chuyển từ bản cũ (dùng `drizzle-kit push`) sang migration versioned**: chạy `npm run db:baseline` một lần trên database hiện có TRƯỚC khi deploy image mới. Quy trình đổi schema và chi tiết baseline: xem [`MIGRATION.md`](MIGRATION.md).
 
 **Backup dữ liệu**: dữ liệu Postgres nằm trong Docker volume `cyberdns_pgdata`. Backup nhanh:
 ```bash
@@ -125,7 +125,11 @@ npm run dev             # http://localhost:3000, hot state qua Vite middleware
 ```
 
 ```bash
-npm run lint    # tsc --noEmit
-npm run db:push # áp dụng schema hiện tại (xem trước output trước khi xác nhận)
+npm run lint        # tsc --noEmit
+npm test            # vitest (unit test cho feedParser, ssrfGuard, rateLimit, password)
+npm run db:generate # sinh file migration SQL mới trong drizzle/ sau khi sửa schema.ts
+npm run db:migrate  # áp dụng migration đang chờ vào database
 npm run build && npm start  # chạy bản production giống hệt Docker/systemd
 ```
+
+Chi tiết quy trình migration (đổi schema, baseline database cũ, rollback): [`MIGRATION.md`](MIGRATION.md).

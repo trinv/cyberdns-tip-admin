@@ -16,6 +16,10 @@ Type=simple
 User=REPLACE_WITH_YOUR_LINUX_USER
 WorkingDirectory=/path/to/cyberdns-tip
 EnvironmentFile=/path/to/cyberdns-tip/.env
+# Apply pending DB migrations before starting (mirrors the Docker entrypoint).
+# A non-zero exit here blocks ExecStart. On the FIRST upgrade from a pre-
+# migration install, run `npm run db:baseline` once first — see MIGRATION.md.
+ExecStartPre=/usr/bin/node /path/to/cyberdns-tip/dist/migrate.cjs
 ExecStart=/usr/bin/node /path/to/cyberdns-tip/dist/server.cjs
 Restart=on-failure
 RestartSec=3
