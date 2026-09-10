@@ -462,13 +462,20 @@ export default function App() {
     return all;
   }, [selectedCategory, selectedStatus, selectedTld, selectedSource, debouncedSearchQuery, sortField, sortDirection]);
 
+  // All of the app's data endpoints now require a signed-in session (see
+  // server.ts — the dashboard/domains/categories/sources/reviews/audit-logs
+  // GETs each gained `requireAuth`). These effects run before the
+  // `if (!currentUser)` login gate below (hooks can't be conditional), so
+  // without this guard they'd fire a burst of 401s on the login screen.
   useEffect(() => {
+    if (!currentUser) return;
     refreshAllData();
-  }, [refreshAllData]);
+  }, [refreshAllData, currentUser]);
 
   useEffect(() => {
+    if (!currentUser) return;
     refreshDomains();
-  }, [refreshDomains]);
+  }, [refreshDomains, currentUser]);
 
   // Re-fetch whenever the category selection changes, AND whenever the
   // global dashboardStats refreshes for any other reason (bulk actions,
@@ -477,8 +484,9 @@ export default function App() {
   // piggybacking on that instead of threading a second, separate refresh
   // call through every one of those mutation call sites individually.
   useEffect(() => {
+    if (!currentUser) return;
     refreshCategoryStatusBreakdown();
-  }, [refreshCategoryStatusBreakdown, dashboardStats]);
+  }, [refreshCategoryStatusBreakdown, dashboardStats, currentUser]);
 
   // Feed sync progress poll — lives at the App level (always mounted,
   // regardless of which tab is active) rather than inside SourcesView, so a
@@ -488,6 +496,7 @@ export default function App() {
   // only polls GET /api/sources to reflect that real state — there is no
   // client-local "isSyncing" flag to lose on navigation.
   useEffect(() => {
+    if (!currentUser) return;
     if (!sources.some((s) => s.status === 'syncing')) return;
     let cancelled = false;
     const poll = async () => {
@@ -529,7 +538,7 @@ export default function App() {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [sources, refreshDomains, refreshAllData]);
+  }, [sources, refreshDomains, refreshAllData, currentUser]);
 
   // Any actual filter change (not just paging/sorting) invalidates the
   // current page/selection — jumping back to page 1 and clearing a

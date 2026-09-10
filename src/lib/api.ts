@@ -73,8 +73,8 @@ export async function fetchHealth(): Promise<{ status: string; engine: string }>
 }
 
 export async function fetchDashboardStats(): Promise<DashboardStats> {
-  const res = await fetch(`${API_BASE}/dashboard/stats`);
-  if (!res.ok) throw new Error('Failed to fetch dashboard stats');
+  const res = await fetch(`${API_BASE}/dashboard/stats`, { headers: await authHeaders() });
+  await checkResponse(res, 'Failed to fetch dashboard stats');
   return res.json();
 }
 
@@ -83,8 +83,8 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
 // for the unscoped, whole-system breakdown.
 export async function fetchStatusBreakdown(category?: string): Promise<CategoryStatusBreakdown> {
   const query = category && category !== 'all' ? `?category=${encodeURIComponent(category)}` : '';
-  const res = await fetch(`${API_BASE}/domains/status-breakdown${query}`);
-  if (!res.ok) throw new Error('Failed to fetch status breakdown');
+  const res = await fetch(`${API_BASE}/domains/status-breakdown${query}`, { headers: await authHeaders() });
+  await checkResponse(res, 'Failed to fetch status breakdown');
   return res.json();
 }
 
@@ -171,8 +171,8 @@ export async function updateUserApi(
 }
 
 export async function fetchCategories(): Promise<CategoryInfo[]> {
-  const res = await fetch(`${API_BASE}/categories`);
-  if (!res.ok) throw new Error('Failed to fetch categories');
+  const res = await fetch(`${API_BASE}/categories`, { headers: await authHeaders() });
+  await checkResponse(res, 'Failed to fetch categories');
   return res.json();
 }
 
@@ -216,8 +216,8 @@ export async function fetchDomains(params: {
   if (params.sortField) query.set('sortField', params.sortField);
   if (params.sortDirection) query.set('sortDirection', params.sortDirection);
 
-  const res = await fetch(`${API_BASE}/domains?${query.toString()}`);
-  if (!res.ok) throw new Error('Failed to fetch domains');
+  const res = await fetch(`${API_BASE}/domains?${query.toString()}`, { headers: await authHeaders() });
+  await checkResponse(res, 'Failed to fetch domains');
   return res.json();
 }
 
@@ -309,8 +309,8 @@ export async function deleteCategoryApi(id: string): Promise<void> {
 }
 
 export async function fetchFeedSources(): Promise<FeedSource[]> {
-  const res = await fetch(`${API_BASE}/sources`);
-  if (!res.ok) throw new Error('Failed to fetch feed sources');
+  const res = await fetch(`${API_BASE}/sources`, { headers: await authHeaders() });
+  await checkResponse(res, 'Failed to fetch feed sources');
   return res.json();
 }
 
@@ -354,8 +354,8 @@ export async function deleteFeedSourceApi(id: string): Promise<{ affectedCount: 
 }
 
 export async function fetchReviewQueue(status: string = 'pending'): Promise<ReviewDomainItem[]> {
-  const res = await fetch(`${API_BASE}/reviews?status=${status}`);
-  if (!res.ok) throw new Error('Failed to fetch review queue');
+  const res = await fetch(`${API_BASE}/reviews?status=${status}`, { headers: await authHeaders() });
+  await checkResponse(res, 'Failed to fetch review queue');
   return res.json();
 }
 
@@ -375,8 +375,8 @@ export async function resolveReviewItemApi(
 }
 
 export async function fetchAuditLogs(): Promise<AuditLog[]> {
-  const res = await fetch(`${API_BASE}/audit-logs`);
-  if (!res.ok) throw new Error('Failed to fetch audit logs');
+  const res = await fetch(`${API_BASE}/audit-logs`, { headers: await authHeaders() });
+  await checkResponse(res, 'Failed to fetch audit logs');
   return res.json();
 }
 

@@ -365,7 +365,7 @@ async function startServer() {
   });
 
   // Dashboard API — real aggregates computed from the domains table
-  app.get('/api/dashboard/stats', async (req, res) => {
+  app.get('/api/dashboard/stats', requireAuth, async (req, res) => {
     try {
       const stats = await getDashboardStats();
       res.json(stats);
@@ -380,7 +380,7 @@ async function startServer() {
   // above it (?category=..., omitted or 'all' = every domain) — separate
   // from /api/dashboard/stats, which always stays global for the Dashboard
   // tab's own KPI cards.
-  app.get('/api/domains/status-breakdown', async (req, res) => {
+  app.get('/api/domains/status-breakdown', requireAuth, async (req, res) => {
     try {
       const { category } = req.query;
       const stats = await getStatusBreakdownForCategory(category as string | undefined);
@@ -392,7 +392,7 @@ async function startServer() {
   });
 
   // Domains Explorer API
-  app.get('/api/domains', async (req, res) => {
+  app.get('/api/domains', requireAuth, async (req, res) => {
     try {
       const { search, category, status, tld, feedSourceId, limit, offset, sortField, sortDirection } = req.query;
       // Always cap the page size. The Domain Explorer always sends an
@@ -513,7 +513,7 @@ async function startServer() {
   });
 
   // Categories API
-  app.get('/api/categories', async (req, res) => {
+  app.get('/api/categories', requireAuth, async (req, res) => {
     try {
       const list = await getCategories();
       res.json(list);
@@ -601,7 +601,7 @@ async function startServer() {
   });
 
   // Sources API
-  app.get('/api/sources', async (req, res) => {
+  app.get('/api/sources', requireAuth, async (req, res) => {
     try {
       const list = await getFeedSources();
       res.json(list);
@@ -676,7 +676,7 @@ async function startServer() {
   });
 
   // Review Queue API
-  app.get('/api/reviews', async (req, res) => {
+  app.get('/api/reviews', requireAuth, async (req, res) => {
     try {
       const { status = 'pending' } = req.query;
       const list = await getReviewQueue(status as string);
@@ -705,7 +705,7 @@ async function startServer() {
   // below.)
 
   // Audit Logs API
-  app.get('/api/audit-logs', async (req, res) => {
+  app.get('/api/audit-logs', requireAuth, async (req, res) => {
     try {
       const list = await getAuditLogs();
       res.json(list);

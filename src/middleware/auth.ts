@@ -44,7 +44,9 @@ export const requireRole = (...roles: string[]) => {
       return res.status(401).json({ error: 'Unauthorized: sign-in required' });
     }
     if (!roles.includes(req.user.role)) {
-      return res.status(403).json({ error: `Forbidden: requires role ${roles.join(' or ')} (current: ${req.user.role})` });
+      // Deliberately generic — don't disclose the caller's own role or the
+      // exact role required back to a client that isn't allowed here.
+      return res.status(403).json({ error: 'Forbidden: bạn không có quyền thực hiện thao tác này.' });
     }
     next();
   };
