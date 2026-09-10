@@ -74,7 +74,11 @@ server {
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        # REPLACE, not append: the TIP app trusts exactly one proxy hop
+        # (server.ts: trust proxy = 1) and derives req.ip — used by
+        # login-anomaly detection and the blocklist ACL — from this header.
+        # Appending would let a client prepend a spoofed address.
+        proxy_set_header X-Forwarded-For \$remote_addr;
         proxy_set_header X-Forwarded-Proto \$scheme;
         # WebSocket upgrade support (see the shared map above) — needed by
         # Uptime Kuma's Socket.IO dashboard; a no-op for plain HTTP.

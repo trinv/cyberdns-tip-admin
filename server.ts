@@ -97,18 +97,23 @@ async function startServer() {
   // the browser's @vite/client would never be able to reach it.
   const httpServer = http.createServer(app);
 
-  // Trust the reverse proxy (Nginx — see deploy/nginx.conf.example) for
-  // client IP resolution: req.ip then reflects the real visitor's address
-  // from X-Forwarded-For instead of always resolving to the proxy's own
-  // address. This is what makes login logging / new-IP detection meaningful.
-  // Safe ONLY because the app itself should never be reachable directly from
-  // the internet in production — see deploy/nginx.conf.example's firewall
-  // note (ufw should block direct access to PORT, leaving 80/443 as the only
-  // public entry points); otherwise anyone could spoof this header directly.
-  app.set('trust proxy', true);
+  // Trust EXACTLY ONE reverse-proxy hop (Nginx — see
+  // deploy/nginx.conf.example) for client IP resolution: with `1`, Express
+  // takes req.ip as the right-most X-Forwarded-For entry, i.e. the address
+  // Nginx itself observed and appended — NOT whatever the client put in the
+  // header. `true` (trust every hop) was wrong: Nginx *appends* to the
+  // client-supplied XFF, so a public request carrying `X-Forwarded-For:
+  // 1.2.3.4` would arrive as `"1.2.3.4, <real ip>"` and `true` would resolve
+  // req.ip to the spoofed `1.2.3.4` — defeating login-anomaly detection and
+  // the blocklist-URL ACL, both of which key off req.ip. The Nginx vhost
+  // pairs with this by sending `X-Forwarded-For $remote_addr` (replace, not
+  // append) as defence in depth.
+  app.set('trust proxy', 1);
 
-  // Middleware
-  app.use(express.json());
+  // Middleware. `limit` well above the largest legitimate body (bulk-propose
+  // paste) but far below Nginx's client_max_body_size — Express's own 100KB
+  // default was silently 413-ing large imports.
+  app.use(express.json({ limit: '4mb' }));
 
   // Bootstrap: the domain_categories cache-sync trigger must exist BEFORE
   // any seeding/writes happen (it's what keeps domains.categories/
@@ -390,16 +395,21 @@ async function startServer() {
   app.get('/api/domains', async (req, res) => {
     try {
       const { search, category, status, tld, feedSourceId, limit, offset, sortField, sortDirection } = req.query;
+      // Always cap the page size. The Domain Explorer always sends an
+      // explicit limit, and the "export entire category" flow pages through
+      // in EXPORT_PAGE_SIZE (5000) chunks — nothing legitimately needs an
+      // unbounded result set, and serving one would let an anonymous caller
+      // make the process materialize the whole domains table (jsonb per row)
+      // into memory.
+      const MAX_PAGE = 5000;
+      const parsedLimit = limit ? parseInt(limit as string, 10) : MAX_PAGE;
       const data = await getDomains({
         search: search as string,
         category: category as string,
         status: status as string,
         tld: tld as string,
         feedSourceId: feedSourceId as string,
-        // No limit param at all => no LIMIT clause (used by the "export
-        // entire category" flow); the paginated Domain Explorer view always
-        // sends an explicit limit for its page size.
-        limit: limit ? parseInt(limit as string, 10) : undefined,
+        limit: Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), MAX_PAGE) : MAX_PAGE,
         offset: offset ? parseInt(offset as string, 10) : 0,
         sortField: sortField as any,
         sortDirection: sortDirection as any,
