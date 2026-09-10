@@ -21,6 +21,7 @@ import { eq, desc, asc, sql, ilike, and, or, inArray } from 'drizzle-orm';
 // relies on.
 import { isIPv4, isIPv6 } from 'node:net';
 import { parseFeedText, normalizeDomain } from './feedParser.ts';
+import { assertValidRole } from './roles.ts';
 import { hashPassword, verifyPassword, burnPasswordCompare, generateSessionToken, generateTempPassword } from '../lib/password.ts';
 import { sendNewIpLoginAlert } from '../lib/mailer.ts';
 import { assertPublicFeedUrl, safeFeedFetch } from '../lib/ssrfGuard.ts';
@@ -219,17 +220,10 @@ export async function listUsers() {
   }
 }
 
-// The only roles the app understands (see src/middleware/auth.ts's
-// requireRole call sites). `role` used to be a free-form string accepted
-// straight from the request body — a typo or a malicious value would just
-// be stored, silently granting nothing (or, worse, matching nothing so the
-// account can't do anything).
-export const VALID_ROLES = ['Analyst', 'Reviewer', 'Admin'] as const;
-function assertValidRole(role: string | undefined) {
-  if (role !== undefined && !VALID_ROLES.includes(role as (typeof VALID_ROLES)[number])) {
-    throw new Error(`Vai trò không hợp lệ: "${role}". Chỉ chấp nhận ${VALID_ROLES.join(', ')}.`);
-  }
-}
+// The only roles the app understands live in ./roles.ts (a DB-free module so
+// the API-validation layer can share them). Re-exported here for existing
+// importers.
+export { VALID_ROLES } from './roles.ts';
 
 export async function createUserAccount(data: { email: string; password: string; displayName?: string; role?: string }) {
   assertValidRole(data.role);

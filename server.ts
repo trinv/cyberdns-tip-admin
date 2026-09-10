@@ -59,6 +59,19 @@ import {
 import { requireAuth, requireRole, AuthRequest } from './src/middleware/auth.ts';
 import { createLoginRateLimiter } from './src/middleware/rateLimit.ts';
 import { securityHeaders } from './src/middleware/securityHeaders.ts';
+import {
+  parseBody,
+  aclSchema,
+  bulkProposeSchema,
+  createCategorySchema,
+  createDnsNodeSchema,
+  createFeedSourceSchema,
+  createUserSchema,
+  proposeDomainSchema,
+  updateCategorySchema,
+  updateDnsNodeSchema,
+  updateUserSchema,
+} from './src/middleware/validateBody.ts';
 import { listCountries, listProvincesForCountry } from './src/lib/geo.ts';
 
 // The sandbox's file-watcher restart does not reliably terminate the previous
@@ -240,12 +253,9 @@ async function startServer() {
     }
   });
 
-  app.post('/api/users', requireAuth, requireRole('Admin'), async (req, res) => {
+  app.post('/api/users', requireAuth, requireRole('Admin'), parseBody(createUserSchema), async (req, res) => {
     try {
       const { email, password, displayName, role } = req.body;
-      if (!email || !password) {
-        return res.status(400).json({ error: 'email và password là bắt buộc.' });
-      }
       const created = await createUserAccount({ email, password, displayName, role });
       res.status(201).json({ success: true, user: created });
     } catch (error: any) {
@@ -253,7 +263,7 @@ async function startServer() {
     }
   });
 
-  app.patch('/api/users/:id', requireAuth, requireRole('Admin'), async (req, res) => {
+  app.patch('/api/users/:id', requireAuth, requireRole('Admin'), parseBody(updateUserSchema), async (req, res) => {
     try {
       const id = parseInt(req.params.id, 10);
       if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid user id' });
@@ -289,17 +299,11 @@ async function startServer() {
     }
   });
 
-  app.post('/api/dns-nodes', requireAuth, requireRole('Admin'), async (req: AuthRequest, res) => {
+  app.post('/api/dns-nodes', requireAuth, requireRole('Admin'), parseBody(createDnsNodeSchema), async (req: AuthRequest, res) => {
     try {
-      const { name, ipAddress, ipv6Address } = req.body;
-      // A node needs at least one address (IPv4 or IPv6), not necessarily
-      // both — the real per-field format validation (net.isIPv4/isIPv6)
-      // and the same "at least one" check on PATCH both live in
-      // createDnsNode/updateDnsNode (src/db/queries.ts), since PATCH has
-      // no equivalent presence check here.
-      if (!name || (!ipAddress && !ipv6Address)) {
-        return res.status(400).json({ error: 'name và ít nhất 1 trong 2 địa chỉ IP (IPv4/IPv6) là bắt buộc.' });
-      }
+      // Shape / enum / range / "≥1 address" now enforced by parseBody; the
+      // per-field net.isIPv4/isIPv6 format check + friendly errors stay in
+      // createDnsNode (src/db/queries.ts).
       const created = await createDnsNode(req.body, { email: req.user?.email, role: req.user?.role });
       res.status(201).json({ success: true, node: created });
     } catch (error: any) {
@@ -307,7 +311,7 @@ async function startServer() {
     }
   });
 
-  app.patch('/api/dns-nodes/:id', requireAuth, requireRole('Admin'), async (req: AuthRequest, res) => {
+  app.patch('/api/dns-nodes/:id', requireAuth, requireRole('Admin'), parseBody(updateDnsNodeSchema), async (req: AuthRequest, res) => {
     try {
       const id = parseInt(req.params.id, 10);
       if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid node id' });
@@ -341,13 +345,9 @@ async function startServer() {
     }
   });
 
-  app.post('/api/blocklist-acl', requireAuth, requireRole('Admin'), async (req: AuthRequest, res) => {
+  app.post('/api/blocklist-acl', requireAuth, requireRole('Admin'), parseBody(aclSchema), async (req: AuthRequest, res) => {
     try {
-      const { enforceEnabled } = req.body;
-      if (typeof enforceEnabled !== 'boolean') {
-        return res.status(400).json({ error: 'enforceEnabled (boolean) is required.' });
-      }
-      const updated = await setAclEnforceEnabled(enforceEnabled, req.user?.email || 'Admin');
+      const updated = await setAclEnforceEnabled(req.body.enforceEnabled, req.user?.email || 'Admin');
       res.json({ success: true, settings: updated });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -465,12 +465,9 @@ async function startServer() {
   // Manual single add — goes to review_queue, not straight to domains
   // (see proposeDomain: an individual analyst's own, unverified judgment
   // call, unlike a feed sync).
-  app.post('/api/domains/propose', requireAuth, async (req: AuthRequest, res) => {
+  app.post('/api/domains/propose', requireAuth, parseBody(proposeDomainSchema), async (req: AuthRequest, res) => {
     try {
       const { domain, categories, reason } = req.body;
-      if (!domain || !categories || !Array.isArray(categories) || categories.length === 0) {
-        return res.status(400).json({ error: 'domain and categories (array) are required.' });
-      }
       const result = await proposeDomain({
         domain,
         category: categories[0],
@@ -481,19 +478,17 @@ async function startServer() {
       res.status(201).json({ success: true, ...result });
     } catch (error: any) {
       console.error('API POST /api/domains/propose error:', error);
-      res.status(500).json({ error: error.message });
+      const isValidation = error instanceof Error && !(error as any).cause;
+      res.status(isValidation ? 400 : 500).json({ error: error.message });
     }
   });
 
   // Batch/paste import — same reasoning as /api/domains/propose, many
   // domains at once (Import tab). Goes to review_queue, not straight to
   // domains.
-  app.post('/api/domains/bulk-propose', requireAuth, async (req: AuthRequest, res) => {
+  app.post('/api/domains/bulk-propose', requireAuth, parseBody(bulkProposeSchema), async (req: AuthRequest, res) => {
     try {
       const { domains: domainList, categories: cats, reason } = req.body;
-      if (!Array.isArray(domainList) || domainList.length === 0 || !Array.isArray(cats) || cats.length === 0) {
-        return res.status(400).json({ error: 'domains (array) and categories (array) are required.' });
-      }
       const result = await proposeDomainsBulk({
         domains: domainList,
         category: cats[0],
@@ -504,7 +499,8 @@ async function startServer() {
       res.status(201).json({ success: true, ...result });
     } catch (error: any) {
       console.error('API POST /api/domains/bulk-propose error:', error);
-      res.status(500).json({ error: error.message });
+      const isValidation = error instanceof Error && !(error as any).cause;
+      res.status(isValidation ? 400 : 500).json({ error: error.message });
     }
   });
 
@@ -553,12 +549,9 @@ async function startServer() {
   // PATCH below).
   // Admin only: creating/renaming a category is a structural config change
   // (DELETE already required Admin — this closes that inconsistency).
-  app.post('/api/categories', requireAuth, requireRole('Admin'), async (req: AuthRequest, res) => {
+  app.post('/api/categories', requireAuth, requireRole('Admin'), parseBody(createCategorySchema), async (req: AuthRequest, res) => {
     try {
       const { name, description, color, deltaThreshold } = req.body;
-      if (!name) {
-        return res.status(400).json({ error: 'name is required.' });
-      }
       const created = await createCategory({ name, description, color, deltaThreshold });
       res.status(201).json({ success: true, category: created });
     } catch (error: any) {
@@ -566,13 +559,14 @@ async function startServer() {
     }
   });
 
-  app.patch('/api/categories/:id', requireAuth, requireRole('Admin'), async (req: AuthRequest, res) => {
+  app.patch('/api/categories/:id', requireAuth, requireRole('Admin'), parseBody(updateCategorySchema), async (req: AuthRequest, res) => {
     try {
       const updated = await updateCategory(req.params.id, req.body);
       res.json({ success: true, category: updated });
     } catch (error: any) {
       console.error('API PATCH /api/categories/:id error:', error);
-      res.status(500).json({ error: error.message });
+      const isValidation = error instanceof Error && !(error as any).cause;
+      res.status(isValidation ? 400 : 500).json({ error: error.message });
     }
   });
 
@@ -640,12 +634,8 @@ async function startServer() {
   // Admin only: registering a feed URL is config, and it's the SSRF surface
   // — runFeedSourceSyncJob fetches whatever URL is stored here. pause/resume/
   // delete were already Admin; add + sync now match.
-  app.post('/api/sources', requireAuth, requireRole('Admin'), async (req: AuthRequest, res) => {
+  app.post('/api/sources', requireAuth, requireRole('Admin'), parseBody(createFeedSourceSchema), async (req: AuthRequest, res) => {
     try {
-      const { name, url, category } = req.body;
-      if (!name || !url || !category) {
-        return res.status(400).json({ error: 'name, url and category are required.' });
-      }
       const created = await createFeedSource(req.body);
       res.status(201).json({ success: true, source: created });
     } catch (error: any) {
