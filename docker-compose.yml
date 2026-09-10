@@ -41,7 +41,13 @@ services:
     #   - "5432:5432"
 
   app:
-    build: .
+    build:
+      context: .
+      args:
+        # Baked into the client bundle at build time (Vite import.meta.env).
+        # Read from the project .env — set VITE_UPTIME_KUMA_URL there, then
+        # `docker compose up -d --build` so it takes effect.
+        VITE_UPTIME_KUMA_URL: ${VITE_UPTIME_KUMA_URL:-}
     restart: unless-stopped
     depends_on:
       db:

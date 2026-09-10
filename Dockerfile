@@ -6,6 +6,10 @@
 # (node:22-alpine@sha256:…) if you want fully reproducible builds; the plain
 # tag is used so `docker compose build` picks up Alpine/Node security patches.
 FROM node:22-alpine AS builder
+# Build-time only: Vite bakes VITE_* into the client bundle (import.meta.env).
+# docker-compose.yml passes this through build.args from the project .env.
+ARG VITE_UPTIME_KUMA_URL=""
+ENV VITE_UPTIME_KUMA_URL=$VITE_UPTIME_KUMA_URL
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # CyberDNS TIP — native (no Docker) install script for Ubuntu 22.04/24.04.
 #
-# Installs Node.js 20, PostgreSQL, creates the app database/user, builds the
-# app, applies the schema, and registers a systemd service so it survives
+# Installs Node.js 22, PostgreSQL, creates the app database/user, builds the
+# app, applies migrations, and registers a systemd service so it survives
 # reboots. Safe to re-run: every step below is idempotent.
 #
 # Usage (run from the repo root, as a user with sudo):
@@ -17,10 +17,10 @@ DB_APP_USER="cyberdns_app"
 
 echo "==> Installing this app from: $REPO_DIR"
 
-# ---- 1. Node.js 20 (NodeSource) ----
+# ---- 1. Node.js 22 (NodeSource) ----
 if ! command -v node >/dev/null 2>&1 || [ "$(node -v | sed -E 's/^v([0-9]+).*/\1/')" -lt 20 ]; then
-  echo "==> Installing Node.js 20..."
-  curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+  echo "==> Installing Node.js 22..."
+  curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
   sudo apt-get install -y nodejs
 else
   echo "==> Node.js already installed: $(node -v)"
