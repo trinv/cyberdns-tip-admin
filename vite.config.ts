@@ -16,6 +16,29 @@ export default defineConfig(() => {
         '@': path.resolve(__dirname, 'src'),
       },
     },
+    build: {
+      rollupOptions: {
+        output: {
+          // Split the big, rarely-changing vendors into their own chunks so a
+          // returning visitor re-downloads only the app code after a deploy,
+          // not React + Chart.js too. maplibre-gl already rides its own lazy
+          // chunk (App.tsx code-splits DnsNodesView) — this keeps it isolated
+          // even if something else pulls it in.
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('react-dom') || id.includes('/react/') || id.includes('scheduler'))
+                return 'react';
+              if (id.includes('chart.js')) return 'charts';
+              if (id.includes('maplibre-gl')) return 'maplibre';
+            }
+          },
+        },
+      },
+      // maplibre-gl's chunk is legitimately ~1 MB and is already lazy-loaded
+      // (only when the DNS Nodes tab opens) — raise the bar so a real
+      // regression in the *initial* bundle still stands out.
+      chunkSizeWarningLimit: 1200,
+    },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modifyâfile watching is disabled to prevent flickering during agent edits.

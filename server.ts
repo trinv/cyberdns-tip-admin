@@ -11,7 +11,6 @@ import { execSync } from 'child_process';
 import express from 'express';
 import http from 'http';
 import path from 'path';
-import { createServer as createViteServer } from 'vite';
 import { ensureSuperAdmin, recoverInterruptedSyncs, migrateAwayFromGracePeriod } from './src/db/queries.ts';
 import { ensureDomainCategoryTriggers, ensureSearchIndexes } from './src/db/triggers.ts';
 import { pool } from './src/db/index.ts';
@@ -847,10 +846,16 @@ async function startServer() {
 
   // ===================== VITE MIDDLEWARE SETUP =====================
   if (process.env.NODE_ENV !== 'production') {
+    // Dynamic import (not a top-level one): `vite` is a devDependency, absent
+    // from the production image (`npm ci --omit=dev`) — a static import would
+    // make dist/server.cjs throw MODULE_NOT_FOUND at startup there. This
+    // branch only ever runs in dev.
+    //
     // This app runs Vite inside a custom Express server. The preview proxy
     // exposes one HTTP port and does not reliably forward Vite's secondary HMR
     // websocket port, so disable HMR here to prevent the 24678 websocket and
     // duplicate-server crash loop. The platform reloads the preview on sync.
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: {
         middlewareMode: true,

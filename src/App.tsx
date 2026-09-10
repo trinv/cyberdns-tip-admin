@@ -47,7 +47,6 @@ import { Sidebar } from './components/Sidebar';
 import { SidebarFilters } from './components/DomainExplorer/SidebarFilters';
 import { DomainTable } from './components/DomainExplorer/DomainTable';
 import { DomainBulkModal } from './components/DomainExplorer/DomainBulkModal';
-import { DashboardView } from './components/Dashboard/DashboardView';
 import { ReleasesView } from './components/Releases/ReleasesView';
 import { ImportView } from './components/Import/ImportView';
 import { ReviewQueueView } from './components/ReviewQueue/ReviewQueueView';
@@ -69,6 +68,14 @@ import { LoginHistoryView } from './components/LoginHistory/LoginHistoryView';
 // BY DnsNodesView.tsx, so it rides along in this same lazy chunk for free.
 const DnsNodesView = lazy(() =>
   import('./components/DnsNodes/DnsNodesView').then((m) => ({ default: m.DnsNodesView })),
+);
+// Also lazy: DashboardView pulls in Chart.js (~60KB gzip) and is the only
+// consumer, so the login screen / first paint shouldn't carry it. It is the
+// default tab, so a signed-in user hits its Suspense fallback briefly on
+// load — acceptable given the dashboard then shows its own data-loading
+// states anyway.
+const DashboardView = lazy(() =>
+  import('./components/Dashboard/DashboardView').then((m) => ({ default: m.DashboardView })),
 );
 import { LoginPage } from './components/LoginPage';
 import { CyberDNSLogo } from './components/CyberDNSLogo';
@@ -1149,14 +1156,22 @@ export default function App() {
 
           {/* TAB 2: DASHBOARD */}
           {currentTab === 'dashboard' && (
-            <DashboardView
-              onNavigateToTab={setCurrentTab}
-              sources={sources}
-              categories={categories}
-              reviewItems={reviewItems}
-              stats={dashboardStats}
-              isAdmin={userRole === 'Admin'}
-            />
+            <Suspense
+              fallback={
+                <div className="flex-1 flex items-center justify-center text-sm text-slate-500 dark:text-slate-400">
+                  Đang tải...
+                </div>
+              }
+            >
+              <DashboardView
+                onNavigateToTab={setCurrentTab}
+                sources={sources}
+                categories={categories}
+                reviewItems={reviewItems}
+                stats={dashboardStats}
+                isAdmin={userRole === 'Admin'}
+              />
+            </Suspense>
           )}
 
           {/* TAB 3: NHẬP (Batch Import & Parser) */}
