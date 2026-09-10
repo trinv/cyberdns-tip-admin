@@ -818,7 +818,7 @@ export default function App() {
     } else {
       try {
         targetList = await fetchAllFilteredDomains();
-      } catch (err) {
+      } catch {
         showToast('Không thể tải toàn bộ danh sách để xuất — vui lòng thử lại.', 'warning');
         return;
       }
@@ -845,7 +845,7 @@ export default function App() {
     } else {
       try {
         targetList = await fetchAllFilteredDomains();
-      } catch (err) {
+      } catch {
         showToast('Không thể tải toàn bộ danh sách để xuất — vui lòng thử lại.', 'warning');
         return;
       }
@@ -1079,7 +1079,6 @@ export default function App() {
             if (currentTab !== 'domain') setCurrentTab('domain');
             setTimeout(() => document.getElementById('input-domain-search')?.focus(), 50);
           }}
-          reviewCount={reviewItems.length}
           notifications={headerNotifications}
           currentUser={currentUser}
           userRole={userRole}
@@ -1088,7 +1087,6 @@ export default function App() {
           onSignOut={handleLogout}
           isDarkMode={isDarkMode}
           toggleTheme={toggleTheme}
-          isSidebarCollapsed={isSidebarCollapsed}
           onToggleSidebar={() => {
             if (typeof window !== 'undefined' && window.innerWidth < 768) {
               setIsMobileSidebarOpen(!isMobileSidebarOpen);
@@ -1129,7 +1127,6 @@ export default function App() {
               <DomainTable
                 domains={domains}
                 isLoading={isDomainsLoading}
-                categories={categories}
                 selectedDomainIds={selectedDomainIds}
                 onToggleSelectDomain={handleToggleSelectDomain}
                 onSelectAllDomains={handleSelectAllDomains}
@@ -1181,12 +1178,6 @@ export default function App() {
               reviewItems={reviewItems}
               stats={dashboardStats}
               isAdmin={userRole === 'Admin'}
-              onOpenReleaseAlert={() => setCurrentTab('release')}
-              onOpenCrawlerAlert={() => setCurrentTab('sources')}
-              onOpenAllowlistAlert={() => {
-                setCurrentTab('domain');
-                setSelectedStatus('allowlist');
-              }}
             />
           )}
 

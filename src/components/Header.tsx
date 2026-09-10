@@ -34,7 +34,6 @@ interface HeaderProps {
   currentTab: string;
   setCurrentTab: (tab: string) => void;
   onOpenSearch: () => void;
-  reviewCount: number;
   notifications: HeaderNotification[];
   currentUser: AppUser | null;
   userRole: 'Analyst' | 'Admin' | 'Reviewer';
@@ -44,14 +43,12 @@ interface HeaderProps {
   isDarkMode: boolean;
   toggleTheme: () => void;
   onToggleSidebar?: () => void;
-  isSidebarCollapsed?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   currentTab,
   setCurrentTab,
   onOpenSearch,
-  reviewCount,
   notifications,
   currentUser,
   userRole,
@@ -61,7 +58,6 @@ export const Header: React.FC<HeaderProps> = ({
   isDarkMode,
   toggleTheme,
   onToggleSidebar,
-  isSidebarCollapsed = false,
 }) => {
   const [roleDropdownOpen, setRoleDropdownOpen] = React.useState(false);
   const [notificationsOpen, setNotificationsOpen] = React.useState(false);

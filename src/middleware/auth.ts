@@ -22,11 +22,6 @@ async function resolveSessionUser(req: AuthRequest) {
   if (user) req.user = user;
 }
 
-export const optionalAuth = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  await resolveSessionUser(req);
-  next();
-};
-
 export const requireAuth = async (req: AuthRequest, res: Response, next: NextFunction) => {
   await resolveSessionUser(req);
   if (!req.user) {

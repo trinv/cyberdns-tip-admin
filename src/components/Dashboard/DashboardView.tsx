@@ -92,9 +92,6 @@ interface DashboardViewProps {
   // which case the sections below show a loading/empty state rather than
   // any placeholder numbers.
   stats: DashboardStats | null;
-  onOpenReleaseAlert: () => void;
-  onOpenCrawlerAlert: () => void;
-  onOpenAllowlistAlert: () => void;
   // Gates the DNS Node status map card below — GET /api/dns-nodes is
   // Admin-only server-side (see server.ts), so there's nothing for a
   // non-Admin to see here. Defaults to false rather than assuming access.
@@ -107,9 +104,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   categories,
   reviewItems,
   stats,
-  onOpenReleaseAlert,
-  onOpenCrawlerAlert,
-  onOpenAllowlistAlert,
   isAdmin = false,
 }) => {
   const reviewCount = reviewItems.length;

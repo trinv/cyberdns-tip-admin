@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { DomainItem, CategoryInfo, DomainStatus, FeedSource, MANUAL_SOURCE_FILTER } from '../../types';
+import { DomainItem, DomainStatus, FeedSource, MANUAL_SOURCE_FILTER } from '../../types';
 import { useClickOutside } from '../../hooks/useClickOutside';
 import { copyToClipboard } from '../../lib/clipboard';
 import {
@@ -27,7 +27,6 @@ interface DomainTableProps {
   // re-sorts, or re-slices it locally.
   domains: DomainItem[];
   isLoading?: boolean;
-  categories: CategoryInfo[];
   selectedDomainIds: Set<string>;
   onToggleSelectDomain: (id: string) => void;
   onSelectAllDomains: (checked: boolean) => void;
@@ -76,7 +75,6 @@ interface DomainTableProps {
 export const DomainTable: React.FC<DomainTableProps> = ({
   domains,
   isLoading = false,
-  categories,
   selectedDomainIds,
   onToggleSelectDomain,
   onSelectAllDomains,
