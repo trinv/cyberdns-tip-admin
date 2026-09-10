@@ -64,8 +64,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, isDarkMode, toggl
             trên không gian mạng
           </h1>
           <p className="text-slate-300 text-sm max-w-md leading-relaxed">
-            An toàn hơn trên Internet, bắt đầu từ DNS. Cổng quản trị Threat Intelligence Platform — đồng bộ
-            nguồn feed, phân loại danh mục, kiểm duyệt và phát hành danh sách chặn có kiểm soát.
+            CyberDNS Threat Intelligence Platform — Nền tảng bảo vệ DNS chủ động, tích hợp Threat Intelligence
+            để phát hiện sớm, đánh giá rủi ro và tự động ngăn chặn các mối đe dọa trên Internet.
           </p>
 
           <div className="grid grid-cols-3 gap-4 pt-4 max-w-md">
@@ -73,19 +73,21 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, isDarkMode, toggl
               <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center">
                 <Globe className="w-4 h-4 text-emerald-400" />
               </div>
-              <span className="text-xs text-slate-300 leading-snug">Đồng bộ nguồn feed thời gian thực</span>
+              <span className="text-xs text-slate-300 leading-snug">Tích hợp Threat Intelligence</span>
             </div>
             <div className="flex flex-col items-start space-y-2">
               <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center">
                 <CheckSquare className="w-4 h-4 text-emerald-400" />
               </div>
-              <span className="text-xs text-slate-300 leading-snug">Kiểm duyệt &amp; phân loại danh mục</span>
+              <span className="text-xs text-slate-300 leading-snug">
+                Kiểm duyệt &amp; phân loại danh mục độc hại
+              </span>
             </div>
             <div className="flex flex-col items-start space-y-2">
               <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center">
                 <ShieldCheck className="w-4 h-4 text-emerald-400" />
               </div>
-              <span className="text-xs text-slate-300 leading-snug">Kiểm soát truy cập theo vai trò</span>
+              <span className="text-xs text-slate-300 leading-snug">Đảm bảo truy cập Internet an toàn</span>
             </div>
           </div>
         </div>
@@ -98,7 +100,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, isDarkMode, toggl
             rel="noreferrer"
             className="hover:text-emerald-400 transition-colors underline decoration-slate-600"
           >
-            cyberdns.vn
+            https://cyberdns.vn
           </a>
         </div>
       </div>
@@ -177,10 +179,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, isDarkMode, toggl
               <span>{isSubmitting ? 'Đang đăng nhập...' : 'Đăng nhập'}</span>
             </button>
           </form>
-
-          <p className="text-center text-xs text-slate-400 dark:text-slate-600">
-            Cần tài khoản? Liên hệ quản trị viên hệ thống của bạn để được cấp quyền truy cập.
-          </p>
         </div>
       </div>
     </div>
