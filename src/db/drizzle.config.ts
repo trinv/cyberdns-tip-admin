@@ -1,14 +1,23 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { defineConfig } from "drizzle-kit";
 import * as dotenv from "dotenv";
 
 // Load environment variables from .env file.
 dotenv.config();
 
-// SSL is off by default here because this file is normally run against a
-// local Cloud SQL Auth Proxy tunnel (or a local Postgres), matching the
-// runtime pool's default for local hosts in src/db/index.ts. Set DB_SSL=true
-// to migrate directly against a remote host that requires TLS.
-const ssl = process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false;
+// Mirrors resolveSsl() in src/db/index.ts. Off by default (this file is
+// normally run against a local Auth Proxy tunnel or a local Postgres);
+// DB_SSL=true verifies the cert (system CAs, or DB_CA_CERT if set),
+// DB_SSL=no-verify encrypts without verifying.
+const caPath = process.env.DB_CA_CERT;
+const ca = caPath ? readFileSync(resolve(caPath), "utf8") : undefined;
+const ssl =
+  process.env.DB_SSL === "no-verify"
+    ? { rejectUnauthorized: false }
+    : process.env.DB_SSL === "true"
+      ? { rejectUnauthorized: true, ca }
+      : false;
 
 // Prefer a single DATABASE_URL when present (e.g. CI, or environments with
 // no separate admin credentials); otherwise fall back to the discrete

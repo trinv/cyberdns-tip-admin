@@ -93,6 +93,13 @@ async function startServer() {
   const app = express();
   // Bind to the platform-assigned port when present (sandbox/dev container), else fall back to 3000.
   const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+  // Interface to bind. Defaults to all interfaces (0.0.0.0) — required for the
+  // Docker "127.0.0.1:<port>:3000" host mapping to reach the app inside its
+  // container. A NATIVE install (systemd, no container network) should set
+  // HOST=127.0.0.1 so the app is only reachable through the local Nginx
+  // reverse proxy, never directly from the internet (deploy/install-ubuntu.sh
+  // does this).
+  const HOST = process.env.HOST || '0.0.0.0';
   // Create the HTTP server explicitly so Vite's HMR websocket can attach to the
   // SAME port as the Express app. Only this one port is exposed through the
   // sandbox proxy, so if Vite were left to open its own default HMR socket,
@@ -813,7 +820,7 @@ async function startServer() {
   // fallback safety net for the brief window where the OS hasn't fully
   // released the socket yet after a kill.
   httpServer.once('listening', () => {
-    console.log(`CyberDNS TIP Full-stack server running on http://0.0.0.0:${PORT}`);
+    console.log(`CyberDNS TIP Full-stack server running on http://${HOST}:${PORT}`);
   });
 
   const listenWithRetry = (retriesLeft = 10) => {
@@ -843,7 +850,7 @@ async function startServer() {
     // instead of accumulating (which previously tripped Node's
     // MaxListenersExceededWarning after enough retries).
     httpServer.once('error', onError);
-    httpServer.listen(PORT, '0.0.0.0', () => {
+    httpServer.listen(PORT, HOST, () => {
       httpServer.removeListener('error', onError);
     });
   };

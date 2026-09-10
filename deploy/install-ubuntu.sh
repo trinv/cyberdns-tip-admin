@@ -73,6 +73,10 @@ if [ ! -f "$REPO_DIR/.env" ]; then
   cat > "$REPO_DIR/.env" <<ENV
 NODE_ENV=production
 PORT=3000
+# Bind to loopback only — this native install has no container network, so
+# the app must be reachable ONLY through the local Nginx reverse proxy, never
+# directly from the internet.
+HOST=127.0.0.1
 DATABASE_URL=postgres://${DB_APP_USER}:${DB_APP_PASSWORD}@localhost:5432/${DB_NAME}
 DB_SSL=false
 SUPERADMIN_EMAIL=admin@cyberdns.local
@@ -125,6 +129,20 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now cyberdns-tip
 echo "==> Done. Service status:"
 sudo systemctl --no-pager status cyberdns-tip || true
+
+# ---- 7. Firewall: only SSH reachable until Nginx/HTTPS is set up ----
+# The app binds 127.0.0.1 (HOST in .env) so it is already not directly
+# exposed, but a host firewall is defense in depth. setup-domain-ssl.sh opens
+# 80/443 when you add a domain.
+if command -v ufw >/dev/null 2>&1; then
+  echo "==> Configuring ufw (SSH only for now; run deploy/setup-domain-ssl.sh to open 80/443)"
+  sudo ufw allow OpenSSH >/dev/null 2>&1 || sudo ufw allow 22/tcp
+  sudo ufw --force enable
+else
+  echo "==> ufw not found — skipping firewall. Make sure port 3000 is NOT reachable"
+  echo "    from outside this VPS with whatever firewall you use."
+fi
+
 echo ""
-echo "CyberDNS TIP should now be reachable at http://<vps-ip>:3000"
-echo "See deploy/nginx.conf.example to put it behind Nginx + HTTPS (recommended for anything beyond local testing)."
+echo "CyberDNS TIP is running on 127.0.0.1:3000 (loopback only)."
+echo "Run deploy/setup-domain-ssl.sh <domain> to expose it via Nginx + HTTPS."

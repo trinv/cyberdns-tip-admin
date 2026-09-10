@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool, PoolConfig } from 'pg';
 import * as schema from './schema.ts';
@@ -7,19 +9,34 @@ declare global {
   var _postgresPool: Pool | undefined;
 }
 
-// Whether to negotiate TLS with the database. `DB_SSL=true`/`false` always
-// wins when set explicitly. Otherwise: local hosts (localhost/127.0.0.1,
-// e.g. a `docker run postgres` or a Cloud SQL Auth Proxy tunnel) default to
-// no SSL, since the proxy/local socket already terminates the trust boundary
-// and Postgres in Docker doesn't speak TLS out of the box. Any other host
-// (a managed provider reachable directly — Cloud SQL public IP, Neon,
-// Render, Railway, ...) defaults to SSL with rejectUnauthorized:false,
-// matching how these providers commonly present certificates.
+// Whether (and how) to negotiate TLS with the database.
+//
+//   DB_SSL=false      → no TLS (the Docker Compose path: app ↔ db over the
+//                       private container network, or a local Auth Proxy).
+//   DB_SSL=true        → TLS with certificate verification. Trusts the system
+//                       CA store, or exactly the PEM at DB_CA_CERT if set
+//                       (the right choice for RDS / Cloud SQL / self-managed
+//                       Postgres — download the provider's CA bundle).
+//   DB_SSL=no-verify   → TLS but accept ANY certificate. Escape hatch for a
+//                       provider whose chain can't be verified; offers
+//                       encryption but NO man-in-the-middle protection.
+//   unset              → local host (localhost/127.0.0.1/::1): no TLS.
+//                        any other host: TLS *with verification* (+DB_CA_CERT
+//                        if provided). This previously defaulted to
+//                        rejectUnauthorized:false — silently accepting any
+//                        cert, i.e. no MITM protection (SEC-09).
 function resolveSsl(hostHint: string | undefined): PoolConfig['ssl'] {
-  if (process.env.DB_SSL === 'false') return false;
-  if (process.env.DB_SSL === 'true') return { rejectUnauthorized: false };
+  const mode = process.env.DB_SSL;
+  if (mode === 'false') return false;
+  if (mode === 'no-verify') return { rejectUnauthorized: false };
+
+  const caPath = process.env.DB_CA_CERT;
+  const ca = caPath ? readFileSync(resolve(caPath), 'utf8') : undefined;
+
+  if (mode === 'true') return { rejectUnauthorized: true, ca };
+
   const isLocalHost = !hostHint || /^(localhost|127\.0\.0\.1|::1)$/i.test(hostHint);
-  return isLocalHost ? false : { rejectUnauthorized: false };
+  return isLocalHost ? false : { rejectUnauthorized: true, ca };
 }
 
 // Resolve pg Pool connection options from the environment. Two supported
