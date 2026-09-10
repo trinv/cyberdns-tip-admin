@@ -15,8 +15,9 @@ Threat Intelligence & Domain Blocklist management platform — sync domain block
 
 ## Yêu cầu
 
-- Node.js ≥ 20
-- PostgreSQL ≥ 14 (khuyến nghị 17)
+- Node.js ≥ 20 (image Docker: 22)
+- PostgreSQL ≥ 15 (khuyến nghị 17) — cần `NULLS NOT DISTINCT` cho unique index
+  ở `src/db/triggers.ts`, cú pháp có từ PG 15
 - Docker + Docker Compose (nếu dùng cách cài đặt khuyến nghị bên dưới)
 
 ## Cài đặt nhanh — Docker Compose (khuyến nghị)

@@ -718,7 +718,12 @@ export async function getDomains(params: {
     const conditions = [];
 
     if (search && search.trim() !== '') {
-      conditions.push(ilike(domains.domain, `%${search.trim()}%`));
+      // Escape LIKE metacharacters so a search for "%" or "a_b" matches those
+      // literal characters, not "everything" / "any char" (SEC-13). Postgres'
+      // default ESCAPE for ILIKE is backslash; the pattern is a bound param so
+      // this is purely about the matcher, not SQL-string quoting.
+      const needle = search.trim().replace(/[\\%_]/g, '\\$&');
+      conditions.push(ilike(domains.domain, `%${needle}%`));
     }
     if (category && category !== 'all') {
       // The jsonb `categories` array, not primaryCategory — a domain can now

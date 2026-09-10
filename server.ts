@@ -755,7 +755,11 @@ async function startServer() {
       res.json(result);
     } catch (error: any) {
       console.error('API POST /api/audit-logs/:id/rollback error:', error);
-      res.status(500).json({ error: error.message });
+      // rollbackAuditLog throws a clear, no-`cause` Error for the expected
+      // cases (not found, expired, already undone, unsupported type) — those
+      // are 400s, not 500s.
+      const isValidation = error instanceof Error && !(error as any).cause;
+      res.status(isValidation ? 400 : 500).json({ error: error.message });
     }
   });
 
