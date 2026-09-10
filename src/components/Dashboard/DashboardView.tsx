@@ -378,7 +378,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 const g = domainGrowth[items[0].dataIndex];
                 return new Date(g.date).toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
               },
-              label: (ctx) => `${ctx.parsed.y.toLocaleString('vi-VN')} domain mới`,
+              label: (ctx) => `${(ctx.parsed.y ?? 0).toLocaleString('vi-VN')} domain mới`,
             },
           },
         },
