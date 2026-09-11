@@ -113,7 +113,7 @@ export default function App() {
     if (isNewIp) {
       setTimeout(() => {
         showToast(
-          '⚠️ Đăng nhập từ một địa chỉ IP mới chưa từng dùng trước đây. Nếu không phải bạn, hãy đổi mật khẩu ngay trong phần Người dùng & Phân quyền.',
+          '⚠️ Phát hiện đăng nhập từ IP mới.',
           'warning',
         );
       }, 600);
@@ -139,8 +139,8 @@ export default function App() {
       setTimeout(() => {
         showToast(
           status === 401
-            ? 'Vui lòng đăng nhập để thao tác này được lưu vào CyberDNSTIP-DB.'
-            : 'Tài khoản của bạn không có quyền thực hiện thao tác này.',
+            ? 'Sign in to save changes.'
+            : 'No permission.',
           'warning',
         );
       }, 0);
@@ -294,7 +294,7 @@ export default function App() {
       items.push({
         id: 'review-pending',
         title: `${reviewItems.length} tên miền đang chờ duyệt`,
-        description: 'Cần xác nhận phân loại trước khi được chặn hoặc từ chối.',
+        description: 'Cần xác nhận phân loại trước khi chặn hoặc từ chối.',
         tab: 'review',
       });
     }

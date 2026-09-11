@@ -124,7 +124,7 @@ export const ImportView: React.FC<ImportViewProps> = ({ categories, onImportDoma
               }`}
             >
               <FileText className="w-4 h-4" />
-              <span>Dán văn bản / Hosts</span>
+              <span>Nhập tên miền / Hosts</span>
             </button>
             <button
               type="button"
@@ -136,7 +136,7 @@ export const ImportView: React.FC<ImportViewProps> = ({ categories, onImportDoma
               }`}
             >
               <Upload className="w-4 h-4" />
-              <span>Tải file .txt / .csv</span>
+              <span>Nhập từ file .txt / .csv</span>
             </button>
             <button
               type="button"
@@ -148,7 +148,7 @@ export const ImportView: React.FC<ImportViewProps> = ({ categories, onImportDoma
               }`}
             >
               <Globe className="w-4 h-4" />
-              <span>Từ URL Threat Feed</span>
+              <span>Nhập từ URL Threat Feed</span>
             </button>
           </div>
 
@@ -236,7 +236,7 @@ export const ImportView: React.FC<ImportViewProps> = ({ categories, onImportDoma
 
             <div className="space-y-1.5">
               <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
-                LÝ DO NHẬP <span className="text-rose-500">*</span> (Bắt buộc kiểm toán)
+                LÝ DO NHẬP <span className="text-rose-500">*</span>
               </label>
               <input
                 type="text"

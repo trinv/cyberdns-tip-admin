@@ -71,26 +71,26 @@ export const Header: React.FC<HeaderProps> = ({
       case 'dashboard':
         return { title: 'SOC Threat Dashboard', icon: LayoutDashboard, category: 'Tổng quan' };
       case 'domain':
-        return { title: 'Quản trị Danh mục Tên miền (Domain Explorer)', icon: Globe, category: 'Khám phá' };
+        return { title: 'Domain Explorer', icon: Globe, category: 'Khám phá' };
       case 'review':
         return {
-          title: 'Hàng đợi Phê duyệt Tên miền (Review Queue)',
+          title: 'Review Queue',
           icon: CheckSquare,
           category: 'Kiểm duyệt',
         };
       case 'release':
-        return { title: 'Blocklist URL Đã Phát Hành', icon: Rocket, category: 'Phát hành' };
+        return { title: 'DNS Blocklist URL', icon: Rocket, category: 'Phát hành' };
       case 'import':
-        return { title: 'Nhập & Xử lý Tên miền Hàng loạt (Batch Import)', icon: Upload, category: 'Công cụ' };
+        return { title: 'Batch Import', icon: Upload, category: 'Công cụ' };
       case 'sources':
         return {
-          title: 'Nguồn Cấp Dữ liệu Tình báo Mối đe dọa (Threat Feeds)',
+          title: 'Threat Feeds',
           icon: Rss,
           category: 'Hệ thống',
         };
       case 'logs':
         return {
-          title: 'Nhật ký Kiểm toán & Khôi phục Giao dịch (Audit Logs)',
+          title: 'Audit Logs',
           icon: History,
           category: 'Kiểm toán',
         };
